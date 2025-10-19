@@ -55,153 +55,151 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Shimmer(
-      child: GestureDetector(
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Card(
-          elevation: 1,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: cs.surface,
-          surfaceTintColor: cs.surface, // keep surface stable in M3
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: AnimatedSize(
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeInOut,
-              alignment: Alignment.topCenter,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Tags
-                  if (widget.tags.isNotEmpty)
-                    Wrap(spacing: 6, runSpacing: 6, children: widget.tags.map((t) => _TagChip(tag: t)).toList()),
-      
-                  const SizedBox(height: 12),
-      
-                  // Header row: image + info
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Image with soft shadow
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(color: cs.shadow.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 8)),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: AnimatedSize(
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.easeInOut,
-                            alignment: Alignment.topCenter,
-                            child: Image.asset(
-                              widget.imageAsset,
-                              height: _expanded ? 180 : 90,
-                              width: _expanded ? 240 : 120,
-                              fit: BoxFit.cover,
-                            ),
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: Card(
+        elevation: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        color: cs.surface,
+        surfaceTintColor: cs.surface, // keep surface stable in M3
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tags
+                if (widget.tags.isNotEmpty)
+                  Wrap(spacing: 6, runSpacing: 6, children: widget.tags.map((t) => TagChip(tag: t)).toList()),
+    
+                const SizedBox(height: 12),
+    
+                // Header row: image + info
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Image with soft shadow
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(color: cs.shadow.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 8)),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeInOut,
+                          alignment: Alignment.topCenter,
+                          child: Image.asset(
+                            widget.imageAsset,
+                            height: _expanded ? 180 : 90,
+                            width: _expanded ? 240 : 120,
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
-      
-                      const SizedBox(width: 8),
-      
-                      // Event info
+                    ),
+    
+                    const SizedBox(width: 8),
+    
+                    // Event info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.datetimeText,
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              shadows: const [Shadow(offset: Offset(1, 1), blurRadius: 2)],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.title,
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 8),
+                          Divider(color: cs.outlineVariant, height: 1),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+    
+                const SizedBox(height: 12),
+    
+                // Location row (tap to expand)
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on, size: 16, color: cs.onSurfaceVariant),
+                      const SizedBox(width: 6),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.datetimeText,
-                              style: tt.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                shadows: const [Shadow(offset: Offset(1, 1), blurRadius: 2)],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.title,
-                              maxLines: 5,
-                              overflow: TextOverflow.ellipsis,
-                              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 8),
-                            Divider(color: cs.outlineVariant, height: 1),
-                          ],
+                        child: Text(
+                          widget.location,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: tt.bodyMedium?.copyWith(color: cs.onSurface),
                         ),
+                      ),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.25 : 0.0, // 90°
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: Icon(Icons.arrow_forward_ios_outlined, size: 16, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
-      
+                ),
+    
+                // Expanded details
+                if (_expanded) ...[
                   const SizedBox(height: 12),
-      
-                  // Location row (tap to expand)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.location_on, size: 16, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.location,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: tt.bodyMedium?.copyWith(color: cs.onSurface),
-                          ),
+                  Divider(height: 1, color: cs.outlineVariant),
+                  const SizedBox(height: 12),
+    
+                  if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
+                  if (widget.ticketText != null) const SizedBox(height: 8),
+                  if (widget.ticketText != null)
+                    _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
+                  if (widget.capacityText != null) const SizedBox(height: 8),
+                  if (widget.capacityText != null) _infoRow(context, Icons.person, widget.capacityText!),
+                  if (widget.description != null) const SizedBox(height: 8),
+                  if (widget.description != null)
+                    _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
+    
+                  const SizedBox(height: 12),
+    
+                  // Actions
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: widget.onJoin,
+                          icon: Icon(Icons.event_available, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                          label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
+                          style: Theme.of(context).elevatedButtonTheme.style,
                         ),
-                        AnimatedRotation(
-                          turns: _expanded ? 0.25 : 0.0, // 90°
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeInOut,
-                          child: Icon(Icons.arrow_forward_ios_outlined, size: 16, color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
+                      ),
+    
+                      const SizedBox(width: 8),
+                      _squareAction(context, icon: Icons.bookmark_outline, onTap: widget.onBookmark),
+                      const SizedBox(width: 6),
+                      _squareAction(context, icon: Icons.share_outlined, onTap: widget.onShare),
+                    ],
                   ),
-      
-                  // Expanded details
-                  if (_expanded) ...[
-                    const SizedBox(height: 12),
-                    Divider(height: 1, color: cs.outlineVariant),
-                    const SizedBox(height: 12),
-      
-                    if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
-                    if (widget.ticketText != null) const SizedBox(height: 8),
-                    if (widget.ticketText != null)
-                      _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
-                    if (widget.capacityText != null) const SizedBox(height: 8),
-                    if (widget.capacityText != null) _infoRow(context, Icons.person, widget.capacityText!),
-                    if (widget.description != null) const SizedBox(height: 8),
-                    if (widget.description != null)
-                      _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
-      
-                    const SizedBox(height: 12),
-      
-                    // Actions
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: widget.onJoin,
-                            icon: Icon(Icons.event_available, size: 20, color: Theme.of(context).colorScheme.onSurface),
-                            label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
-                            style: Theme.of(context).elevatedButtonTheme.style,
-                          ),
-                        ),
-      
-                        const SizedBox(width: 8),
-                        _squareAction(context, icon: Icons.bookmark_outline, onTap: widget.onBookmark),
-                        const SizedBox(width: 6),
-                        _squareAction(context, icon: Icons.share_outlined, onTap: widget.onShare),
-                      ],
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
         ),
@@ -239,8 +237,8 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
   }
 }
 
-class _TagChip extends StatelessWidget {
-  const _TagChip({required this.tag});
+class TagChip extends StatelessWidget {
+  const TagChip({required this.tag});
   final EventTag tag;
 
   @override
