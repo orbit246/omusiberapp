@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omusiber/widgets/home/simple_appbar.dart';
 import 'package:omusiber/widgets/saved_events/saved_events_appbar.dart';
 import 'package:omusiber/widgets/shared/navbar.dart';
 
@@ -13,12 +14,12 @@ class SavedEventsPage extends StatelessWidget {
 
     return Scaffold(
       bottomNavigationBar: AppNavigationBar(),
+      appBar: PreferredSize(preferredSize: const Size.fromHeight(60), child: SimpleAppbar(title: "Kaydedilenler")),
+
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            SavedEventsAppbar(),
-            const SizedBox(height: 20),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),

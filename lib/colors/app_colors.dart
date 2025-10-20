@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const primary = Color(0xFF7B2CBF);
   static const primaryAccent = Color(0xFF9D4EDD);
-  static const deepPurple = Color(0xFF240046);
+  static const deepPurple = Color.fromARGB(255, 56, 1, 107);
   static const softLavender = Color(0xFFE0AAFF);
   static const neonMint = Color(0xFF80FFDB);
   static const cyberTeal = Color(0xFF5DD9C1);

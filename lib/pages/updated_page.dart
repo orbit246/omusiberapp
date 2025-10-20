@@ -46,6 +46,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
       ),
 
       bottomNavigationBar: AppNavigationBar(),
+      appBar: PreferredSize(preferredSize: const Size.fromHeight(60), child: HomePageAppbar()),
 
       body: SafeArea(
         child: SingleChildScrollView(
@@ -53,8 +54,6 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
             padding: EdgeInsetsGeometry.all(8.0),
             child: Column(
               children: [
-                HomePageAppbar(),
-
                 SizedBox(height: 14),
                 Center(child: EventToggle()),
                 ValueListenableBuilder(

@@ -12,7 +12,7 @@ class AppTheme {
       secondary: AppColors.neonMint,
       tertiary: AppColors.electricMagenta,
       background: AppColors.deepPurple,
-      surface: AppColors.jetBlack,
+      surface: AppColors.jetBlack.withAlpha(160),
     );
     
     return _base(scheme).copyWith(extensions: <ThemeExtension<dynamic>>[CyberSemantic.dark(scheme)]);

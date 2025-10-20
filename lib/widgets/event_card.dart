@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omusiber/widgets/shared/square_action.dart';
 import 'package:shimmer_animation/shimmer_animation.dart';
 
 class EventTag {
@@ -61,7 +62,7 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
         elevation: 1,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         color: cs.surface,
-        surfaceTintColor: cs.surface, // keep surface stable in M3
+        surfaceTintColor: cs.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -75,9 +76,9 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                 // Tags
                 if (widget.tags.isNotEmpty)
                   Wrap(spacing: 6, runSpacing: 6, children: widget.tags.map((t) => TagChip(tag: t)).toList()),
-    
+
                 const SizedBox(height: 12),
-    
+
                 // Header row: image + info
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,9 +106,9 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-    
+
                     const SizedBox(width: 8),
-    
+
                     // Event info
                     Expanded(
                       child: Column(
@@ -134,9 +135,9 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-    
+
                 const SizedBox(height: 12),
-    
+
                 // Location row (tap to expand)
                 InkWell(
                   borderRadius: BorderRadius.circular(8),
@@ -161,13 +162,13 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-    
+
                 // Expanded details
                 if (_expanded) ...[
                   const SizedBox(height: 12),
                   Divider(height: 1, color: cs.outlineVariant),
                   const SizedBox(height: 12),
-    
+
                   if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
                   if (widget.ticketText != null) const SizedBox(height: 8),
                   if (widget.ticketText != null)
@@ -177,25 +178,25 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                   if (widget.description != null) const SizedBox(height: 8),
                   if (widget.description != null)
                     _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
-    
+
                   const SizedBox(height: 12),
-    
+
                   // Actions
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: widget.onJoin,
-                          icon: Icon(Icons.event_available, size: 20, color: Theme.of(context).colorScheme.onSurface),
-                          label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
+                          icon: Icon(Icons.more_horiz, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                          label: Text("Etkinlik Detayları", style: Theme.of(context).textTheme.labelLarge),
                           style: Theme.of(context).elevatedButtonTheme.style,
                         ),
                       ),
-    
+
                       const SizedBox(width: 8),
-                      _squareAction(context, icon: Icons.bookmark_outline, onTap: widget.onBookmark),
+                      SquareEventAction(icon: Icons.bookmark_outline, onTap: widget.onBookmark!),
                       const SizedBox(width: 6),
-                      _squareAction(context, icon: Icons.share_outlined, onTap: widget.onShare),
+                      SquareEventAction(icon: Icons.share_outlined, onTap: widget.onShare!),
                     ],
                   ),
                 ],
@@ -220,19 +221,6 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
           child: Text(text, style: tt.bodyMedium?.copyWith(color: cs.onSurface)),
         ),
       ],
-    );
-  }
-
-  Widget _squareAction(BuildContext context, {required IconData icon, VoidCallback? onTap}) {
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: cs.surfaceVariant,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: SizedBox(width: 46, height: 46, child: Icon(icon, size: 24, color: cs.onSurface)),
-      ),
     );
   }
 }
