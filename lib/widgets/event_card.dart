@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:omusiber/widgets/shared/square_action.dart';
-import 'package:shimmer_animation/shimmer_animation.dart';
+import 'package:omusiber/widgets/test_widget.dart';
+// Removed unused 'shimmer_animation' import
 
 class EventTag {
   final String text;
@@ -62,10 +62,11 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
         elevation: 1,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         color: cs.surface,
-        surfaceTintColor: cs.surface,
+        surfaceTintColor: cs.surface, // keep surface stable in M3
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(12),
+          // This outer AnimatedSize handles the card's overall height change
           child: AnimatedSize(
             duration: const Duration(milliseconds: 350),
             curve: Curves.easeInOut,
@@ -77,14 +78,14 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                 if (widget.tags.isNotEmpty)
                   Wrap(spacing: 6, runSpacing: 6, children: widget.tags.map((t) => TagChip(tag: t)).toList()),
 
-                const SizedBox(height: 12),
+                if (widget.tags.isNotEmpty) const SizedBox(height: 12),
 
                 // Header row: image + info
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Image with soft shadow
-                    DecoratedBox(
+                    Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
@@ -93,17 +94,7 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: AnimatedSize(
-                          duration: const Duration(milliseconds: 350),
-                          curve: Curves.easeInOut,
-                          alignment: Alignment.topCenter,
-                          child: Image.asset(
-                            widget.imageAsset,
-                            height: _expanded ? 180 : 90,
-                            width: _expanded ? 240 : 120,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                        child: Image.asset(widget.imageAsset, height: 90, width: 120, fit: BoxFit.cover),
                       ),
                     ),
 
@@ -137,7 +128,6 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                 ),
 
                 const SizedBox(height: 12),
-
                 // Location row (tap to expand)
                 InkWell(
                   borderRadius: BorderRadius.circular(8),
@@ -163,43 +153,108 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // Expanded details
-                if (_expanded) ...[
-                  const SizedBox(height: 12),
-                  Divider(height: 1, color: cs.outlineVariant),
-                  const SizedBox(height: 12),
-
-                  if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
-                  if (widget.ticketText != null) const SizedBox(height: 8),
-                  if (widget.ticketText != null)
-                    _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
-                  if (widget.capacityText != null) const SizedBox(height: 8),
-                  if (widget.capacityText != null) _infoRow(context, Icons.person, widget.capacityText!),
-                  if (widget.description != null) const SizedBox(height: 8),
-                  if (widget.description != null)
-                    _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
-
-                  const SizedBox(height: 12),
-
-                  // Actions
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: widget.onJoin,
-                          icon: Icon(Icons.more_horiz, size: 20, color: Theme.of(context).colorScheme.onSurface),
-                          label: Text("Etkinlik Detayları", style: Theme.of(context).textTheme.labelLarge),
-                          style: Theme.of(context).elevatedButtonTheme.style,
+                // Use collection-if to show text only when collapsed
+                if (!_expanded)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        "Detaylı bilgi için tıklayın",
+                        style: tt.bodySmall?.copyWith(
+                          color: const Color.fromARGB(255, 123, 117, 142),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
                       ),
-
-                      const SizedBox(width: 8),
-                      SquareEventAction(icon: Icons.bookmark_outline, onTap: widget.onBookmark!),
-                      const SizedBox(width: 6),
-                      SquareEventAction(icon: Icons.share_outlined, onTap: widget.onShare!),
-                    ],
+                    ),
                   ),
-                ],
+
+                // Smooth expandable area (drawer effect)
+                const SizedBox(height: 12),
+                Center(
+                  child: StackedPushingExpansionWidget(
+                    header: const Text(
+                      "Tap to Expand",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    content: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Item 1", style: TextStyle(fontSize: 16)),
+                        Divider(),
+                        Text("Item 2", style: TextStyle(fontSize: 16)),
+                        Divider(),
+                        Text("Item 3", style: TextStyle(fontSize: 16)),
+                        SizedBox(height: 10),
+                        Text("Some more descriptive text about the items..."),
+                      ],
+                    ),
+                  ),
+                ),
+
+                AnimatedSize(
+                  // This animates the height change
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.topCenter,
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      heightFactor: _expanded ? 1.0 : 0.0,
+                      // AnimatedOpacity was removed from here
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Divider(height: 1, color: cs.outlineVariant),
+                          const SizedBox(height: 12),
+
+                          // Use collection-if and spread operator for cleaner list
+                          if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
+
+                          if (widget.ticketText != null) ...[
+                            const SizedBox(height: 8),
+                            _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
+                          ],
+
+                          if (widget.capacityText != null) ...[
+                            const SizedBox(height: 8),
+                            _infoRow(context, Icons.person, widget.capacityText!),
+                          ],
+
+                          if (widget.description != null) ...[
+                            const SizedBox(height: 8),
+                            _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
+                          ],
+
+                          const SizedBox(height: 12),
+
+                          // Actions
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: widget.onJoin,
+                                  icon: Icon(
+                                    Icons.event_available,
+                                    size: 20,
+                                    color: Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                  label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
+                                  style: Theme.of(context).elevatedButtonTheme.style,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _squareAction(context, icon: Icons.bookmark_outline, onTap: widget.onBookmark),
+                              // Consistent spacing
+                              const SizedBox(width: 8),
+                              _squareAction(context, icon: Icons.share_outlined, onTap: widget.onShare),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -223,19 +278,32 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
       ],
     );
   }
+
+  Widget _squareAction(BuildContext context, {required IconData icon, VoidCallback? onTap}) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surfaceVariant,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: SizedBox(width: 46, height: 46, child: Icon(icon, size: 24, color: cs.onSurface)),
+      ),
+    );
+  }
 }
 
 class TagChip extends StatelessWidget {
-  const TagChip({required this.tag});
+  const TagChip({super.key, required this.tag});
   final EventTag tag;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final bg = tag.color ?? cs.secondaryContainer; // default to a pleasant container tone from scheme
+    final bg = tag.color ?? cs.secondaryContainer;
     final fg = tag.color != null
-        ? _contrastOn(bg, cs) // compute a readable on-color if custom color passed
+        ? _contrastOn(bg) // Removed unused ColorScheme
         : cs.onSecondaryContainer;
 
     return Container(
@@ -259,8 +327,8 @@ class TagChip extends StatelessWidget {
     );
   }
 
-  // Simple contrast helper: falls back to onSurface if needed.
-  Color _contrastOn(Color bg, ColorScheme cs) {
+  // Simple contrast helper. Removed unused ColorScheme parameter.
+  Color _contrastOn(Color bg) {
     // luminance threshold heuristic
     return bg.computeLuminance() > 0.5 ? Colors.black : Colors.white;
   }

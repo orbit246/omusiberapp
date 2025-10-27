@@ -7,6 +7,7 @@ import 'package:omusiber/widgets/home/home_page_appbar.dart';
 import 'package:omusiber/widgets/home/search_bar.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/widgets/shared/navbar.dart';
+import 'package:omusiber/widgets/test_widget.dart';
 
 class SimplifiedHomePageState extends StatefulWidget {
   const SimplifiedHomePageState({super.key});
@@ -66,6 +67,29 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                               // Inside a Row/Column/Toolbar/etc.
                               // If your ExpandableSearchBar constructor is NOT const, do this:
                               SizedBox(height: 8),
+
+                              // In your build method:
+                              Center(
+                                child: StackedPushingExpansionWidget(
+                                  header: const Text(
+                                    "Tap to Expand",
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                  content: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text("Item 1", style: TextStyle(fontSize: 16)),
+                                      Divider(),
+                                      Text("Item 2", style: TextStyle(fontSize: 16)),
+                                      Divider(),
+                                      Text("Item 3", style: TextStyle(fontSize: 16)),
+                                      SizedBox(height: 10),
+                                      Text("Some more descriptive text about the items..."),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
                               ExpandableSearchBar(hintText: 'Etkinlik ara...'),
                               EventCard(
                                 title: "Etkinlik Adı — Çok Uzun Başlık Buraya Sığar ve En Fazla İki Satır Olur",
