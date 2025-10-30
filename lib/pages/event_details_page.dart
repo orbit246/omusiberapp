@@ -5,8 +5,17 @@ import 'package:omusiber/widgets/event_details/event_details_appbar.dart';
 import 'package:omusiber/widgets/home/simple_appbar.dart';
 import 'package:omusiber/widgets/shared/square_action.dart';
 
-class EventDetailsPage extends StatelessWidget {
+class EventDetailsPage extends StatefulWidget {
   const EventDetailsPage({super.key});
+
+  @override
+  State<EventDetailsPage> createState() => _EventDetailsPageState();
+}
+
+class _EventDetailsPageState extends State<EventDetailsPage> {
+  final CarouselSliderController buttonCarouselController = CarouselSliderController();
+  int _current = 0;
+  final List<int> imgList = [1, 2, 3, 4, 5];
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +33,16 @@ class EventDetailsPage extends StatelessWidget {
               Expanded(
                 child: ListView(
                   children: [
+                    /*                Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: const [
+                        TagChip(tag: EventTag("Ücretsiz", Icons.money_off, color: Colors.green)),
+                        TagChip(tag: EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue)),
+                        TagChip(tag: EventTag("Konuklu", Icons.person, color: Colors.orange)),
+                        TagChip(tag: EventTag("Android", Icons.android, color: Colors.blueAccent)),
+                      ],
+                    ), */
                     Card(
                       elevation: 4,
                       clipBehavior: Clip.antiAlias,
@@ -33,31 +52,61 @@ class EventDetailsPage extends StatelessWidget {
                           SizedBox(
                             height: 250,
                             child: CarouselSlider(
-                              options: CarouselOptions(height: 250, viewportFraction: 1, enableInfiniteScroll: false),
-                              items: [1, 2, 3, 4, 5].map((i) {
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 5),
-                                  color: Theme.of(context).colorScheme.primaryContainer,
-                                  child: Center(
-                                    child: Text('Resim $i', style: Theme.of(context).textTheme.headlineMedium),
-                                  ),
+                              carouselController: buttonCarouselController,
+                              options: CarouselOptions(
+                                height: 250,
+                                viewportFraction: 1,
+                                enableInfiniteScroll: true,
+                                autoPlay: true,
+                                onPageChanged: (index, reason) {
+                                  setState(() {
+                                    _current = index;
+                                  });
+                                },
+                              ),
+                              items: imgList.map((i) {
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                                      color: Theme.of(context).colorScheme.primaryContainer,
+                                      child: Center(
+                                        child: Text('Resim $i', style: Theme.of(context).textTheme.headlineMedium),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 10,
+                                      right: 10,
+                                      left: 10,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: imgList.asMap().entries.map<Widget>((entry) {
+                                          return GestureDetector(
+                                            onTap: () {
+                                              buttonCarouselController.animateToPage(entry.key);
+                                              setState(() {
+                                                _current = entry.key;
+                                              });
+                                            },
+                                            child: Container(
+                                              width: 8.0,
+                                              height: 8.0,
+                                              margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: (Theme.of(context).brightness == Brightness.dark
+                                                        ? Colors.white
+                                                        : Colors.black)
+                                                    .withOpacity(_current == entry.key ? 0.9 : 0.4),
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ],
                                 );
                               }).toList(),
-                            ),
-                          ),
-                          Positioned(
-                            top: 4,
-                            left: 4,
-                            right: 4,
-                            child: Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: const [
-                                TagChip(tag: EventTag("Ücretsiz", Icons.money_off)),
-                                TagChip(tag: EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue)),
-                                TagChip(tag: EventTag("Konuklu", Icons.person, color: Colors.orange)),
-                                TagChip(tag: EventTag("Android", Icons.android, color: Colors.blueAccent)),
-                              ],
                             ),
                           ),
                         ],
@@ -100,7 +149,7 @@ class EventDetailsPage extends StatelessWidget {
 
                     // Your cards (no nested scrolling)
                     const SizedBox(height: 12),
-                    ...List.generate(5, (_) => newMethod(context)),
+                    ...List.generate(5, (_) => createPlaceholder(context)),
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -132,7 +181,7 @@ class EventDetailsPage extends StatelessWidget {
   }
 }
 
-Card newMethod(BuildContext context) {
+Card createPlaceholder(BuildContext context) {
   return Card(
     margin: const EdgeInsets.only(top: 8),
     child: Padding(

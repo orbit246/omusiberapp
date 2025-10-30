@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:omusiber/widgets/test_widget.dart';
+import 'package:share_plus/share_plus.dart';
 // Removed unused 'shimmer_animation' import
 
 class EventTag {
@@ -50,6 +52,8 @@ class EventCard extends StatefulWidget {
 
 class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
   late bool _expanded = widget.initialExpanded;
+  bool _isSaved = false;
+  GlobalKey<StackedPushingExpansionWidgetState> _expansionKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +61,12 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
     final tt = Theme.of(context).textTheme;
 
     return GestureDetector(
-      onTap: () => setState(() => _expanded = !_expanded),
+      onTap: () {
+        setState(() {
+          _expanded = !_expanded;
+          _expansionKey.currentState?.toggleExpansion();
+        });
+      },
       child: Card(
         elevation: 1,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -65,7 +74,7 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
         surfaceTintColor: cs.surface, // keep surface stable in M3
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.only(top: 16.0, left: 16.0, right: 16.0, bottom: 2.0),
           // This outer AnimatedSize handles the card's overall height change
           child: AnimatedSize(
             duration: const Duration(milliseconds: 350),
@@ -128,130 +137,129 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                 ),
 
                 const SizedBox(height: 12),
+
                 // Location row (tap to expand)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Row(
+                StackedPushingExpansionWidget(
+                  key: _expansionKey,
+                  header: Column(
                     children: [
-                      Icon(Icons.location_on, size: 16, color: cs.onSurfaceVariant),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          widget.location,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: tt.bodyMedium?.copyWith(color: cs.onSurface),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on, size: 16, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                widget.location,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: tt.bodyMedium?.copyWith(color: cs.onSurface),
+                              ),
+                            ),
+                            AnimatedRotation(
+                              turns: _expanded ? 0.25 : 0.0, // 90°
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
+                              child: Icon(Icons.arrow_forward_ios_outlined, size: 16, color: cs.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ),
-                      AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0.0, // 90°
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeInOut,
-                        child: Icon(Icons.arrow_forward_ios_outlined, size: 16, color: cs.onSurfaceVariant),
-                      ),
+
+                      // Use collection-if to show text only when collapsed
+                      if (!_expanded)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              "Detaylı bilgi için tıklayın",
+                              style: tt.bodySmall?.copyWith(
+                                color: const Color.fromARGB(255, 123, 117, 142),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                ),
-
-                // Use collection-if to show text only when collapsed
-                if (!_expanded)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Text(
-                        "Detaylı bilgi için tıklayın",
-                        style: tt.bodySmall?.copyWith(
-                          color: const Color.fromARGB(255, 123, 117, 142),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // Smooth expandable area (drawer effect)
-                const SizedBox(height: 12),
-                Center(
-                  child: StackedPushingExpansionWidget(
-                    header: const Text(
-                      "Tap to Expand",
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    content: Column(
+                  content: ClipRect(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Item 1", style: TextStyle(fontSize: 16)),
-                        Divider(),
-                        Text("Item 2", style: TextStyle(fontSize: 16)),
-                        Divider(),
-                        Text("Item 3", style: TextStyle(fontSize: 16)),
-                        SizedBox(height: 10),
-                        Text("Some more descriptive text about the items..."),
-                      ],
-                    ),
-                  ),
-                ),
+                        Divider(height: 1, color: cs.outlineVariant),
+                        const SizedBox(height: 12),
 
-                AnimatedSize(
-                  // This animates the height change
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeInOut,
-                  alignment: Alignment.topCenter,
-                  child: ClipRect(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      heightFactor: _expanded ? 1.0 : 0.0,
-                      // AnimatedOpacity was removed from here
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Divider(height: 1, color: cs.outlineVariant),
-                          const SizedBox(height: 12),
+                        // Use collection-if and spread operator for cleaner list
+                        if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
 
-                          // Use collection-if and spread operator for cleaner list
-                          if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
-
-                          if (widget.ticketText != null) ...[
-                            const SizedBox(height: 8),
-                            _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
-                          ],
-
-                          if (widget.capacityText != null) ...[
-                            const SizedBox(height: 8),
-                            _infoRow(context, Icons.person, widget.capacityText!),
-                          ],
-
-                          if (widget.description != null) ...[
-                            const SizedBox(height: 8),
-                            _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
-                          ],
-
-                          const SizedBox(height: 12),
-
-                          // Actions
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: widget.onJoin,
-                                  icon: Icon(
-                                    Icons.event_available,
-                                    size: 20,
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                  ),
-                                  label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
-                                  style: Theme.of(context).elevatedButtonTheme.style,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _squareAction(context, icon: Icons.bookmark_outline, onTap: widget.onBookmark),
-                              // Consistent spacing
-                              const SizedBox(width: 8),
-                              _squareAction(context, icon: Icons.share_outlined, onTap: widget.onShare),
-                            ],
-                          ),
+                        if (widget.ticketText != null) ...[
+                          const SizedBox(height: 8),
+                          _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
                         ],
-                      ),
+
+                        if (widget.capacityText != null) ...[
+                          const SizedBox(height: 8),
+                          _infoRow(context, Icons.person, widget.capacityText!),
+                        ],
+
+                        if (widget.description != null) ...[
+                          const SizedBox(height: 8),
+                          _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
+                        ],
+
+                        const SizedBox(height: 12),
+
+                        // Actions
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: widget.onJoin,
+                                icon: Icon(
+                                  Icons.event_available,
+                                  size: 20,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                                label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
+                                style: Theme.of(context).elevatedButtonTheme.style,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _squareAction(
+                              context,
+                              icon: !_isSaved ? Icons.bookmark_outline : Icons.bookmark,
+                              onTap: () {
+                                setState(() {
+                                  _isSaved = !_isSaved;
+
+                                  Fluttertoast.showToast(
+                                    msg: "Etkinlik ${_isSaved ? 'kaydedildi' : 'kaydedilmedi'}",
+                                    toastLength: Toast.LENGTH_SHORT,
+                                    gravity: ToastGravity.BOTTOM,
+                                    timeInSecForIosWeb: 1,
+                                    backgroundColor: Theme.of(context).colorScheme.surface,
+                                    textColor: Colors.white,
+                                    fontSize: 16.0,
+                                  );
+                                });
+                              },
+                            ),
+                            // Consistent spacing
+                            const SizedBox(width: 8),
+                            _squareAction(
+                              context,
+                              icon: Icons.share_outlined,
+                              onTap: () {
+                                SharePlus.instance.share(
+                                  ShareParams(text: 'Check out this event: ${widget.title} at ${widget.location}'),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),

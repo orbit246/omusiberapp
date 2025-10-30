@@ -19,12 +19,15 @@ class SimpleAppbar extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const CircleAvatar(child: Icon(Icons.arrow_back, size: 28)),
+                child: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                  child: Icon(Icons.arrow_back, size: 28, color: Theme.of(context).colorScheme.surfaceBright),
+                ),
               ),
               const Spacer(),
               Text(title, style: Theme.of(context).textTheme.headlineMedium),
               const Spacer(),
-              SizedBox(width: 28),
+              SizedBox(width: 40),
             ],
           ),
         ),

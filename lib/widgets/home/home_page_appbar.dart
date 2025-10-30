@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class HomePageAppbar extends StatelessWidget {
   HomePageAppbar({super.key});
@@ -7,8 +8,6 @@ class HomePageAppbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme.headlineMedium;
-
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -22,15 +21,21 @@ class HomePageAppbar extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () => _showSideMenu(context),
-                child: const CircleAvatar(child: Icon(Icons.menu, size: 28)),
+                child: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                  child: Icon(Icons.menu, size: 28, color: Theme.of(context).colorScheme.onSurface),
+                ),
               ),
               const Spacer(),
-              Text('Etkinlikler', style: text),
+              Text('Etkinlikler', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontFamily: GoogleFonts.ptSans().fontFamily)),
               const Spacer(),
               GestureDetector(
                 key: _profileKey,
                 onTap: () => _showProfileMenu(context),
-                child: const CircleAvatar(child: Icon(Icons.person, size: 28)),
+                child: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                  child: Icon(Icons.person, size: 28, color: Theme.of(context).colorScheme.onSurface),
+                ),
               ),
             ],
           ),

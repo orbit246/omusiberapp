@@ -14,23 +14,23 @@ class StackedPushingExpansionWidget extends StatefulWidget {
   final Widget content;
 
   @override
-  _StackedPushingExpansionWidgetState createState() => _StackedPushingExpansionWidgetState();
+  StackedPushingExpansionWidgetState createState() => StackedPushingExpansionWidgetState();
 }
 
-class _StackedPushingExpansionWidgetState extends State<StackedPushingExpansionWidget> {
+class StackedPushingExpansionWidgetState extends State<StackedPushingExpansionWidget> {
   bool _isExpanded = false;
 
   // --- Customizable Values ---
   // Note: _collapsedHeight must be > 0 for the bottom card to peek out.
   final double _collapsedHeight = 5.0; 
-  final double _expandedContentHeight = 250.0;
-  final double _headerHeight = 50.0;
+  final double _expandedContentHeight = 200.0;
+  final double _headerHeight = 40.0;
   final double _overlap = 10.0; // How much the header overlaps the body
-  final Duration _animationDuration = const Duration(milliseconds: 300);
+  final Duration _animationDuration = const Duration(milliseconds: 250);
   final Curve _animationCurve = Curves.easeInOut;
   // --------------------------
 
-  void _toggleExpansion() {
+  void toggleExpansion() {
     setState(() {
       _isExpanded = !_isExpanded;
     });
@@ -56,68 +56,55 @@ class _StackedPushingExpansionWidgetState extends State<StackedPushingExpansionW
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // --- 1. The main stacking area ---
-        Stack(
-          alignment: Alignment.topCenter,
+        Column(
           children: [
-            // A) The Bottom (Expandable) Card - Controls the space
-            AnimatedContainer(
-              duration: _animationDuration,
-              curve: _animationCurve,
-              // The top margin pushes the bottom card down enough for the header card to sit on top.
-              margin: EdgeInsets.only(top: _headerHeight - _overlap),
-              
-              // The height determines the final size and is what pushes elements down.
-              height: _currentContainerHeight,
-              width: 300,
-              
-              child: Card(
-                elevation: 4.0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12.0),
-                  child: SingleChildScrollView(
-                    physics: const NeverScrollableScrollPhysics(), // Content is clipped, so scrolling is not needed here
-                    child: Padding(
-                      // This padding ensures the content starts below the overlap area.
-                      padding: EdgeInsets.only(
-                        top: _collapsedHeight + 16, // Padding accounts for the initial visible strip + Card padding
-                        left: 16.0,
-                        right: 16.0,
-                        bottom: 16.0,
-                      ),
-                      
-                      // *** Offstage and AnimatedSize to handle content rendering ***
-                      child: AnimatedSize(
-                        duration: _animationDuration,
-                        curve: _animationCurve,
-                        child: Offstage(
-                          offstage: !_isExpanded,
-                          child: widget.content,
+            Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                // A) The Bottom (Expandable) Card - Controls the space
+                AnimatedContainer(
+                  duration: _animationDuration,
+                  curve: _animationCurve,
+                  // The top margin pushes the bottom card down enough for the header card to sit on top.
+                  margin: EdgeInsets.only(top: _headerHeight - _overlap),
+                  
+                  // The height determines the final size and is what pushes elements down.
+                 //  height: _currentContainerHeight,
+               //   width: MediaQuery.of(context).size.width, // 90% of screen width
+                  
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12.0),
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(), // Content is clipped, so scrolling is not needed here
+                      child: Padding(
+                        // This padding ensures the content starts below the overlap area.
+                        padding: EdgeInsets.only(
+                          top: _collapsedHeight , // Padding accounts for the initial visible strip + Card padding
+                          left: 4.0,
+                          right: 4.0,
+                          bottom: 8,
+                        ),
+                        
+                        // *** Offstage and AnimatedSize to handle content rendering ***
+                        child: AnimatedSize(
+                          duration: _animationDuration,
+                          curve: _animationCurve,
+                          child: Offstage(
+                            offstage: !_isExpanded,
+                            child: widget.content,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-
-            // B) The Top (Header) Card - Always visible and tappable
-            GestureDetector(
-              onTap: _toggleExpansion,
-              child: SizedBox(
-                height: _headerHeight,
-                width: 280,
-                child: Card(
-                  elevation: 6.0,
-                  color: Colors.blue,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
+            
+                // B) The Top (Header) Card - Always visible and tappable
+                SizedBox(
+                  height: _headerHeight,
                   child: Center(child: widget.header),
                 ),
-              ),
+              ],
             ),
           ],
         ),

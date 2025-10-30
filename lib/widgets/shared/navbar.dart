@@ -42,9 +42,9 @@ class App_NavigationBarState extends State<AppNavigationBar> {
         });
       },
       items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "Duyurular"),
         BottomNavigationBarItem(icon: Icon(Icons.event), label: "Etkinlikler"),
-        BottomNavigationBarItem(icon: Icon(Icons.notifications_on), label: "Bildirimler"),
-        BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Kaydedilenler"),
+        BottomNavigationBarItem(icon: Icon(Icons.notifications_on), label: "Kaydedilenler"),
       ],
     );
   }

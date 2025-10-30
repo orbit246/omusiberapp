@@ -11,10 +11,12 @@ class AppTheme {
       primary: AppColors.primary,
       secondary: AppColors.neonMint,
       tertiary: AppColors.electricMagenta,
-      background: AppColors.deepPurple,
-      surface: AppColors.jetBlack.withAlpha(160),
+      background: Color(0xff15131D),
+      surface: Color(0xff2c293a).withOpacity(.66),
+      onPrimaryContainer: Color(0xff2c293a),
+      surfaceBright: Colors.white,
     );
-    
+
     return _base(scheme).copyWith(extensions: <ThemeExtension<dynamic>>[CyberSemantic.dark(scheme)]);
   }
 
@@ -67,5 +69,19 @@ class AppTheme {
         labelStyle: TextStyle(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
       ),
     );
+  }
+
+  static ThemeData? light() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primaryAccent,
+      brightness: Brightness.light, // <- everything derives from this + seed
+      primary: AppColors.primary,
+      secondary: AppColors.neonMint,
+      tertiary: AppColors.electricMagenta,
+      background: Color(0xfff3f0ff),
+      surface: Color(0xffdfd8fd).withOpacity(.66),
+    );
+
+    return _base(scheme).copyWith(extensions: <ThemeExtension<dynamic>>[CyberSemantic.light(scheme)]);
   }
 }

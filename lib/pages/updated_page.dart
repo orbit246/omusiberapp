@@ -43,7 +43,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
             },
           );
         },
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add, color: Theme.of(context).colorScheme.surfaceBright),
       ),
 
       bottomNavigationBar: AppNavigationBar(),
@@ -52,7 +52,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsetsGeometry.all(8.0),
+            padding: EdgeInsetsGeometry.all(4.0),
             child: Column(
               children: [
                 SizedBox(height: 14),
@@ -67,29 +67,6 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                               // Inside a Row/Column/Toolbar/etc.
                               // If your ExpandableSearchBar constructor is NOT const, do this:
                               SizedBox(height: 8),
-
-                              // In your build method:
-                              Center(
-                                child: StackedPushingExpansionWidget(
-                                  header: const Text(
-                                    "Tap to Expand",
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                  ),
-                                  content: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text("Item 1", style: TextStyle(fontSize: 16)),
-                                      Divider(),
-                                      Text("Item 2", style: TextStyle(fontSize: 16)),
-                                      Divider(),
-                                      Text("Item 3", style: TextStyle(fontSize: 16)),
-                                      SizedBox(height: 10),
-                                      Text("Some more descriptive text about the items..."),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
                               ExpandableSearchBar(hintText: 'Etkinlik ara...'),
                               EventCard(
                                 title: "Etkinlik Adı — Çok Uzun Başlık Buraya Sığar ve En Fazla İki Satır Olur",
@@ -102,7 +79,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                                 description:
                                     "Bu etkinlikte konuşmacılar yapay zekâ, güvenlik ve modern mobil geliştirme pratiklerini anlatacak.",
                                 tags: const [
-                                  EventTag("Ücretsiz", Icons.money_off),
+                                  EventTag("Ücretsiz", Icons.money_off, color: Colors.green),
                                   EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue),
                                   EventTag("Konuklu", Icons.person, color: Colors.orange),
                                   EventTag(
@@ -112,10 +89,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                                   ),
                                 ],
                                 onJoin: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const EventDetailsPage()),
-                                  );
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => EventDetailsPage()));
                                 },
                                 onBookmark: () {},
                                 onShare: () {},
@@ -131,7 +105,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                                 description:
                                     "Bu etkinlikte konuşmacılar yapay zekâ, güvenlik ve modern mobil geliştirme pratiklerini anlatacak.",
                                 tags: const [
-                                  EventTag("Ücretsiz", Icons.money_off),
+                                  EventTag("Ücretsiz", Icons.money_off, color: Colors.green),
                                   EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue),
                                   EventTag("Konuklu", Icons.person, color: Colors.orange),
                                   EventTag(
@@ -155,7 +129,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                                 description:
                                     "Bu etkinlikte konuşmacılar yapay zekâ, güvenlik ve modern mobil geliştirme pratiklerini anlatacak.",
                                 tags: const [
-                                  EventTag("Ücretsiz", Icons.money_off),
+                                  EventTag("Ücretsiz", Icons.money_off, color: Colors.green),
                                   EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue),
                                   EventTag("Konuklu", Icons.person, color: Colors.orange),
                                   EventTag(
@@ -179,7 +153,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                                 description:
                                     "Bu etkinlikte konuşmacılar yapay zekâ, güvenlik ve modern mobil geliştirme pratiklerini anlatacak.",
                                 tags: const [
-                                  EventTag("Ücretsiz", Icons.money_off),
+                                  EventTag("Ücretsiz", Icons.money_off, color: Colors.green),
                                   EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue),
                                   EventTag("Konuklu", Icons.person, color: Colors.orange),
                                   EventTag(
@@ -203,7 +177,7 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                                 description:
                                     "Bu etkinlikte konuşmacılar yapay zekâ, güvenlik ve modern mobil geliştirme pratiklerini anlatacak.",
                                 tags: const [
-                                  EventTag("Ücretsiz", Icons.money_off),
+                                  EventTag("Ücretsiz", Icons.money_off, color: Colors.green),
                                   EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue),
                                   EventTag("Konuklu", Icons.person, color: Colors.orange),
                                   EventTag(
