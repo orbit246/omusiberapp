@@ -4,6 +4,7 @@ import 'package:omusiber/pages/anon_profile_page%20.dart';
 import 'package:omusiber/pages/event_details_page.dart';
 import 'package:omusiber/pages/mainpage.dart';
 import 'package:omusiber/pages/mainpagew.dart';
+import 'package:omusiber/pages/news_page.dart';
 import 'package:omusiber/pages/splash_page.dart';
 import 'package:omusiber/pages/updated_page.dart';
 import 'package:omusiber/widgets/event_details/event_details_appbar.dart';
@@ -25,7 +26,7 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.light(),
       themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
-      home: SimplifiedHomePageState(),
+      home: NewsPage(),
     );
   }
 }

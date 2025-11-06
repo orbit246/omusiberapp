@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omusiber/pages/news_page.dart';
 import 'package:omusiber/pages/notifications_page.dart';
 import 'package:omusiber/pages/profile_page.dart';
 import 'package:omusiber/pages/saved_events_page.dart';
@@ -28,11 +29,11 @@ class App_NavigationBarState extends State<AppNavigationBar> {
               builder: (context) {
                 switch (index) {
                   case 0:
-                    return SimplifiedHomePageState(); // Replace with your actual event page widget
+                    return NewsPage(); // Replace with your actual event page widget
                   case 1:
-                    return NotificationsPage(); // Replace with your actual profile page widget
+                    return SimplifiedHomePageState(); // Replace with your actual profile page widget
                     case 2:
-                    return SavedEventsPage();
+                    return NotificationsPage();
                   default:
                     return SavedEventsPage(); // Fallback to a default page
                 }
@@ -44,7 +45,7 @@ class App_NavigationBarState extends State<AppNavigationBar> {
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "Duyurular"),
         BottomNavigationBarItem(icon: Icon(Icons.event), label: "Etkinlikler"),
-        BottomNavigationBarItem(icon: Icon(Icons.notifications_on), label: "Kaydedilenler"),
+        BottomNavigationBarItem(icon: Icon(Icons.notifications_on), label: "Bildirimler"),
       ],
     );
   }
