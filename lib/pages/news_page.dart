@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/widgets/home/simple_appbar.dart';
 import 'package:omusiber/widgets/home/simple_appbar_no_back.dart';
 import 'package:omusiber/widgets/news/fetch_news_button.dart';
@@ -24,20 +25,32 @@ class _NewsPageState extends State<NewsPage> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.only(left: 12.0, right: 12.0),
-          child: Column(
-            spacing: 8,
-            children: [
-              SizedBox(height: 12),
-              // Place this anywhere in your widget tree:
-              Center(
-                child: FetchNewsButton(
-                  onFetch: () async {
-                    await Future.delayed(const Duration(seconds: 5));
-                    // Optionally show a SnackBar or update state outside.
-                  },
-                ),
-              ),
-            ],
+          child: StreamBuilder(
+            stream: NewsFetcher().fetchLatestNews().asStream(),
+            builder: (context, asyncSnapshot) {
+              return Column(
+                spacing: 8,
+                children: [
+                  SizedBox(height: 12),
+                  // Place this anywhere in your widget tree:
+                  Center(
+                    child: FetchNewsButton(
+                      onFetch: () async {
+                        await Future.delayed(const Duration(seconds: 5));
+                        // Optionally show a SnackBar or update state outside.
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  if (asyncSnapshot.connectionState == ConnectionState.waiting)
+                    CircularProgressIndicator()
+                  else if (asyncSnapshot.hasError)
+                    Text("Haberler yüklenirken bir hata oluştu.")
+                  else if (asyncSnapshot.hasData)
+                    ...asyncSnapshot.data!.map((newsView) => NewsCard(view: newsView)).toList(),
+                ],
+              );
+            }
           ),
         ),
       ),

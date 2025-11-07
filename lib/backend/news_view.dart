@@ -32,7 +32,7 @@ class NewsView {
   final String authorName;
 
   /// Big cover image (required).
-  final ImageProvider heroImage;
+  final String heroImage;
 
   /// Small circle avatar (optional).
   final ImageProvider? authorAvatar;
@@ -58,7 +58,7 @@ class NewsView {
     String? title,
     String? summary,
     String? authorName,
-    ImageProvider? heroImage,
+    String? heroImage,
     ImageProvider? authorAvatar,
     int? commentCount,
     int? viewCount,

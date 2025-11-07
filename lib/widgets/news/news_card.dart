@@ -25,7 +25,7 @@ class NewsCard extends StatelessWidget {
             child: SizedBox(
               height: 200,
               width: double.infinity,
-              child: Image(image: view.heroImage, fit: BoxFit.cover),
+              child: Image(image: AssetImage(view.heroImage), fit: BoxFit.cover),
             ),
           ),
           Padding(
