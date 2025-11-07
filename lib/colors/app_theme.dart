@@ -13,7 +13,7 @@ class AppTheme {
       tertiary: AppColors.electricMagenta,
       background: Color(0xff15131D),
       surface: Color(0xff2c293a).withOpacity(.66),
-      onPrimaryContainer: Color(0xff2c293a),
+      onPrimaryContainer: AppColors.offWhite,
       surfaceBright: Colors.white,
     );
 

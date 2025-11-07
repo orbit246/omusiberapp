@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:omusiber/colors/app_theme.dart';
-import 'package:omusiber/pages/anon_profile_page%20.dart';
-import 'package:omusiber/pages/event_details_page.dart';
-import 'package:omusiber/pages/mainpage.dart';
-import 'package:omusiber/pages/mainpagew.dart';
+import 'package:omusiber/pages/removed/anon_profile_page%20.dart';
+import 'package:omusiber/pages/removed/event_details_page.dart';
+import 'package:omusiber/pages/removed/mainpage.dart';
+import 'package:omusiber/pages/removed/mainpagew.dart';
 import 'package:omusiber/pages/news_page.dart';
 import 'package:omusiber/pages/splash_page.dart';
 import 'package:omusiber/pages/updated_page.dart';
@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-      theme: AppTheme.light(),
+      theme: AppTheme.dark(),
       themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
       home: NewsPage(),

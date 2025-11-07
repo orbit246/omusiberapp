@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:omusiber/pages/event_details_page.dart';
+import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
 import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_toggle.dart';
@@ -7,7 +7,6 @@ import 'package:omusiber/widgets/home/home_page_appbar.dart';
 import 'package:omusiber/widgets/home/search_bar.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/widgets/shared/navbar.dart';
-import 'package:omusiber/widgets/test_widget.dart';
 
 class SimplifiedHomePageState extends StatefulWidget {
   const SimplifiedHomePageState({super.key});
