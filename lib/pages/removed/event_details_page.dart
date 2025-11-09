@@ -22,7 +22,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     return Scaffold(
       appBar: const PreferredSize(
         preferredSize: Size.fromHeight(60),
-        child: SimpleAppbar(title: "Detaylar"),
+        child: SimpleAppbar(title: "Etkinlik Detayları"),
       ),
       body: SafeArea(
         child: Padding(

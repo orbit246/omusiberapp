@@ -5,15 +5,12 @@ import 'package:html/dom.dart';
 import 'package:omusiber/backend/news_view.dart';
 
 class NewsFetcher {
-  NewsFetcher({
-    this.timeout = const Duration(seconds: 10),
-    Map<String, String>? headers,
-  }) : headers = {
-          // A basic desktop UA helps some sites return full HTML.
-          'User-Agent':
-              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36',
-          ...?headers,
-        };
+  NewsFetcher({this.timeout = const Duration(seconds: 10), Map<String, String>? headers})
+    : headers = {
+        // A basic desktop UA helps some sites return full HTML.
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36',
+        ...?headers,
+      };
 
   final Duration timeout;
   final Map<String, String> headers;
@@ -26,7 +23,20 @@ class NewsFetcher {
     });
 
     return [
-
+      NewsView(
+        title: "Örnek Haber Başlığı 1",
+        summary: "Bu, örnek bir haber özetidir. Haber içeriği burada yer alacaktır.",
+        heroImage: "assets/news.webp",
+        authorName: "Yazar 1",
+        authorAvatar: null,
+      ),
+       NewsView(
+        title: "Örnek Haber Başlığı 2",
+        summary: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        heroImage: "assets/news.webp",
+        authorName: "Yazar 1",
+        authorAvatar: null,
+      ),
     ];
   }
 
@@ -44,9 +54,7 @@ class NewsFetcher {
 
     // This targets things like: <a class="btn btn-theme read-more" href="...">
     // It will also catch <button> with the same classes, and try data-href fallback.
-    final elements = <Element>[
-      ...doc.querySelectorAll('.btn.btn-theme.read-more'),
-    ];
+    final elements = <Element>[...doc.querySelectorAll('.btn.btn-theme.read-more')];
 
     final out = <Uri>{};
 
