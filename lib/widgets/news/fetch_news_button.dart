@@ -117,7 +117,7 @@ class _FetchNewsButtonState extends State<FetchNewsButton>
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   Theme.of(
                                     context,
-                                  ).colorScheme.onPrimaryContainer,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             )
@@ -127,7 +127,7 @@ class _FetchNewsButtonState extends State<FetchNewsButton>
                               size: 20,
                               color: Theme.of(
                                 context,
-                              ).colorScheme.onPrimaryContainer,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                     ),
                   ),

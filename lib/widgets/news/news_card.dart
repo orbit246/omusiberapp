@@ -25,7 +25,7 @@ class NewsCard extends StatelessWidget {
             child: SizedBox(
               height: 200,
               width: double.infinity,
-              child: Image(image: AssetImage(view.heroImage), fit: BoxFit.cover),
+              child: view.heroImage != null ? Image(image: NetworkImage(view.heroImage!), fit: BoxFit.cover) : Container(color: Colors.grey),
             ),
           ),
           Padding(
@@ -155,7 +155,7 @@ class NewsCard extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => NewsItemPage(),
+                              builder: (context) => NewsItemPage(view: view),
                             ),
                           );
                         },

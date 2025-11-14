@@ -25,8 +25,8 @@ class _NewsPageState extends State<NewsPage> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.only(left: 12.0, right: 12.0),
-          child: StreamBuilder(
-            stream: NewsFetcher().fetchLatestNews().asStream(),
+          child: FutureBuilder(
+            future: NewsFetcher().fetchLatestNews(),
             builder: (context, asyncSnapshot) {
               return Column(
                 spacing: 8,
@@ -44,8 +44,8 @@ class _NewsPageState extends State<NewsPage> {
                   SizedBox(height: 12),
                   if (asyncSnapshot.connectionState == ConnectionState.waiting)
                     CircularProgressIndicator()
-                  else if (asyncSnapshot.hasError)
-                    Text("Haberler yüklenirken bir hata oluştu.")
+                  else if (asyncSnapshot.hasError) 
+                    Text("Haberler yüklenirken bir hata oluştu.${asyncSnapshot.error}")
                   else if (asyncSnapshot.hasData)
                     ...asyncSnapshot.data!.map((newsView) => NewsCard(view: newsView)).toList(),
                 ],
