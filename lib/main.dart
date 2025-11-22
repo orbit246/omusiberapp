@@ -10,7 +10,7 @@ import 'package:omusiber/pages/updated_page.dart';
 import 'package:omusiber/widgets/event_details/event_details_appbar.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // 👈 this is required before using plugins
+  WidgetsFlutterBinding.ensureInitialized();
 
   runApp(const MyApp());
 }
