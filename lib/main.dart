@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:omusiber/colors/app_theme.dart';
+import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/pages/removed/anon_profile_page%20.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/pages/removed/mainpage.dart';
@@ -26,7 +27,7 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.dark(),
       themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
-      home: NewsPage(),
+      home: MasterView(),
     );
   }
 }

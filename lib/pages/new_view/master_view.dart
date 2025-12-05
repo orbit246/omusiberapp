@@ -4,16 +4,15 @@ import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/settings_sheet.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
-// Yeni oluşturduğumuz SettingsSheet'i import et
 
-class MasterWidget extends StatefulWidget {
-  const MasterWidget({super.key});
+class MasterView extends StatefulWidget {
+  const MasterView({super.key});
 
   @override
-  State<MasterWidget> createState() => _MasterWidgetState();
+  State<MasterView> createState() => _MasterViewState();
 }
 
-class _MasterWidgetState extends State<MasterWidget> with SingleTickerProviderStateMixin {
+class _MasterViewState extends State<MasterView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _appBarTitle = "Haberler";
 
@@ -21,22 +20,19 @@ class _MasterWidgetState extends State<MasterWidget> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        setState(() {
-          switch (_tabController.index) {
-            case 0:
-              _appBarTitle = "Haberler";
-              break;
-            case 1:
-              _appBarTitle = "Etkinlikler";
-              break;
-            case 2:
-              _appBarTitle = "Bildirimler";
-              break;
-          }
-        });
+        _updateAppBar(_tabController.index);
+      }
+    });
+  }
+
+  void _updateAppBar(int index) {
+    setState(() {
+      switch (index) {
+        case 0: _appBarTitle = "Haberler"; break;
+        case 1: _appBarTitle = "Etkinlikler"; break;
+        case 2: _appBarTitle = "Bildirimler"; break;
       }
     });
   }
@@ -47,8 +43,13 @@ class _MasterWidgetState extends State<MasterWidget> with SingleTickerProviderSt
     super.dispose();
   }
 
-  // Ayarlar Popup'ını açan fonksiyon
-  void _showSettingsSheet() {
+  // 2. UPDATED FUNCTION: Navigates to the new page
+  void _openSettingsPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SettingsPage(),
+      ),
+    );
   }
 
   void _showCreateEventSheet() {
@@ -57,6 +58,7 @@ class _MasterWidgetState extends State<MasterWidget> with SingleTickerProviderSt
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
+      useRootNavigator: true, 
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       builder: (context) {
         return CreateEventSheet(
@@ -103,10 +105,10 @@ class _MasterWidgetState extends State<MasterWidget> with SingleTickerProviderSt
                       color: colorScheme.onSurface,
                     ),
                   ),
-                  // GÜNCELLENEN KISIM: Ayarlar Butonu
+                  // 3. UPDATED BUTTON ACTION
                   IconButton(
                     icon: Icon(Icons.settings, color: colorScheme.onSurface),
-                    onPressed: _showSettingsSheet, // Artık yeni fonksiyonu çağırıyor
+                    onPressed: _openSettingsPage, 
                   ),
                 ],
               ),
@@ -123,6 +125,7 @@ class _MasterWidgetState extends State<MasterWidget> with SingleTickerProviderSt
                     labelColor: colorScheme.primary,
                     unselectedLabelColor: colorScheme.onSurfaceVariant,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
+                    onTap: (index) => _updateAppBar(index),
                     tabs: const [
                       Tab(text: "Haberler"),
                       Tab(text: "Etkinlikler"),

@@ -1,22 +1,32 @@
-// lib/theme/app_colors.dart
 import 'package:flutter/material.dart';
 
-/// Base brand palette (from your purple/cyber brief)
+/// Updated with the "Cyber Grape & Teal" palette from the playground
 class AppColors {
-  static const primary = Color(0xFF7B2CBF);
-  static const primaryAccent = Color(0xFF9D4EDD);
-  static const deepPurple = Color.fromARGB(255, 56, 1, 107);
-  static const softLavender = Color(0xFFE0AAFF);
-  static const neonMint = Color(0xFF80FFDB);
-  static const cyberTeal = Color(0xFF5DD9C1);
-  static const offWhite = Color(0xFFF8F9FA);
-  static const coolGray = Color(0xFFADB5BD);
-  static const jetBlack = Color(0xFF0B0B0D);
-  static const amberGlow = Color(0xFFFFD166);
-  static const electricMagenta = Color(0xFFFF5EDF);
+  // Primary Brand Colors
+  static const primary = Color(0xFF311B92);      // Deep Indigo (Light Mode Primary)
+  static const primaryAccent = Color(0xFFB388FF); // Lavender/Light Purple (Dark Mode Primary)
+  
+  // Accents (Teal/Mint)
+  static const cyberTeal = Color(0xFF00BFA5);    // Sharp Teal (Light Mode Accent)
+  static const neonMint = Color(0xFF64FFDA);     // Glowing Mint (Dark Mode Accent)
+  
+  // Neutrals & Backgrounds
+  static const deepBackground = Color(0xFF0F172A); // Slate 900 (Dark Mode Bg)
+  static const surfaceDark = Color(0xFF1E293B);    // Slate 800 (Dark Mode Surface)
+  static const offWhite = Color(0xFFF0F4F8);       // Cool White (Light Mode Bg)
+  static const coolGray = Color(0xFF94A3B8);
+  static const jetBlack = Color(0xFF102A43);
+  
+  // Functional Colors
+  static const amberGlow = Color(0xFFFFD54F);      // Warning
+  static const electricMagenta = Color(0xFFFF4081); // Tertiary/Pink Accent
+  
+  // Legacy/Unused from original mapped to new palette
+  static const deepPurple = Color(0xFF12005E);
+  static const softLavender = Color(0xFFD1C4E9);
 }
 
-/// Semantic tokens that libs/components can use without caring about exact hex
+/// Semantic tokens updated to use the new palette
 class CyberSemantic extends ThemeExtension<CyberSemantic> {
   final Color success;
   final Color warning;
@@ -61,19 +71,23 @@ class CyberSemantic extends ThemeExtension<CyberSemantic> {
     );
   }
 
+  // Updated Semantic Light Logic
   static CyberSemantic light(ColorScheme cs) => CyberSemantic(
-        success: const Color(0xFF12B886), // teal-ish
+        success: const Color(0xFF00BFA5), // Teal
         warning: AppColors.amberGlow,
-        info: AppColors.cyberTeal,
-        brandGlow: AppColors.neonMint.withOpacity(0.5),
-        highlightBg: const Color(0xFFF1E6FF),
+        info: const Color(0xFF2979FF),
+        // Glow is now purple-ish
+        brandGlow: AppColors.primary.withOpacity(0.15),
+        highlightBg: const Color(0xFFEDE7F6), // Very light purple
       );
 
+  // Updated Semantic Dark Logic
   static CyberSemantic dark(ColorScheme cs) => CyberSemantic(
-        success: const Color(0xFF2DD4BF),
+        success: AppColors.neonMint,
         warning: AppColors.amberGlow,
-        info: AppColors.neonMint,
-        brandGlow: AppColors.neonMint.withOpacity(0.25),
-        highlightBg: const Color(0xFF2F1B44),
+        info: const Color(0xFF448AFF),
+        // Glow is neon mint in dark mode
+        brandGlow: AppColors.neonMint.withOpacity(0.20),
+        highlightBg: const Color(0xFF1E293B), // Matching surface
       );
 }

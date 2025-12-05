@@ -170,15 +170,12 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                       // Use collection-if to show text only when collapsed
                       if (!_expanded)
                         Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              "Detaylı bilgi için tıklayın",
-                              style: tt.bodySmall?.copyWith(
-                                color: const Color.fromARGB(255, 123, 117, 142),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
+                          child: Text(
+                            "Detaylı bilgi için tıklayın",
+                            style: tt.bodySmall?.copyWith(
+                              color: const Color.fromARGB(255, 123, 117, 142),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
                           ),
                         ),
@@ -256,7 +253,7 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                                   ShareParams(text: 'Check out this event: ${widget.title} at ${widget.location}'),
                                 );
                               },
-                            ),
+                            ),  
                           ],
                         ),
                       ],

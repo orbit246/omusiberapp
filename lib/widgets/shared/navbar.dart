@@ -29,7 +29,7 @@ class App_NavigationBarState extends State<AppNavigationBar> {
               builder: (context) {
                 switch (index) {
                   case 0:
-                    return NewsPage(); // Replace with your actual event page widget
+                    return MasterWidget(); // Replace with your actual event page widget
                   case 1:
                     return SimplifiedHomePageState(); // Replace with your actual profile page widget
                     case 2:
