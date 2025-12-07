@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/theme_manager.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -7,6 +8,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final themeManager = ThemeManager();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -30,29 +32,14 @@ class SettingsPage extends StatelessWidget {
                 children: [
                   // --- Account Section ---
                   _buildSectionHeader(context, "Hesap"),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.person_outline,
-                    title: "Profil Düzenle",
-                    onTap: () {},
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.lock_outline,
-                    title: "Şifre ve Güvenlik",
-                    onTap: () {},
-                  ),
+                  _buildSettingsTile(context, icon: Icons.person_outline, title: "Profil Düzenle", onTap: () {}),
+                  _buildSettingsTile(context, icon: Icons.lock_outline, title: "Şifre ve Güvenlik", onTap: () {}),
 
                   const SizedBox(height: 24),
 
                   // --- App Settings Section ---
                   _buildSectionHeader(context, "Uygulama"),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.notifications_outlined,
-                    title: "Bildirimler",
-                    onTap: () {},
-                  ),
+                  _buildSettingsTile(context, icon: Icons.notifications_outlined, title: "Bildirimler", onTap: () {}),
                   _buildSettingsTile(
                     context,
                     icon: Icons.language,
@@ -60,7 +47,7 @@ class SettingsPage extends StatelessWidget {
                     subtitle: "Türkçe",
                     onTap: () {},
                   ),
-                  
+
                   // Example of a Switch (Toggle)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -76,9 +63,20 @@ class SettingsPage extends StatelessWidget {
                       "Karanlık Mod",
                       style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                     ),
-                    trailing: Switch(
-                      value: false, // Connect to your theme provider
-                      onChanged: (val) {},
+                    // 2. Use a ListenableBuilder here too!
+                    // This ensures the switch visually updates if the theme changes elsewhere.
+                    trailing: ListenableBuilder(
+                      listenable: themeManager,
+                      builder: (context, _) {
+                        return Switch(
+                          // Check if current mode is Dark
+                          value: themeManager.themeMode == ThemeMode.dark,
+                          onChanged: (val) {
+                            // 3. Call the toggle function
+                            themeManager.toggleTheme(val);
+                          },
+                        );
+                      },
                     ),
                   ),
 
@@ -86,12 +84,7 @@ class SettingsPage extends StatelessWidget {
 
                   // --- Other Section ---
                   _buildSectionHeader(context, "Diğer"),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.info_outline,
-                    title: "Hakkında",
-                    onTap: () {},
-                  ),
+                  _buildSettingsTile(context, icon: Icons.info_outline, title: "Hakkında", onTap: () {}),
                   _buildSettingsTile(
                     context,
                     icon: Icons.logout,
@@ -100,7 +93,7 @@ class SettingsPage extends StatelessWidget {
                     iconColor: colorScheme.error,
                     onTap: () {},
                   ),
-                  
+
                   // Bottom padding for scrolling
                   const SizedBox(height: 40),
                 ],
@@ -141,7 +134,7 @@ class SettingsPage extends StatelessWidget {
     Color? iconColor,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: ListTile(
@@ -157,10 +150,7 @@ class SettingsPage extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: textColor,
-          ),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500, color: textColor),
         ),
         subtitle: subtitle != null ? Text(subtitle) : null,
         trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),

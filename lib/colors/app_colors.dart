@@ -24,6 +24,9 @@ class AppColors {
   // Legacy/Unused from original mapped to new palette
   static const deepPurple = Color(0xFF12005E);
   static const softLavender = Color(0xFFD1C4E9);
+
+  static const Color mistyRose = Color(0xFFFFF5F7);
+  static const Color palePink = Color(0xFFFFF9FA);
 }
 
 /// Semantic tokens updated to use the new palette

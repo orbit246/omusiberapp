@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/pages/new_view/events_tab_view.dart';
 import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
-import 'package:omusiber/pages/new_view/settings_sheet.dart';
+import 'package:omusiber/pages/new_view/settings_page.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
 // Yeni oluşturduğumuz SettingsSheet'i import et
 

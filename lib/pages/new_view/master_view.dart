@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/pages/new_view/events_tab_view.dart';
 import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
-import 'package:omusiber/pages/new_view/settings_sheet.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
+import 'package:omusiber/pages/new_view/settings_page.dart';
 
 class MasterView extends StatefulWidget {
   const MasterView({super.key});
@@ -16,40 +16,41 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
   late TabController _tabController;
   String _appBarTitle = "Haberler";
 
+  final List<bool> _unreadStates = [true, false, true];
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        _updateAppBar(_tabController.index);
+        _handleTabSelection(_tabController.index);
       }
     });
   }
 
-  void _updateAppBar(int index) {
+  void _handleTabSelection(int index) {
     setState(() {
       switch (index) {
-        case 0: _appBarTitle = "Haberler"; break;
-        case 1: _appBarTitle = "Etkinlikler"; break;
-        case 2: _appBarTitle = "Bildirimler"; break;
+        case 0:
+          _appBarTitle = "Haberler";
+          break;
+        case 1:
+          _appBarTitle = "Etkinlikler";
+          break;
+        case 2:
+          _appBarTitle = "Bildirimler";
+          break;
+      }
+      if (_unreadStates[index]) {
+        _unreadStates[index] = false;
       }
     });
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  // 2. UPDATED FUNCTION: Navigates to the new page
   void _openSettingsPage() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const SettingsPage(),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
   }
 
   void _showCreateEventSheet() {
@@ -58,15 +59,62 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      useRootNavigator: true, 
+      useRootNavigator: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      builder: (context) {
-        return CreateEventSheet(
-          onCreate: (data) {},
-          onFinishLater: (data) {},
-        );
-      },
+      builder: (context) => CreateEventSheet(onCreate: (data) {}, onFinishLater: (data) {}),
     );
+  }
+
+  // UPDATED: Dynamic Collapsing Row
+  Widget _buildBadgedTab({required String text, required int index}) {
+    final bool isUnread = _unreadStates[index];
+
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(text),
+
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+
+            // Logic: 6px (Gap) + 8px (Dot) = 14px
+            width: isUnread ? 14.0 : 0.0,
+
+            height: 8,
+            alignment: Alignment.centerLeft,
+            clipBehavior: Clip.hardEdge,
+            decoration: const BoxDecoration(),
+
+            // FIX: Wrap inside SingleChildScrollView
+            // This suppresses the error when the container is narrow (e.g. 5px)
+            // but the content is wide (14px) during the animation.
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(), // User can't scroll it
+              child: Row(
+                children: [
+                  const SizedBox(width: 6), // The Gap
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.redAccent),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -76,7 +124,7 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      
+
       floatingActionButton: _tabController.index == 1
           ? FloatingActionButton(
               onPressed: _showCreateEventSheet,
@@ -88,13 +136,13 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              backgroundColor: colorScheme.surface,
-              surfaceTintColor: colorScheme.surfaceTint,
+              backgroundColor: theme.appBarTheme.backgroundColor,
+              surfaceTintColor: Colors.transparent,
               pinned: true,
               floating: true,
               snap: true,
-              scrolledUnderElevation: 2,
-              
+              scrolledUnderElevation: 0,
+
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -105,10 +153,9 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
                       color: colorScheme.onSurface,
                     ),
                   ),
-                  // 3. UPDATED BUTTON ACTION
                   IconButton(
                     icon: Icon(Icons.settings, color: colorScheme.onSurface),
-                    onPressed: _openSettingsPage, 
+                    onPressed: _openSettingsPage,
                   ),
                 ],
               ),
@@ -124,12 +171,16 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
                     indicatorColor: colorScheme.primary,
                     labelColor: colorScheme.primary,
                     unselectedLabelColor: colorScheme.onSurfaceVariant,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    onTap: (index) => _updateAppBar(index),
-                    tabs: const [
-                      Tab(text: "Haberler"),
-                      Tab(text: "Etkinlikler"),
-                      Tab(text: "Bildirimler"),
+
+                    // Standard padding ensures good spacing when the dot is gone
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+
+                    onTap: (index) => _handleTabSelection(index),
+
+                    tabs: [
+                      _buildBadgedTab(text: "Haberler", index: 0),
+                      _buildBadgedTab(text: "Etkinlikler", index: 1),
+                      _buildBadgedTab(text: "Bildirimler", index: 2),
                     ],
                   ),
                 ),
@@ -139,11 +190,7 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
         },
         body: TabBarView(
           controller: _tabController,
-          children: const [
-            NewsTabView(),
-            EventsTabView(),
-            NotificationsTabView(),
-          ],
+          children: const [NewsTabView(), EventsTabView(), NotificationsTabView()],
         ),
       ),
     );
