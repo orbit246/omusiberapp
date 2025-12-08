@@ -31,19 +31,22 @@ class NewsFetcher {
     debugPrint('[NewsFetcher] $msg');
   }
 
-  /// Fetches news. 
+  /// Fetches news.
   /// 1. Checks Cache (30 min).
   /// 2. Fetches Network.
   /// 3. If BOTH fail (empty list), returns a dummy Example News.
   Future<List<NewsView>> fetchLatestNews({bool forceRefresh = false}) async {
     // 1. Check Cache
-    if (!forceRefresh && _cachedNews != null && _lastFetchTime != null) {
-      final difference = DateTime.now().difference(_lastFetchTime!);
-      if (difference < _cacheDuration) {
-        _log('CACHE HIT: Returning data fetched ${difference.inMinutes} mins ago.');
-        return _cachedNews!;
+    if (false)
+      if (!forceRefresh && _cachedNews != null && _lastFetchTime != null) {
+        final difference = DateTime.now().difference(_lastFetchTime!);
+        if (difference < _cacheDuration) {
+          _log(
+            'CACHE HIT: Returning data fetched ${difference.inMinutes} mins ago.',
+          );
+          return _cachedNews!;
+        }
       }
-    }
 
     // 2. Network Fetch Logic
     const listUrl = 'https://carsambamyo.omu.edu.tr/tr/haberler';
@@ -53,10 +56,12 @@ class NewsFetcher {
 
     try {
       final readMoreLinks = await fetchReadMoreLinks(listUrl);
-      
+
       if (readMoreLinks.isNotEmpty) {
         final limitedLinks = readMoreLinks.take(5).toList();
-        final futures = limitedLinks.map((uri) => _safeFetchNewsDetail(uri)).toList();
+        final futures = limitedLinks
+            .map((uri) => _safeFetchNewsDetail(uri))
+            .toList();
         result = await Future.wait(futures);
       }
     } catch (e) {
@@ -81,7 +86,8 @@ class NewsFetcher {
   NewsView _getExampleNews() {
     return NewsView(
       title: "OMÜ Siber Kulübü'ne Hoşgeldiniz",
-      summary: "Haberler şu anda yüklenemedi veya internet bağlantısı yok. "
+      summary:
+          "Haberler şu anda yüklenemedi veya internet bağlantısı yok. "
           "Bu, uygulamanın boş görünmemesi için oluşturulmuş örnek bir haberdir. "
           "Lütfen internet bağlantınızı kontrol edip sayfayı yenileyiniz.",
       heroImage: _fallbackImage,
@@ -115,8 +121,9 @@ class NewsFetcher {
 
     final doc = html_parser.parse(res.body);
 
-    final title = doc.querySelector('h1.heading-title')?.text.trim() ?? 'Başlık Yok';
-    
+    final title =
+        doc.querySelector('h1.heading-title')?.text.trim() ?? 'Başlık Yok';
+
     String authorName = 'Bilinmeyen Yazar';
     final meta = doc.querySelector('.news-item .meta.text-muted');
     if (meta != null) {
@@ -125,7 +132,9 @@ class NewsFetcher {
     }
 
     String? heroImage;
-    final heroSrc = doc.querySelector('.news-item .featured-image img')?.attributes['src'];
+    final heroSrc = doc
+        .querySelector('.news-item .featured-image img')
+        ?.attributes['src'];
     if (heroSrc != null && heroSrc.trim().isNotEmpty) {
       final raw = heroSrc.trim();
       heroImage = raw.startsWith('http') ? raw : url.resolve(raw).toString();
@@ -134,9 +143,15 @@ class NewsFetcher {
     String summary = '';
     final article = doc.querySelector('article.news-item');
     if (article != null) {
-      final paragraphs = article.querySelectorAll('p')
+      final paragraphs = article
+          .querySelectorAll('p')
           .map((p) => p.text.trim())
-          .where((t) => t.isNotEmpty && !t.startsWith('Yazar:') && !t.contains('Tarih:'))
+          .where(
+            (t) =>
+                t.isNotEmpty &&
+                !t.startsWith('Yazar:') &&
+                !t.contains('Tarih:'),
+          )
           .toList();
       summary = paragraphs.join('\n\n');
     }
@@ -147,7 +162,7 @@ class NewsFetcher {
       heroImage: heroImage ?? _fallbackImage,
       authorName: authorName,
       authorAvatar: null,
-      detailUrl: url.toString()
+      detailUrl: url.toString(),
     );
   }
 
@@ -172,7 +187,12 @@ class NewsFetcher {
   }
 
   String _fallbackTitleFromUrl(Uri url) {
-    final lastSegment = url.pathSegments.isNotEmpty ? url.pathSegments.last : url.toString();
-    return lastSegment.replaceAll('-', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final lastSegment = url.pathSegments.isNotEmpty
+        ? url.pathSegments.last
+        : url.toString();
+    return lastSegment
+        .replaceAll('-', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 }

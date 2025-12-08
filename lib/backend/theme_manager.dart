@@ -7,7 +7,7 @@ class ThemeManager with ChangeNotifier {
   ThemeManager._internal();
 
   // 2. State Variables
-  ThemeMode _themeMode = ThemeMode.system; // Default to system setting
+  ThemeMode _themeMode = ThemeMode.dark; // Default to system setting
   
   // Getter to access current theme mode safely
   ThemeMode get themeMode => _themeMode;

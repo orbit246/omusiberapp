@@ -131,4 +131,16 @@ class NewsView {
       onShare: onShare ?? this.onShare,
     );
   }
+
+  // This tells Dart: "Two news items are equal if they have the same URL"
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is NewsView &&
+        other.detailUrl == detailUrl; // Assuming URL is unique for every news
+  }
+
+  @override
+  int get hashCode => detailUrl.hashCode;
 }
