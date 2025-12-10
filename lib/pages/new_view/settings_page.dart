@@ -1,14 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/theme_manager.dart';
+import 'dart:math';
 
-class SettingsPage extends StatelessWidget {
+// SettingsPage must be a StatefulWidget to hold the initial random state for the easter egg
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  final themeManager = ThemeManager();
+  
+  // State to hold the result of the 1/1000 random chance
+  bool _isEasterEggMode = false;
+
+  // Secret tap sequence variables removed.
+  // int _tapCount = 0;
+  // DateTime? _lastTapTime;
+
+  // Secret tap handler function removed.
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final themeManager = ThemeManager();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -48,35 +65,79 @@ class SettingsPage extends StatelessWidget {
                     onTap: () {},
                   ),
 
-                  // Example of a Switch (Toggle)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(8),
+                  // Dark Mode Switch (Toggle)
+                  // Wrapped in GestureDetector to capture long press to force the easter egg
+                  GestureDetector(
+                    onLongPress: () {
+                      // 100% chance easter egg on long press
+                      setState(() {
+                        _isEasterEggMode = true; // Force easter egg mode ON
+                      });
+
+                      // Toggle the theme state as if the switch was pressed
+                      final isCurrentlyDark = themeManager.themeMode == ThemeMode.dark;
+                      themeManager.toggleTheme(!isCurrentlyDark);
+                    },
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      // 2. The ListenableBuilder updates the icon dynamically based on theme mode
+                      // and whether the easter egg mode is active.
+                      leading: ListenableBuilder(
+                        listenable: themeManager,
+                        builder: (context, _) {
+                          final isDarkMode = themeManager.themeMode == ThemeMode.dark;
+                          Widget iconWidget;
+                          final iconColor = colorScheme.onSecondaryContainer;
+                          const iconSize = 24.0; // Increased size
+
+                          if (_isEasterEggMode) {
+                            // Easter egg mode is ON (1/1000 chance hit or long press)
+                            // Assets now use the increased size and theme color tint.
+                            iconWidget = isDarkMode
+                                ? Image.asset('assets/cookie.png', height: iconSize, width: iconSize)
+                                : Image.asset('assets/quarter_moon.png', height: iconSize, width: iconSize);
+                          } else {
+                            // Default mode (icon size also increased for consistency)
+                            iconWidget = Icon(Icons.dark_mode_outlined, color: iconColor, size: iconSize);
+                          }
+
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Transform.rotate(angle: _isEasterEggMode ? 100 : 0, child: iconWidget),
+                          );
+                        },
                       ),
-                      child: Icon(Icons.dark_mode_outlined, color: colorScheme.onSecondaryContainer),
-                    ),
-                    title: Text(
-                      "Karanlık Mod",
-                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-                    ),
-                    // 2. Use a ListenableBuilder here too!
-                    // This ensures the switch visually updates if the theme changes elsewhere.
-                    trailing: ListenableBuilder(
-                      listenable: themeManager,
-                      builder: (context, _) {
-                        return Switch(
-                          // Check if current mode is Dark
-                          value: themeManager.themeMode == ThemeMode.dark,
-                          onChanged: (val) {
-                            // 3. Call the toggle function
-                            themeManager.toggleTheme(val);
-                          },
-                        );
-                      },
+                      title: Text(
+                        "Karanlık Mod",
+                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                      trailing: ListenableBuilder(
+                        listenable: themeManager,
+                        builder: (context, _) {
+                          return Switch(
+                            // Check if current mode is Dark
+                            value: themeManager.themeMode == ThemeMode.dark,
+                            onChanged: (val) {
+                              // PRIMARY CLICK: 1/1000 chance logic
+                              // 1. Calculate 1/1000 chance for easter egg mode upon every toggle
+                              final random = Random();
+                              final newEasterEggMode = random.nextInt(1000) == 0;
+                              
+                              // 2. Update the easter egg state
+                              setState(() {
+                                _isEasterEggMode = newEasterEggMode;
+                              });
+
+                              // 3. Call the toggle function
+                              themeManager.toggleTheme(val);
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
 

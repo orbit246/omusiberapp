@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/pages/news_page.dart';
 import 'package:omusiber/pages/notifications_page.dart';
 import 'package:omusiber/pages/removed/profile_page.dart';
@@ -29,7 +30,7 @@ class App_NavigationBarState extends State<AppNavigationBar> {
               builder: (context) {
                 switch (index) {
                   case 0:
-                    return MasterWidget(); // Replace with your actual event page widget
+                    return MasterView(); // Replace with your actual event page widget
                   case 1:
                     return SimplifiedHomePageState(); // Replace with your actual profile page widget
                     case 2:

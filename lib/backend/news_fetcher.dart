@@ -37,16 +37,15 @@ class NewsFetcher {
   /// 3. If BOTH fail (empty list), returns a dummy Example News.
   Future<List<NewsView>> fetchLatestNews({bool forceRefresh = false}) async {
     // 1. Check Cache
-    if (false)
-      if (!forceRefresh && _cachedNews != null && _lastFetchTime != null) {
-        final difference = DateTime.now().difference(_lastFetchTime!);
-        if (difference < _cacheDuration) {
-          _log(
-            'CACHE HIT: Returning data fetched ${difference.inMinutes} mins ago.',
-          );
-          return _cachedNews!;
-        }
+    if (!forceRefresh && _cachedNews != null && _lastFetchTime != null) {
+      final difference = DateTime.now().difference(_lastFetchTime!);
+      if (difference < _cacheDuration) {
+        _log(
+          'CACHE HIT: Returning data fetched ${difference.inMinutes} mins ago.',
+        );
+        return _cachedNews!;
       }
+    }
 
     // 2. Network Fetch Logic
     const listUrl = 'https://carsambamyo.omu.edu.tr/tr/haberler';
@@ -62,7 +61,17 @@ class NewsFetcher {
         final futures = limitedLinks
             .map((uri) => _safeFetchNewsDetail(uri))
             .toList();
-        result = await Future.wait(futures);
+        
+        // Await all details
+        final allResults = await Future.wait(futures);
+        
+        // Filter out news where the author is 'Bilinmeyen Yazar' (Unknown Author).
+        // This handles both parsing failures and _safeFetchNewsDetail fallbacks.
+        result = allResults
+            .where((news) => news.authorName != 'Bilinmeyen Yazar')
+            .toList();
+        
+        _log('Filtered out ${allResults.length - result.length} news items with "Bilinmeyen Yazar".');
       }
     } catch (e) {
       _log('ERROR fetching news: $e');
@@ -104,11 +113,12 @@ class NewsFetcher {
       return await fetchNewsDetail(url);
     } catch (e) {
       _log('SAFE WRAPPER: Error for $url: $e');
+      // Return a fallback with the specific 'Bilinmeyen Yazar' name for filtering
       return NewsView(
         title: _fallbackTitleFromUrl(url),
         summary: 'Bu haberin detayları yüklenirken bir sorun oluştu.',
         heroImage: _fallbackImage,
-        authorName: 'Bilinmeyen Yazar',
+        authorName: 'Bilinmeyen Yazar', // Fallback author name used for filtering
         authorAvatar: null,
         detailUrl: url.toString(),
       );
