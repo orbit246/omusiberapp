@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "598076585741",
+    "firebase_url": "https://omusiber-65c94-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "omusiber-65c94",
+    "storage_bucket": "omusiber-65c94.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598076585741:android:5058c8267faa586bd16244",
+        "android_client_info": {
+          "package_name": "me.orbitium.akademiz"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "598076585741-h1imvjhnv54mcg88pr7pj1nj2i4ok6m1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7PHagxT7t8DpI2gzW5n77QBOfeOgP8Ds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "598076585741-h1imvjhnv54mcg88pr7pj1nj2i4ok6m1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

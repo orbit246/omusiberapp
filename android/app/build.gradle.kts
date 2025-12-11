@@ -3,10 +3,16 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
+    id("com.android.application")
+}
+
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
 }
 
 android {
-    namespace = "com.example.omusiber"
+    namespace = "me.orbitium.akademiz"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +27,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.omusiber"
+        applicationId = "me.orbitium.akademiz"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
