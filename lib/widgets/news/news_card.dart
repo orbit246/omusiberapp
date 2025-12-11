@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:omusiber/backend/news_view.dart';
+import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/news_item_page.dart';
 import 'package:omusiber/widgets/news/news_card_item.dart';
 

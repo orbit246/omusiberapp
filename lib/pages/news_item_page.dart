@@ -1,6 +1,6 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
-import 'package:omusiber/backend/news_view.dart';
+import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/widgets/home/simple_appbar.dart';
 import 'package:omusiber/widgets/shared/square_action.dart';
 import 'package:url_launcher/url_launcher.dart';

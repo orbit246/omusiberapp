@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
-import 'package:html/dom.dart';
-import 'package:omusiber/backend/news_view.dart';
+import 'package:omusiber/backend/view/news_view.dart';
 
 class NewsFetcher {
   // Singleton pattern
