@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:omusiber/widgets/test_widget.dart';
 import 'package:share_plus/share_plus.dart';
-// Removed unused 'shimmer_animation' import
+import 'package:omusiber/widgets/test_widget.dart';
 
 class EventTag {
   final String text;
   final IconData icon;
-  final Color? color; // optional custom bg
+  final Color? color;
   const EventTag(this.text, this.icon, {this.color});
 }
 
@@ -17,7 +16,7 @@ class EventCard extends StatefulWidget {
     required this.title,
     required this.datetimeText,
     required this.location,
-    required this.imageAsset,
+    required this.imageUrl,
     this.durationText,
     this.ticketText,
     this.capacityText,
@@ -32,7 +31,9 @@ class EventCard extends StatefulWidget {
   final String title;
   final String datetimeText;
   final String location;
-  final String imageAsset;
+
+  /// ImageKit (or any CDN) URL. Can be empty.
+  final String imageUrl;
 
   final String? durationText;
   final String? ticketText;
@@ -53,7 +54,7 @@ class EventCard extends StatefulWidget {
 class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
   late bool _expanded = widget.initialExpanded;
   bool _isSaved = false;
-  GlobalKey<StackedPushingExpansionWidgetState> _expansionKey = GlobalKey();
+  final GlobalKey<StackedPushingExpansionWidgetState> _expansionKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -71,11 +72,10 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
         elevation: 1,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         color: cs.surface,
-        surfaceTintColor: cs.surface, // keep surface stable in M3
+        surfaceTintColor: cs.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: const EdgeInsets.only(top: 16.0, left: 16.0, right: 16.0, bottom: 2.0),
-          // This outer AnimatedSize handles the card's overall height change
+          padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 2),
           child: AnimatedSize(
             duration: const Duration(milliseconds: 350),
             curve: Curves.easeInOut,
@@ -83,33 +83,21 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tags
                 if (widget.tags.isNotEmpty)
-                  Wrap(spacing: 6, runSpacing: 6, children: widget.tags.map((t) => TagChip(tag: t)).toList()),
-
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: widget.tags.map((t) => TagChip(tag: t)).toList(),
+                  ),
                 if (widget.tags.isNotEmpty) const SizedBox(height: 12),
 
-                // Header row: image + info
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Image with soft shadow
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(color: cs.shadow.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 8)),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(widget.imageAsset, height: 90, width: 120, fit: BoxFit.cover),
-                      ),
-                    ),
+                    _imageBlock(context),
 
                     const SizedBox(width: 8),
 
-                    // Event info
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +126,6 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
 
                 const SizedBox(height: 12),
 
-                // Location row (tap to expand)
                 StackedPushingExpansionWidget(
                   key: _expansionKey,
                   header: Column(
@@ -158,7 +145,7 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                               ),
                             ),
                             AnimatedRotation(
-                              turns: _expanded ? 0.25 : 0.0, // 90°
+                              turns: _expanded ? 0.25 : 0.0,
                               duration: const Duration(milliseconds: 250),
                               curve: Curves.easeInOut,
                               child: Icon(Icons.arrow_forward_ios_outlined, size: 16, color: cs.onSurfaceVariant),
@@ -166,8 +153,6 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                           ],
                         ),
                       ),
-
-                      // Use collection-if to show text only when collapsed
                       if (!_expanded)
                         Center(
                           child: Text(
@@ -188,7 +173,6 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                         Divider(height: 1, color: cs.outlineVariant),
                         const SizedBox(height: 12),
 
-                        // Use collection-if and spread operator for cleaner list
                         if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
 
                         if (widget.ticketText != null) ...[
@@ -208,18 +192,13 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
 
                         const SizedBox(height: 12),
 
-                        // Actions
                         Row(
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: widget.onJoin,
-                                icon: Icon(
-                                  Icons.event_available,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                label: Text("Katıl", style: Theme.of(context).textTheme.labelLarge),
+                                icon: Icon(Icons.event_available, size: 20, color: cs.onSurface),
+                                label: Text("Katıl", style: tt.labelLarge),
                                 style: Theme.of(context).elevatedButtonTheme.style,
                               ),
                             ),
@@ -228,32 +207,50 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
                               context,
                               icon: !_isSaved ? Icons.bookmark_outline : Icons.bookmark,
                               onTap: () {
-                                setState(() {
-                                  _isSaved = !_isSaved;
+                                setState(() => _isSaved = !_isSaved);
 
-                                  Fluttertoast.showToast(
-                                    msg: "Etkinlik ${_isSaved ? 'kaydedildi' : 'kaydedilmedi'}",
-                                    toastLength: Toast.LENGTH_SHORT,
-                                    gravity: ToastGravity.BOTTOM,
-                                    timeInSecForIosWeb: 1,
-                                    backgroundColor: Theme.of(context).colorScheme.surface,
-                                    textColor: Colors.white,
-                                    fontSize: 16.0,
-                                  );
-                                });
+                                // Optional external handler
+                                try {
+                                  widget.onBookmark?.call();
+                                } catch (_) {}
+
+                                Fluttertoast.showToast(
+                                  msg: "Etkinlik ${_isSaved ? 'kaydedildi' : 'kaydedilmedi'}",
+                                  toastLength: Toast.LENGTH_SHORT,
+                                  gravity: ToastGravity.BOTTOM,
+                                  timeInSecForIosWeb: 1,
+                                  backgroundColor: Theme.of(context).colorScheme.surface,
+                                  textColor: Colors.white,
+                                  fontSize: 16,
+                                );
                               },
                             ),
-                            // Consistent spacing
                             const SizedBox(width: 8),
                             _squareAction(
                               context,
                               icon: Icons.share_outlined,
-                              onTap: () {
-                                SharePlus.instance.share(
-                                  ShareParams(text: 'Check out this event: ${widget.title} at ${widget.location}'),
-                                );
+                              onTap: () async {
+                                // Prefer provided callback, fallback to default SharePlus
+                                if (widget.onShare != null) {
+                                  try {
+                                    widget.onShare!.call();
+                                  } catch (_) {
+                                    _toast(context, "Paylaşım başarısız");
+                                  }
+                                  return;
+                                }
+
+                                try {
+                                  await SharePlus.instance.share(
+                                    ShareParams(
+                                      text: 'Etkinlik: ${widget.title}\nKonum: ${widget.location}',
+                                    ),
+                                  );
+                                } catch (_) {
+                                  _toast(context, "Paylaşım başarısız");
+                                }
                               },
-                            ),  
+                            ),
                           ],
                         ),
                       ],
@@ -268,6 +265,31 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
     );
   }
 
+  Widget _imageBlock(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _NetworkThumb(
+          url: widget.imageUrl,
+          height: 90,
+          width: 120,
+        ),
+      ),
+    );
+  }
+
   Widget _infoRow(BuildContext context, IconData icon, String text, {bool topAligned = false}) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
@@ -277,9 +299,7 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
       children: [
         Icon(icon, size: 18, color: cs.onSurfaceVariant),
         const SizedBox(width: 6),
-        Expanded(
-          child: Text(text, style: tt.bodyMedium?.copyWith(color: cs.onSurface)),
-        ),
+        Expanded(child: Text(text, style: tt.bodyMedium?.copyWith(color: cs.onSurface))),
       ],
     );
   }
@@ -296,6 +316,72 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
       ),
     );
   }
+
+  void _toast(BuildContext context, String msg) {
+    Fluttertoast.showToast(
+      msg: msg,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      timeInSecForIosWeb: 1,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      textColor: Colors.white,
+      fontSize: 16,
+    );
+  }
+}
+
+class _NetworkThumb extends StatelessWidget {
+  const _NetworkThumb({
+    required this.url,
+    required this.height,
+    required this.width,
+  });
+
+  final String url;
+  final double height;
+  final double width;
+
+  bool get _validUrl => url.trim().startsWith('http://') || url.trim().startsWith('https://');
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (!_validUrl) {
+      return _fallback(cs);
+    }
+
+    return Image.network(
+      url.trim(),
+      height: height,
+      width: width,
+      fit: BoxFit.cover,
+      // Helps avoid huge in-memory images on list views.
+      cacheHeight: (height * MediaQuery.of(context).devicePixelRatio).round(),
+      cacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round(),
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        final value = progress.expectedTotalBytes == null
+            ? null
+            : progress.cumulativeBytesLoaded / progress.expectedTotalBytes!;
+        return SizedBox(
+          height: height,
+          width: width,
+          child: Center(child: CircularProgressIndicator(value: value)),
+        );
+      },
+      errorBuilder: (context, error, stack) => _fallback(cs),
+    );
+  }
+
+  Widget _fallback(ColorScheme cs) {
+    return Container(
+      height: height,
+      width: width,
+      color: cs.surfaceVariant,
+      child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant),
+    );
+  }
 }
 
 class TagChip extends StatelessWidget {
@@ -307,9 +393,7 @@ class TagChip extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final bg = tag.color ?? cs.secondaryContainer;
-    final fg = tag.color != null
-        ? _contrastOn(bg) // Removed unused ColorScheme
-        : cs.onSecondaryContainer;
+    final fg = tag.color != null ? _contrastOn(bg) : cs.onSecondaryContainer;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -325,16 +409,15 @@ class TagChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             tag.text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: fg, fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
         ],
       ),
     );
   }
 
-  // Simple contrast helper. Removed unused ColorScheme parameter.
-  Color _contrastOn(Color bg) {
-    // luminance threshold heuristic
-    return bg.computeLuminance() > 0.5 ? Colors.black : Colors.white;
-  }
+  Color _contrastOn(Color bg) => bg.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 }
