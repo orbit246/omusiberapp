@@ -19,16 +19,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
-}
-
-// keep your existing android { ... } and dependencies { ... } below
-
-
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
