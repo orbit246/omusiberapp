@@ -5,35 +5,110 @@ class EventRepository {
   EventRepository({
     FirebaseFirestore? firestore,
     String collectionPath = 'events',
+    Duration minRefreshDelay = const Duration(milliseconds: 600),
+    Duration cacheTtl = const Duration(seconds: 30),
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _collectionPath = collectionPath;
+        _collectionPath = collectionPath,
+        _minRefreshDelay = minRefreshDelay,
+        _cacheTtl = cacheTtl;
 
   final FirebaseFirestore _firestore;
   final String _collectionPath;
 
+  /// Minimum time a refresh call should take (prevents UI flicker).
+  final Duration _minRefreshDelay;
+
+  /// In-memory cache TTL.
+  final Duration _cacheTtl;
+
+  List<PostView>? _cache;
+  DateTime? _cacheAt;
+
+  Future<List<PostView>>? _inFlight;
+
   CollectionReference<Map<String, dynamic>> get _eventsRef =>
       _firestore.collection(_collectionPath);
 
-  Future<List<PostView>> fetchEvents() async {
+  /// Fetch events with:
+  /// - basic in-memory cache (TTL)
+  /// - request coalescing (concurrent callers share one Future)
+  /// - minimum refresh delay (optional UX smoothing)
+  ///
+  /// Set [forceRefresh] to bypass cache.
+  Future<List<PostView>> fetchEvents({bool forceRefresh = false}) {
+    final now = DateTime.now();
+
+    if (!forceRefresh && _cache != null && _cacheAt != null) {
+      final age = now.difference(_cacheAt!);
+      if (age <= _cacheTtl) {
+        return Future.value(_cache);
+      }
+    }
+
+    // If a fetch is already running, reuse it.
+    final existing = _inFlight;
+    if (existing != null) return existing;
+
+    final future = _fetchAndCache();
+    _inFlight = future;
+
+    // Clear in-flight when done.
+    future.whenComplete(() {
+      if (identical(_inFlight, future)) _inFlight = null;
+    });
+
+    return future;
+  }
+
+  /// Clears in-memory cache (useful after writes, logout, etc).
+  void clearCache() {
+    _cache = null;
+    _cacheAt = null;
+  }
+
+  Future<List<PostView>> _fetchAndCache() async {
+    final start = DateTime.now();
+
     try {
-      final querySnapshot = await _eventsRef.get();
-      return querySnapshot.docs.map((doc) {
+      // Optional: try cache first then server by using Source.serverAndCache.
+      // This still obeys security rules; it just uses local persistence when available.
+      final querySnapshot = await _eventsRef.get(const GetOptions(source: Source.serverAndCache));
+
+      final items = querySnapshot.docs.map((doc) {
         final data = doc.data();
         return PostView.fromJson({
           'id': doc.id,
           ...data,
         });
       }).toList();
+
+      _cache = items;
+      _cacheAt = DateTime.now();
+
+      await _enforceMinDelay(start);
+      return items;
     } on FirebaseException catch (e) {
+      await _enforceMinDelay(start);
       throw EventRepoException.fromFirebase(e, operation: 'fetchEvents');
     } catch (e) {
+      await _enforceMinDelay(start);
       throw EventRepoException.unknown(e, operation: 'fetchEvents');
+    }
+  }
+
+  Future<void> _enforceMinDelay(DateTime start) async {
+    final elapsed = DateTime.now().difference(start);
+    final remaining = _minRefreshDelay - elapsed;
+    if (remaining > Duration.zero) {
+      await Future.delayed(remaining);
     }
   }
 
   Future<void> addEvent(PostView event) async {
     try {
       await _eventsRef.doc(event.id).set(event.toJson());
+      // Cache is now potentially stale.
+      clearCache();
     } on FirebaseException catch (e) {
       throw EventRepoException.fromFirebase(e, operation: 'addEvent');
     } catch (e) {
@@ -44,6 +119,7 @@ class EventRepository {
   Future<void> deleteEvent(String eventId) async {
     try {
       await _eventsRef.doc(eventId).delete();
+      clearCache();
     } on FirebaseException catch (e) {
       throw EventRepoException.fromFirebase(e, operation: 'deleteEvent');
     } catch (e) {
@@ -54,6 +130,7 @@ class EventRepository {
   Future<void> updateEvent(String eventId, PostView updatedEvent) async {
     try {
       await _eventsRef.doc(eventId).update(updatedEvent.toJson());
+      clearCache();
     } on FirebaseException catch (e) {
       throw EventRepoException.fromFirebase(e, operation: 'updateEvent');
     } catch (e) {
@@ -63,12 +140,6 @@ class EventRepository {
 }
 
 /// Typed exception you can handle in UI.
-///
-/// Typical UI usage:
-/// try { await repo.addEvent(e); }
-/// on EventRepoException catch (e) {
-///   if (e.kind == EventRepoErrorKind.permissionDenied) ...
-/// }
 enum EventRepoErrorKind {
   permissionDenied,
   unauthenticated,
@@ -93,7 +164,7 @@ class EventRepoException implements Exception {
   final EventRepoErrorKind kind;
   final String operation;
   final String message;
-  final String? code; // firebase code
+  final String? code;
   final Object? original;
 
   factory EventRepoException.fromFirebase(
@@ -151,7 +222,6 @@ EventRepoErrorKind _mapFirebaseCode(String code) {
 }
 
 String _defaultMessage(EventRepoErrorKind kind, String? firebaseMessage) {
-  // Keep messages stable for UI; keep firebaseMessage as fallback.
   switch (kind) {
     case EventRepoErrorKind.permissionDenied:
       return 'Permission denied';
