@@ -1,3 +1,12 @@
+// 1. ADD THIS BLOCK AT THE TOP
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// 2. YOUR EXISTING CONFIGURATION
 allprojects {
     repositories {
         google()
@@ -5,10 +14,9 @@ allprojects {
     }
 }
 
-val newBuildDir: Directory =
-    rootProject.layout.buildDirectory
-        .dir("../../build")
-        .get()
+val newBuildDir: Directory = rootProject.layout.buildDirectory
+    .dir("../../build")
+    .get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
@@ -17,6 +25,11 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+plugins {
+  // Add the dependency for the Google services Gradle plugin
+  id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
 tasks.register<Delete>("clean") {

@@ -1,20 +1,19 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:intl/intl.dart';
 
 enum LocationMode { manual, map }
 
 class CreateEventData {
   final String title;
   final String description;
+  final DateTime eventDateTime;
   final List<String> tags;
-  final Uint8List? imageBytes;
-
-  /// null == unlimited (∞)
+  final List<Uint8List> images;
   final int? maxContributors;
-
-  /// Location: either manualAddress (if provided), or lat/lng (if picked on map)
   final String? manualAddress;
   final double? latitude;
   final double? longitude;
@@ -22,8 +21,9 @@ class CreateEventData {
   const CreateEventData({
     required this.title,
     required this.description,
+    required this.eventDateTime,
     required this.tags,
-    required this.imageBytes,
+    required this.images,
     required this.maxContributors,
     required this.manualAddress,
     required this.latitude,
@@ -32,7 +32,11 @@ class CreateEventData {
 }
 
 class CreateEventSheet extends StatefulWidget {
-  const CreateEventSheet({super.key, required this.onCreate, required this.onFinishLater});
+  const CreateEventSheet({
+    super.key, 
+    required this.onCreate, 
+    required this.onFinishLater
+  });
 
   final void Function(CreateEventData data) onCreate;
   final void Function(CreateEventData data) onFinishLater;
@@ -42,25 +46,27 @@ class CreateEventSheet extends StatefulWidget {
 }
 
 class _CreateEventSheetState extends State<CreateEventSheet> {
+  // --- Controllers ---
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _tagCtrl = TextEditingController();
   final _manualAddressCtrl = TextEditingController();
+  final _mapController = MapController();
   final _formKey = GlobalKey<FormState>();
 
+  // --- State Variables ---
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
+  
   final _tags = <String>[];
-  Uint8List? _imageBytes;
+  final List<Uint8List> _images = [];
   bool _submitting = false;
 
-  // Max contributors controls
+  // --- Logic Toggles ---
   bool _unlimited = false;
-  double _maxContribSlider = 10; // 1..100
-
-  // Location controls
+  double _maxContribSlider = 10;
   LocationMode _locationMode = LocationMode.manual;
-
-  LatLng _mapLatLng = const LatLng(41.0082, 28.9784); // Istanbul as a sensible default
-  GoogleMapController? _mapController;
+  LatLng _mapLatLng = const LatLng(41.2867, 36.3300); // Default: Samsun
 
   @override
   void dispose() {
@@ -68,29 +74,61 @@ class _CreateEventSheetState extends State<CreateEventSheet> {
     _descCtrl.dispose();
     _tagCtrl.dispose();
     _manualAddressCtrl.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+  // --- Actions ---
 
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      locale: const Locale('tr', 'TR'),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final now = TimeOfDay.now();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? now,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() => _selectedTime = picked);
+    }
+  }
+
+  Future<void> _pickImages() async {
+    final picker = ImagePicker();
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: Text('Take a photo', style: tt.bodyLarge),
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Fotoğraf Çek'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: Text('Choose from gallery', style: tt.bodyLarge),
+              title: const Text('Galeriden Seç (Çoklu)'),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
@@ -100,21 +138,37 @@ class _CreateEventSheetState extends State<CreateEventSheet> {
 
     if (source == null) return;
 
-    final file = await picker.pickImage(source: source, imageQuality: 85);
-    if (file == null) return;
+    if (source == ImageSource.gallery) {
+      final files = await picker.pickMultiImage(imageQuality: 80);
+      if (files.isEmpty) return;
+      for (final f in files) {
+        final bytes = await f.readAsBytes();
+        setState(() => _images.add(bytes));
+      }
+    } else {
+      final file = await picker.pickImage(source: source, imageQuality: 80);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      setState(() => _images.add(bytes));
+    }
+  }
 
-    final bytes = await file.readAsBytes();
+  void _removeImage(int index) {
+    setState(() => _images.removeAt(index));
+  }
+
+  void _onReorderImages(int oldIndex, int newIndex) {
     setState(() {
-      _imageBytes = bytes;
+      if (oldIndex < newIndex) newIndex -= 1;
+      final item = _images.removeAt(oldIndex);
+      _images.insert(newIndex, item);
     });
   }
 
   void _addTagFromField() {
     final raw = _tagCtrl.text.trim();
     if (raw.isEmpty) return;
-    if (!_tags.contains(raw)) {
-      setState(() => _tags.add(raw));
-    }
+    if (!_tags.contains(raw)) setState(() => _tags.add(raw));
     _tagCtrl.clear();
   }
 
@@ -122,359 +176,461 @@ class _CreateEventSheetState extends State<CreateEventSheet> {
     setState(() => _tags.remove(t));
   }
 
-  CreateEventData _collect() => CreateEventData(
-    title: _titleCtrl.text.trim(),
-    description: _descCtrl.text.trim(),
-    tags: List.unmodifiable(_tags),
-    imageBytes: _imageBytes,
-    maxContributors: _unlimited ? null : _maxContribSlider.round(),
-    manualAddress: _locationMode == LocationMode.manual ? _manualAddressCtrl.text.trim() : null,
-    latitude: _locationMode == LocationMode.map ? _mapLatLng.latitude : null,
-    longitude: _locationMode == LocationMode.map ? _mapLatLng.longitude : null,
-  );
+  CreateEventData? _collectData() {
+    if (_selectedDate == null || _selectedTime == null) return null;
+
+    final dt = DateTime(
+      _selectedDate!.year, 
+      _selectedDate!.month, 
+      _selectedDate!.day,
+      _selectedTime!.hour, 
+      _selectedTime!.minute
+    );
+
+    return CreateEventData(
+      title: _titleCtrl.text.trim(),
+      description: _descCtrl.text.trim(),
+      eventDateTime: dt,
+      tags: List.unmodifiable(_tags),
+      images: List.unmodifiable(_images),
+      maxContributors: _unlimited ? null : _maxContribSlider.round(),
+      manualAddress: _locationMode == LocationMode.manual ? _manualAddressCtrl.text.trim() : null,
+      latitude: _locationMode == LocationMode.map ? _mapLatLng.latitude : null,
+      longitude: _locationMode == LocationMode.map ? _mapLatLng.longitude : null,
+    );
+  }
 
   Future<void> _submit(bool finishLater) async {
-    if (!finishLater && !(_formKey.currentState?.validate() ?? false)) return;
+    if (!finishLater) {
+      if (!(_formKey.currentState?.validate() ?? false)) return;
+      if (_selectedDate == null || _selectedTime == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lütfen tarih ve saat seçiniz.'))
+        );
+        return;
+      }
+    }
 
     setState(() => _submitting = true);
-    final data = _collect();
+    final data = _collectData();
 
-    try {
-      if (finishLater) {
-        widget.onFinishLater(data);
-      } else {
-        widget.onCreate(data);
+    if (data != null) {
+      try {
+        if (finishLater) {
+          widget.onFinishLater(data);
+        } else {
+          widget.onCreate(data);
+        }
+        if (mounted) Navigator.pop(context);
+      } finally {
+        if (mounted) setState(() => _submitting = false);
       }
-      if (mounted) Navigator.pop(context);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+    } else {
+       if (mounted) setState(() => _submitting = false);
     }
   }
 
+  // --- UI Build ---
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+    const inputRadius = 16.0;
 
-    const inputRadius = 12.0; // slightly more rounded inputs
-    const buttonRadius = 6.0; // less rounded buttons
+    // Formatters
+    final dateStr = _selectedDate == null 
+        ? 'Tarih Seç' 
+        : DateFormat('d MMM yyyy', 'tr').format(_selectedDate!);
+    
+    final timeStr = _selectedTime == null 
+        ? 'Saat' 
+        : '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}';
 
     return FractionallySizedBox(
-      heightFactor: 0.92,
+      heightFactor: 0.95,
       child: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Form(
           key: _formKey,
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                sliver: SliverList.list(
-                  children: [
-                    Text('Create Event', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
+          child: Column(
+            children: [
+              // Header Drag Handle
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Container(
+                  width: 40, height: 4, 
+                  decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2))
+                ),
+              ),
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      sliver: SliverList.list(
+                        children: [
+                          Text('Etkinlik Oluştur', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          Text('Detayları girerek yeni bir etkinlik başlat.', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                          const SizedBox(height: 24),
 
-                    // Title
-                    TextFormField(
-                      controller: _titleCtrl,
-                      textInputAction: TextInputAction.next,
-                      style: tt.bodyLarge,
-                      decoration: InputDecoration(
-                        labelText: 'Title',
-                        labelStyle: tt.bodyMedium,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
-                      ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Image
-                    Text('Image', style: tt.titleMedium),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: _pickImage,
-                      borderRadius: BorderRadius.circular(inputRadius),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeInOut,
-                        height: _imageBytes == null ? 140 : 180,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(inputRadius),
-                          color: cs.surfaceVariant.withOpacity(0.35),
-                          border: Border.all(color: cs.outlineVariant),
-                        ),
-                        child: _imageBytes == null
-                            ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.add, size: 32),
-                                    const SizedBox(height: 8),
-                                    Text('Add an image', style: tt.bodyMedium),
-                                  ],
-                                ),
-                              )
-                            : ClipRRect(
+                          // --- 1. IMAGES (Cover + Reorderable) ---
+                          InkWell(
+                            onTap: _pickImages,
+                            borderRadius: BorderRadius.circular(inputRadius),
+                            child: Container(
+                              height: 180,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(inputRadius),
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Image.memory(_imageBytes!, fit: BoxFit.cover),
-                                    Positioned(
-                                      right: 8,
-                                      top: 8,
-                                      child: FilledButton.tonalIcon(
-                                        style: FilledButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(buttonRadius),
-                                          ),
-                                        ),
-                                        onPressed: _pickImage,
-                                        icon: const Icon(Icons.edit),
-                                        label: Text('Change', style: tt.labelLarge),
+                                border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+                                image: _images.isNotEmpty 
+                                  ? DecorationImage(image: MemoryImage(_images.first), fit: BoxFit.cover)
+                                  : null
+                              ),
+                              child: _images.isEmpty 
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_photo_alternate_outlined, size: 40, color: cs.primary),
+                                      const SizedBox(height: 8),
+                                      Text('Fotoğraf Ekle', style: tt.labelLarge?.copyWith(color: cs.primary)),
+                                      Text('(İlk fotoğraf kapak olur)', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                                    ],
+                                  )
+                                : Align(
+                                    alignment: Alignment.topRight,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                                        child: const Text('Kapak', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
-                                  ],
+                                  ),
+                            ),
+                          ),
+                          
+                          // Thumbnails List
+                          if (_images.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 80,
+                              child: ReorderableListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                onReorder: _onReorderImages,
+                                itemCount: _images.length,
+                                proxyDecorator: (child, index, animation) => Material(elevation: 8, color: Colors.transparent, borderRadius: BorderRadius.circular(8), child: child),
+                                itemBuilder: (context, index) {
+                                  return Container(
+                                    key: ValueKey(_images[index]),
+                                    margin: const EdgeInsets.only(right: 12),
+                                    width: 80,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: index == 0 ? cs.primary : cs.outlineVariant, width: index == 0 ? 2 : 1),
+                                      image: DecorationImage(image: MemoryImage(_images[index]), fit: BoxFit.cover),
+                                    ),
+                                    child: Stack(
+                                      children: [
+                                        if (index == 0) Positioned(top: 4, left: 4, child: CircleAvatar(radius: 8, backgroundColor: cs.primary, child: const Icon(Icons.star, size: 10, color: Colors.white))),
+                                        Positioned(
+                                          top: 2, right: 2,
+                                          child: InkWell(
+                                            onTap: () => _removeImage(index),
+                                            child: CircleAvatar(radius: 10, backgroundColor: Colors.black.withOpacity(0.6), child: const Icon(Icons.close, size: 14, color: Colors.white)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Center(child: Text('Sıralamak için basılı tutup sürükleyin', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontSize: 10))),
+                          ],
+                          const SizedBox(height: 24),
+
+                          // --- 2. TEXT FIELDS ---
+                          TextFormField(
+                            controller: _titleCtrl,
+                            textInputAction: TextInputAction.next,
+                            decoration: InputDecoration(
+                              labelText: 'Etkinlik Başlığı',
+                              hintText: 'Örn: Kodlama Kampı',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
+                              prefixIcon: const Icon(Icons.title),
+                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Başlık zorunludur' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _descCtrl,
+                            maxLines: 4, minLines: 2,
+                            textInputAction: TextInputAction.newline,
+                            decoration: InputDecoration(
+                              labelText: 'Açıklama',
+                              hintText: 'Etkinlik hakkında detaylar...',
+                              alignLabelWithHint: true,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
+                              prefixIcon: const Icon(Icons.description_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // --- 3. DATE & TIME (3:2 Ratio) ---
+                          Row(
+                            children: [
+                              // Date (Flex 3)
+                              Expanded(
+                                flex: 3,
+                                child: InkWell(
+                                  onTap: _pickDate,
+                                  borderRadius: BorderRadius.circular(inputRadius),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: cs.outline),
+                                      borderRadius: BorderRadius.circular(inputRadius),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.calendar_today, color: _selectedDate == null ? cs.onSurfaceVariant : cs.primary, size: 20),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            dateStr,
+                                            style: tt.bodyLarge?.copyWith(
+                                              color: _selectedDate == null ? cs.onSurfaceVariant : cs.onSurface,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Description
-                    TextFormField(
-                      controller: _descCtrl,
-                      maxLines: 5,
-                      minLines: 3,
-                      style: tt.bodyLarge,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        labelText: 'Description',
-                        labelStyle: tt.bodyMedium,
-                        alignLabelWithHint: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Tags
-                    Text('Tags', style: tt.titleMedium),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _tagCtrl,
-                            textInputAction: TextInputAction.done,
-                            style: tt.bodyLarge,
-                            decoration: InputDecoration(
-                              hintText: 'Type a tag and press Enter',
-                              hintStyle: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
-                            ),
-                            onSubmitted: (_) => _addTagFromField(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.tonal(
-                          style: FilledButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(buttonRadius)),
-                          ),
-                          onPressed: _addTagFromField,
-                          child: Text('Add', style: tt.labelLarge),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: _tags.isEmpty
-                          ? Text('No tags yet', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))
-                          : Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _tags
-                                  .map(
-                                    (t) => InputChip(
-                                      label: Text(t, style: tt.bodyMedium),
-                                      onDeleted: () => _removeTag(t),
+                              const SizedBox(width: 12),
+                              // Time (Flex 2)
+                              Expanded(
+                                flex: 2,
+                                child: InkWell(
+                                  onTap: _pickTime,
+                                  borderRadius: BorderRadius.circular(inputRadius),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: cs.outline),
+                                      borderRadius: BorderRadius.circular(inputRadius),
                                     ),
-                                  )
-                                  .toList(),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.access_time, color: _selectedTime == null ? cs.onSurfaceVariant : cs.primary, size: 20),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          timeStr,
+                                          style: tt.bodyLarge?.copyWith(
+                                            color: _selectedTime == null ? cs.onSurfaceVariant : cs.onSurface,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          // --- 4. TAGS ---
+                          Text('Etiketler', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _tagCtrl,
+                                  textInputAction: TextInputAction.done,
+                                  decoration: InputDecoration(
+                                    hintText: 'Etiket yaz (Enter)',
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onSubmitted: (_) => _addTagFromField(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filled(onPressed: _addTagFromField, icon: const Icon(Icons.add)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (_tags.isNotEmpty)
+                            Wrap(
+                              spacing: 8, runSpacing: 8,
+                              children: _tags.map((t) => InputChip(
+                                label: Text(t),
+                                onDeleted: () => _removeTag(t),
+                                backgroundColor: cs.secondaryContainer.withOpacity(0.5),
+                              )).toList(),
+                            )
+                          else 
+                            Text('Henüz etiket eklenmedi.', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          
+                          const SizedBox(height: 24),
+                          const Divider(),
+                          const SizedBox(height: 24),
+
+                          // --- 5. CONTRIBUTORS ---
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Katılımcı Limiti', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                              SegmentedButton<bool>(
+                                segments: const [ButtonSegment(value: false, label: Text('Sınırlı')), ButtonSegment(value: true, label: Text('Sınırsız'))],
+                                selected: {_unlimited},
+                                onSelectionChanged: (s) => setState(() => _unlimited = s.first),
+                                style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact, shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)))),
+                              ),
+                            ],
+                          ),
+                          if (!_unlimited) ...[
+                             const SizedBox(height: 16),
+                             Row(
+                               children: [
+                                 Expanded(
+                                   child: Slider(
+                                     min: 1, max: 100, divisions: 99,
+                                     value: _maxContribSlider,
+                                     label: _maxContribSlider.round().toString(),
+                                     onChanged: (v) => setState(() => _maxContribSlider = v),
+                                   ),
+                                 ),
+                                 Text('${_maxContribSlider.round()}', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.primary)),
+                               ],
+                             ),
+                          ],
+
+                          const SizedBox(height: 24),
+                          const Divider(),
+                          const SizedBox(height: 24),
+
+                          // --- 6. LOCATION ---
+                          Text('Konum Seçimi', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<LocationMode>(
+                              segments: const [
+                                ButtonSegment(value: LocationMode.manual, label: Text('Adres Gir'), icon: Icon(Icons.edit_location)),
+                                ButtonSegment(value: LocationMode.map, label: Text('Haritadan Seç'), icon: Icon(Icons.map)),
+                              ],
+                              selected: {_locationMode},
+                              onSelectionChanged: (s) => setState(() => _locationMode = s.first),
                             ),
-                    ),
+                          ),
+                          const SizedBox(height: 16),
 
-                    const SizedBox(height: 24),
-
-                    // === Max Contributors ===
-                    Text('Max contributors', style: tt.titleMedium),
-                    const SizedBox(height: 8),
-                    SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(value: false, label: Text('Limited', style: tt.labelLarge)),
-                        ButtonSegment(value: true, label: Text('Unlimited', style: tt.labelLarge)),
-                      ],
-                      selected: {_unlimited},
-                      onSelectionChanged: (sel) {
-                        setState(() => _unlimited = sel.first);
-                      },
-                      style: ButtonStyle(
-                        shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(buttonRadius)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _unlimited ? 0.4 : 1.0,
-                      child: IgnorePointer(
-                        ignoring: _unlimited,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                          if (_locationMode == LocationMode.manual)
+                            TextFormField(
+                              controller: _manualAddressCtrl,
+                              minLines: 1, maxLines: 3,
+                              decoration: InputDecoration(
+                                labelText: 'Adres veya Mekan Adı',
+                                prefixIcon: const Icon(Icons.place),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
+                              ),
+                            )
+                          else 
+                            // FLUTTER MAP
+                            Column(
                               children: [
-                                Text('Selected: ', style: tt.bodyMedium),
-                                Text(
-                                  '${_maxContribSlider.round()}',
-                                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(inputRadius),
+                                  child: Container(
+                                    height: 250,
+                                    decoration: BoxDecoration(border: Border.all(color: cs.outlineVariant)),
+                                    child: FlutterMap(
+                                      mapController: _mapController,
+                                      options: MapOptions(
+                                        initialCenter: _mapLatLng,
+                                        initialZoom: 13.0,
+                                        onTap: (_, point) => setState(() => _mapLatLng = point),
+                                      ),
+                                      children: [
+                                        TileLayer(
+                                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                          // UPDATED USER AGENT HERE:
+                                          userAgentPackageName: 'me.orbitium.akademiz', 
+                                        ),
+                                        MarkerLayer(
+                                          markers: [
+                                            Marker(
+                                              point: _mapLatLng,
+                                              width: 50, height: 50,
+                                              child: const Icon(Icons.location_on, size: 40, color: Colors.red),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    'Seçili: ${_mapLatLng.latitude.toStringAsFixed(4)}, ${_mapLatLng.longitude.toStringAsFixed(4)}',
+                                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                  ),
                                 ),
                               ],
                             ),
-                            Slider(
-                              min: 1,
-                              max: 100,
-                              divisions: 99,
-                              value: _maxContribSlider,
-                              label: _maxContribSlider.round().toString(),
-                              onChanged: (v) => setState(() => _maxContribSlider = v),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // === Location ===
-                    Text('Location', style: tt.titleMedium),
-                    const SizedBox(height: 8),
-                    SegmentedButton<LocationMode>(
-                      segments: [
-                        ButtonSegment(
-                          value: LocationMode.manual,
-                          label: Text('Manual', style: tt.labelLarge),
-                          icon: const Icon(Icons.edit_location_alt_outlined),
-                        ),
-                        ButtonSegment(
-                          value: LocationMode.map,
-                          label: Text('Map', style: tt.labelLarge),
-                          icon: const Icon(Icons.map_outlined),
-                        ),
-                      ],
-                      selected: {_locationMode},
-                      onSelectionChanged: (s) => setState(() => _locationMode = s.first),
-                      style: ButtonStyle(
-                        shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(buttonRadius)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (_locationMode == LocationMode.manual) ...[
-                      TextFormField(
-                        controller: _manualAddressCtrl,
-                        style: tt.bodyLarge,
-                        textInputAction: TextInputAction.newline,
-                        minLines: 1,
-                        maxLines: 3,
-                        decoration: InputDecoration(
-                          hintText: 'Address or place name',
-                          hintStyle: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(inputRadius)),
-                          prefixIcon: const Icon(Icons.place_outlined),
-                        ),
-                      ),
-                    ] else ...[
-                      // Inline Google Map with draggable marker
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(inputRadius),
-                        child: SizedBox(
-                          height: 220,
-                          child: GoogleMap(
-                            mapType: MapType.normal,
-                            initialCameraPosition: CameraPosition(target: _mapLatLng, zoom: 14),
-                            myLocationButtonEnabled: false,
-                            myLocationEnabled: false,
-                            onMapCreated: (c) => _mapController = c,
-                            markers: {
-                              Marker(
-                                markerId: const MarkerId('pick'),
-                                position: _mapLatLng,
-                                draggable: true,
-                                onDragEnd: (p) => setState(() => _mapLatLng = p),
-                              ),
-                            },
-                            onTap: (p) => setState(() => _mapLatLng = p),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on_outlined, size: 18, color: cs.onSurfaceVariant),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Lat: ${_mapLatLng.latitude.toStringAsFixed(5)} | Lng: ${_mapLatLng.longitude.toStringAsFixed(5)}',
-                              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                          const SizedBox(height: 40),
                         ],
                       ),
-                    ],
-
-                    const SizedBox(height: 28),
-
-                    // Actions
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(buttonRadius)),
-                            ),
-                            onPressed: _submitting ? null : () => _submit(true),
-                            child: Text('Finish later', style: tt.labelLarge),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(buttonRadius)),
-                            ),
-                            onPressed: _submitting ? null : () => _submit(false),
-                            child: _submitting
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : Text('Create', style: tt.labelLarge),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
+              
+              // --- BOTTOM BAR ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.5))),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: _submitting ? null : () => _submit(true),
+                        child: const Text('Taslağı Kaydet'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                        onPressed: _submitting ? null : () => _submit(false),
+                        child: _submitting 
+                          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: cs.onPrimary, strokeWidth: 2))
+                          : const Text('Oluştur'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
             ],
           ),
         ),

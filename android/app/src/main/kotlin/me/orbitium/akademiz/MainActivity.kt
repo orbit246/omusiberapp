@@ -1,4 +1,4 @@
-package com.example.omusiber
+package me.orbitium.akademiz
 
 import io.flutter.embedding.android.FlutterActivity
 
