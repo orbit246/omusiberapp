@@ -18,7 +18,8 @@ class AuthService {
   );
 
   // --- SETTINGS ---
-  final String allowedDomain = 'school.edu'; // change to your real domain
+  // "ogr.omu.edu.tr" is the standard student email domain for OMÜ.
+  final String allowedDomain = 'ogr.omu.edu.tr';
 
   /// Google Sign-In + Firebase Auth + Firestore profile upsert.
   Future<User?> signInWithGoogle() async {
@@ -41,8 +42,9 @@ class AuthService {
       );
 
       // 4. Sign in to Firebase
-      final UserCredential userCred =
-          await _auth.signInWithCredential(credential);
+      final UserCredential userCred = await _auth.signInWithCredential(
+        credential,
+      );
       final User? user = userCred.user;
 
       if (user == null) {
@@ -53,24 +55,53 @@ class AuthService {
       final String? email = user.email;
       if (email == null || !email.endsWith('@$allowedDomain')) {
         await signOut();
-        throw Exception(
-          'Access denied: Only @$allowedDomain emails are allowed.',
+        throw AuthException(
+          'Erişim reddedildi: Sadece @$allowedDomain uzantılı öğrenci mailleri kabul edilmektedir.',
         );
       }
 
       // 6. Upsert Firestore user profile
+      // Use UID as document ID, but store studentId inside
       final String studentId = _extractStudentId(email);
       await _upsertStudentProfile(user, studentId);
 
       return user;
-    } on FirebaseAuthException {
-      // Firebase-specific error
-      await signOut();
-      rethrow;
-    } catch (_) {
-      // Any other error
-      await signOut();
-      rethrow;
+    } catch (e) {
+      await signOut(); // Ensure clean state
+      throw _handleAuthError(e);
+    }
+  }
+
+  /// Anonymous Sign-In
+  /// Requires user to have accepted TOS/Privacy Agreement in the UI.
+  Future<User?> signInAnonymously({
+    required bool acceptedTos,
+    required bool acceptedPrivacy,
+  }) async {
+    if (!acceptedTos || !acceptedPrivacy) {
+      throw AuthException(
+        'Hizmet şartlarını ve gizlilik politikasını kabul etmelisiniz.',
+      );
+    }
+
+    try {
+      final UserCredential userCred = await _auth.signInAnonymously();
+      final User? user = userCred.user;
+
+      if (user == null) {
+        throw AuthException('Misafir girişi başarısız oldu (Kullanıcı yok).');
+      }
+
+      // Upsert anonymous profile
+      await _upsertAnonymousProfile(
+        user,
+        acceptedTos: acceptedTos,
+        acceptedPrivacy: acceptedPrivacy,
+      );
+
+      return user;
+    } catch (e) {
+      throw _handleAuthError(e);
     }
   }
 
@@ -85,20 +116,52 @@ class AuthService {
 
   /// Create or update student document in Firestore
   Future<void> _upsertStudentProfile(User user, String studentId) async {
-    final DocumentReference<Map<String, dynamic>> docRef =
-        _firestore.collection('students').doc(studentId);
+    // Document ID is now the User UID (not studentId)
+    final DocumentReference<Map<String, dynamic>> docRef = _firestore
+        .collection('students')
+        .doc(user.uid);
 
     // Use merge: true to avoid overwriting unknown fields in the future
     await docRef.set(<String, dynamic>{
-      'studentId': studentId,
+      'studentId': studentId, // Stored as a field
       'uid': user.uid,
       'email': user.email,
       'name': user.displayName ?? '',
       'photoUrl': user.photoURL ?? '',
       'createdAt': FieldValue.serverTimestamp(),
       'lastLoginAt': FieldValue.serverTimestamp(),
-      'isAllowed': false,
+      'isAllowed': true,
       'role': 'student',
+      // Implicitly accepted because they are students?
+      // Or we can add default true for them if needed, but usually this is for Anon.
+      'acceptedTos': true,
+      'acceptedPrivacy': true,
+    }, SetOptions(merge: true));
+  }
+
+  /// Create or update anonymous user document in Firestore
+  Future<void> _upsertAnonymousProfile(
+    User user, {
+    required bool acceptedTos,
+    required bool acceptedPrivacy,
+  }) async {
+    // Document ID is the User UID
+    final DocumentReference<Map<String, dynamic>> docRef = _firestore
+        .collection('students')
+        .doc(user.uid);
+
+    await docRef.set(<String, dynamic>{
+      'studentId': 'anon_${user.uid}',
+      'uid': user.uid,
+      'email': null,
+      'name': 'Misafir Kullanıcı',
+      'photoUrl': '',
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastLoginAt': FieldValue.serverTimestamp(),
+      'isAllowed': true,
+      'role': 'anonymous',
+      'acceptedTos': acceptedTos,
+      'acceptedPrivacy': acceptedPrivacy,
     }, SetOptions(merge: true));
   }
 
@@ -115,5 +178,63 @@ class AuthService {
     } catch (_) {
       // ignore
     }
+  }
+}
+
+/// Custom Exception for Auth Failures
+class AuthException implements Exception {
+  final String message;
+  final String? code;
+
+  AuthException(this.message, {this.code});
+
+  @override
+  String toString() => 'AuthException: $message';
+}
+
+/// Helper to map Firebase Auth errors to Turkish user-friendly messages
+AuthException _handleAuthError(Object e) {
+  if (e is FirebaseAuthException) {
+    switch (e.code) {
+      case 'user-not-found':
+        return AuthException('Kullanıcı bulunamadı.', code: e.code);
+      case 'wrong-password':
+        return AuthException('Hatalı şifre.', code: e.code);
+      case 'email-already-in-use':
+        return AuthException(
+          'Bu e-posta adresi zaten kullanımda.',
+          code: e.code,
+        );
+      case 'credential-already-in-use':
+        return AuthException(
+          'Bu hesap zaten başka bir kullanıcıyla eşleşmiş.',
+          code: e.code,
+        );
+      case 'network-request-failed':
+        return AuthException(
+          'İnternet bağlantınızı kontrol edin.',
+          code: e.code,
+        );
+      case 'user-disabled':
+        return AuthException('Bu hesap devre dışı bırakılmış.', code: e.code);
+      case 'too-many-requests':
+        return AuthException(
+          'Çok fazla deneme yaptınız. Lütfen daha sonra tekrar deneyin.',
+          code: e.code,
+        );
+      case 'operation-not-allowed':
+        return AuthException(
+          'Bu giriş yöntemi şu anda aktif değil.',
+          code: e.code,
+        );
+      case 'invalid-email':
+        return AuthException('Geçersiz e-posta formatı.', code: e.code);
+      default:
+        return AuthException('Bir hata oluştu: ${e.message}', code: e.code);
+    }
+  } else if (e is AuthException) {
+    return e;
+  } else {
+    return AuthException('Beklenmeyen bir hata oluştu: $e');
   }
 }
