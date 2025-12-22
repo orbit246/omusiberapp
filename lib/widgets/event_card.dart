@@ -31,18 +31,13 @@ class EventCard extends StatefulWidget {
   final String title;
   final String datetimeText;
   final String location;
-
-  /// ImageKit (or any CDN) URL. Can be empty.
   final String imageUrl;
-
   final String? durationText;
   final String? ticketText;
   final String? capacityText;
   final String? description;
-
   final List<EventTag> tags;
   final bool initialExpanded;
-
   final VoidCallback? onJoin;
   final VoidCallback? onBookmark;
   final VoidCallback? onShare;
@@ -54,13 +49,15 @@ class EventCard extends StatefulWidget {
 class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
   late bool _expanded = widget.initialExpanded;
   bool _isSaved = false;
-  final GlobalKey<StackedPushingExpansionWidgetState> _expansionKey = GlobalKey();
+  final GlobalKey<StackedPushingExpansionWidgetState> _expansionKey =
+      GlobalKey();
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
+    // Modern "Elevated" container style
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -68,243 +65,271 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
           _expansionKey.currentState?.toggleExpansion();
         });
       },
-      child: Card(
-        elevation: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        color: cs.surface,
-        surfaceTintColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 2),
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeInOut,
-            alignment: Alignment.topCenter,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.tags.isNotEmpty)
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: widget.tags.map((t) => TagChip(tag: t)).toList(),
-                  ),
-                if (widget.tags.isNotEmpty) const SizedBox(height: 12),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _imageBlock(context),
-
-                    const SizedBox(width: 8),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.datetimeText,
-                            style: tt.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              shadows: const [Shadow(offset: Offset(1, 1), blurRadius: 2)],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.title,
-                            maxLines: 5,
-                            overflow: TextOverflow.ellipsis,
-                            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 8),
-                          Divider(color: cs.outlineVariant, height: 1),
-                        ],
-                      ),
-                    ),
-                  ],
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0D000000), // Very light black shadow
+              blurRadius: 20,
+              offset: Offset(0, 8),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- RESTORED: Tags ---
+            if (widget.tags.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: widget.tags.map((t) => TagChip(tag: t)).toList(),
                 ),
+              ),
 
-                const SizedBox(height: 12),
+            // --- TOP CONTENT ---
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image - Larger and Squarish
+                  _imageBlock(context),
 
-                StackedPushingExpansionWidget(
-                  key: _expansionKey,
-                  header: Column(
-                    children: [
-                      InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.location_on, size: 16, color: cs.onSurfaceVariant),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                widget.location,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: tt.bodyMedium?.copyWith(color: cs.onSurface),
-                              ),
-                            ),
-                            AnimatedRotation(
-                              turns: _expanded ? 0.25 : 0.0,
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeInOut,
-                              child: Icon(Icons.arrow_forward_ios_outlined, size: 16, color: cs.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (!_expanded)
-                        Center(
-                          child: Text(
-                            "Detaylı bilgi için tıklayın",
-                            style: tt.bodySmall?.copyWith(
-                              color: const Color.fromARGB(255, 123, 117, 142),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  content: ClipRect(
+                  const SizedBox(width: 16),
+
+                  // Text Content
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Divider(height: 1, color: cs.outlineVariant),
-                        const SizedBox(height: 12),
-
-                        if (widget.durationText != null) _infoRow(context, Icons.schedule, widget.durationText!),
-
-                        if (widget.ticketText != null) ...[
-                          const SizedBox(height: 8),
-                          _infoRow(context, Icons.confirmation_number_outlined, widget.ticketText!),
-                        ],
-
-                        if (widget.capacityText != null) ...[
-                          const SizedBox(height: 8),
-                          _infoRow(context, Icons.person, widget.capacityText!),
-                        ],
-
-                        if (widget.description != null) ...[
-                          const SizedBox(height: 8),
-                          _infoRow(context, Icons.info_outline, widget.description!, topAligned: true),
-                        ],
-
-                        const SizedBox(height: 12),
-
+                        // Date Badge / Text
+                        Text(
+                          widget.datetimeText.toUpperCase(),
+                          style: tt.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        // Title
+                        Text(
+                          widget.title,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: tt.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            height: 1.25,
+                            fontSize: 17,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Location
                         Row(
                           children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 14,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: widget.onJoin,
-                                icon: Icon(Icons.event_available, size: 20, color: cs.onSurface),
-                                label: Text("Katıl", style: tt.labelLarge),
-                                style: Theme.of(context).elevatedButtonTheme.style,
+                              child: Text(
+                                widget.location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: tt.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            _squareAction(
-                              context,
-                              icon: !_isSaved ? Icons.bookmark_outline : Icons.bookmark,
-                              onTap: () {
-                                setState(() => _isSaved = !_isSaved);
-
-                                // Optional external handler
-                                try {
-                                  widget.onBookmark?.call();
-                                } catch (_) {}
-
-                                Fluttertoast.showToast(
-                                  msg: "Etkinlik ${_isSaved ? 'kaydedildi' : 'kaydedilmedi'}",
-                                  toastLength: Toast.LENGTH_SHORT,
-                                  gravity: ToastGravity.BOTTOM,
-                                  timeInSecForIosWeb: 1,
-                                  backgroundColor: Theme.of(context).colorScheme.surface,
-                                  textColor: Colors.white,
-                                  fontSize: 16,
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            _squareAction(
-                              context,
-                              icon: Icons.share_outlined,
-                              onTap: () async {
-                                // Prefer provided callback, fallback to default SharePlus
-                                if (widget.onShare != null) {
-                                  try {
-                                    widget.onShare!.call();
-                                  } catch (_) {
-                                    _toast(context, "Paylaşım başarısız");
-                                  }
-                                  return;
-                                }
-
-                                try {
-                                  await SharePlus.instance.share(
-                                    ShareParams(
-                                      text: 'Etkinlik: ${widget.title}\nKonum: ${widget.location}',
-                                    ),
-                                  );
-                                } catch (_) {
-                                  _toast(context, "Paylaşım başarısız");
-                                }
-                              },
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+
+            // --- EXPANSION CONTENT ---
+            StackedPushingExpansionWidget(
+              key: _expansionKey,
+              header: _buildExpansionTrigger(context),
+              content: _buildExpandedContent(context),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _imageBlock(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withOpacity(0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: _NetworkThumb(
-          url: widget.imageUrl,
-          height: 90,
-          width: 120,
-        ),
-      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: _NetworkThumb(url: widget.imageUrl, height: 100, width: 100),
     );
   }
 
-  Widget _infoRow(BuildContext context, IconData icon, String text, {bool topAligned = false}) {
+  Widget _buildExpansionTrigger(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Row(
-      crossAxisAlignment: topAligned ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-      children: [
-        Icon(icon, size: 18, color: cs.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Expanded(child: Text(text, style: tt.bodyMedium?.copyWith(color: cs.onSurface))),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Text(
+                  "Detaylar",
+                  style: tt.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: _expanded ? 0.25 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOut,
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!_expanded)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              child: Text(
+                "Detaylı bilgi için tıklayın",
+                style: tt.bodySmall?.copyWith(color: cs.outline),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _squareAction(BuildContext context, {required IconData icon, VoidCallback? onTap}) {
+  Widget _buildExpandedContent(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Divider(height: 1, color: cs.outlineVariant),
+          const SizedBox(height: 12),
+
+          if (widget.durationText != null)
+            _infoRow(context, Icons.schedule, widget.durationText!),
+
+          if (widget.ticketText != null) ...[
+            const SizedBox(height: 8),
+            _infoRow(
+              context,
+              Icons.confirmation_number_outlined,
+              widget.ticketText!,
+            ),
+          ],
+
+          if (widget.capacityText != null) ...[
+            const SizedBox(height: 8),
+            _infoRow(context, Icons.person, widget.capacityText!),
+          ],
+
+          if (widget.description != null) ...[
+            const SizedBox(height: 8),
+            _infoRow(
+              context,
+              Icons.info_outline,
+              widget.description!,
+              topAligned: true,
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Action Buttons - Old Style
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: widget.onJoin,
+                  icon: Icon(
+                    Icons.event_available,
+                    size: 20,
+                    color: cs.onSurface,
+                  ),
+                  label: Text("Katıl", style: tt.labelLarge),
+                  style: Theme.of(context).elevatedButtonTheme.style,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _squareAction(
+                context,
+                icon: !_isSaved ? Icons.bookmark_outline : Icons.bookmark,
+                onTap: () {
+                  setState(() => _isSaved = !_isSaved);
+                  try {
+                    widget.onBookmark?.call();
+                  } catch (_) {}
+                  Fluttertoast.showToast(
+                    msg: "Etkinlik ${_isSaved ? 'kaydedildi' : 'kaydedilmedi'}",
+                    toastLength: Toast.LENGTH_SHORT,
+                    gravity: ToastGravity.BOTTOM,
+                    timeInSecForIosWeb: 1,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    textColor: Colors.white,
+                    fontSize: 16,
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              _squareAction(
+                context,
+                icon: Icons.share_outlined,
+                onTap: () async {
+                  if (widget.onShare != null) {
+                    try {
+                      widget.onShare!.call();
+                    } catch (_) {}
+                    return;
+                  }
+                  try {
+                    await SharePlus.instance.share(
+                      ShareParams(text: '${widget.title}\n${widget.location}'),
+                    );
+                  } catch (_) {}
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _squareAction(
+    BuildContext context, {
+    required IconData icon,
+    VoidCallback? onTap,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return Material(
       color: cs.surfaceVariant,
@@ -312,21 +337,45 @@ class _EventCardState extends State<EventCard> with TickerProviderStateMixin {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: SizedBox(width: 46, height: 46, child: Icon(icon, size: 24, color: cs.onSurface)),
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Icon(icon, size: 24, color: cs.onSurface),
+        ),
       ),
     );
   }
 
-  void _toast(BuildContext context, String msg) {
-    Fluttertoast.showToast(
-      msg: msg,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      timeInSecForIosWeb: 1,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      textColor: Colors.white,
-      fontSize: 16,
+  Widget _infoRow(
+    BuildContext context,
+    IconData icon,
+    String text, {
+    bool topAligned = false,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: topAligned
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16, color: cs.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: tt.bodyMedium?.copyWith(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  void _toast(BuildContext context, String msg) {
+    Fluttertoast.showToast(msg: msg);
   }
 }
 
@@ -336,41 +385,22 @@ class _NetworkThumb extends StatelessWidget {
     required this.height,
     required this.width,
   });
-
   final String url;
   final double height;
   final double width;
 
-  bool get _validUrl => url.trim().startsWith('http://') || url.trim().startsWith('https://');
+  bool get _validUrl => url.trim().startsWith('http');
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    if (!_validUrl) {
-      return _fallback(cs);
-    }
-
+    if (!_validUrl) return _fallback(cs);
     return Image.network(
       url.trim(),
       height: height,
       width: width,
       fit: BoxFit.cover,
-      // Helps avoid huge in-memory images on list views.
-      cacheHeight: (height * MediaQuery.of(context).devicePixelRatio).round(),
-      cacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round(),
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        final value = progress.expectedTotalBytes == null
-            ? null
-            : progress.cumulativeBytesLoaded / progress.expectedTotalBytes!;
-        return SizedBox(
-          height: height,
-          width: width,
-          child: Center(child: CircularProgressIndicator(value: value)),
-        );
-      },
-      errorBuilder: (context, error, stack) => _fallback(cs),
+      errorBuilder: (_, __, ___) => _fallback(cs),
     );
   }
 
@@ -378,8 +408,11 @@ class _NetworkThumb extends StatelessWidget {
     return Container(
       height: height,
       width: width,
-      color: cs.surfaceVariant,
-      child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant),
+      color: cs.surfaceContainerHighest,
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: cs.onSurfaceVariant,
+      ),
     );
   }
 }
@@ -391,33 +424,29 @@ class TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    final bg = tag.color ?? cs.secondaryContainer;
-    final fg = tag.color != null ? _contrastOn(bg) : cs.onSecondaryContainer;
-
+    // Lighter, more subtle tags
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.outlineVariant),
+        color: cs.primaryContainer.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(tag.icon, size: 12, color: fg),
-          const SizedBox(width: 4),
+          if (tag.text == 'Ücretli')
+            Icon(Icons.attach_money, size: 12, color: cs.onPrimaryContainer),
+          // (Small logic for dynamic icons if needed inside)
           Text(
             tag.text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w700,
-                ),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: cs.onPrimaryContainer,
+            ),
           ),
         ],
       ),
     );
   }
-
-  Color _contrastOn(Color bg) => bg.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 }

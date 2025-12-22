@@ -1,12 +1,112 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
-import 'package:omusiber/widgets/event_toggle.dart';
-import 'package:omusiber/widgets/home/search_bar.dart';
 import 'package:omusiber/widgets/no_events.dart';
 
+// --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
+class SlideInEntry extends StatefulWidget {
+  final Widget child;
+  final Duration delay;
+  final bool animate;
+
+  const SlideInEntry({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+    this.animate = true,
+  });
+
+  @override
+  State<SlideInEntry> createState() => _SlideInEntryState();
+}
+
+class _SlideInEntryState extends State<SlideInEntry>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _offsetAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _sizeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _offsetAnimation = Tween<Offset>(
+      begin: const Offset(-0.5, 0.0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
+
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+
+    _sizeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.fastOutSlowIn,
+    );
+
+    if (!widget.animate) {
+      _controller.value = 1.0;
+    } else {
+      _runAnimation();
+    }
+  }
+
+  void _runAnimation() async {
+    if (widget.delay > Duration.zero) {
+      await Future.delayed(widget.delay);
+    }
+    if (mounted) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizeTransition(
+      sizeFactor: _sizeAnimation,
+      axisAlignment: -1.0,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(position: _offsetAnimation, child: widget.child),
+      ),
+    );
+  }
+}
+
+// --- 2. CUSTOM PHYSICS (Copied from NewsTabView) ---
+class RefreshSafeScrollPhysics extends BouncingScrollPhysics {
+  const RefreshSafeScrollPhysics({super.parent});
+
+  @override
+  RefreshSafeScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return RefreshSafeScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double applyBoundaryConditions(ScrollMetrics position, double value) {
+    if (value > position.maxScrollExtent) {
+      return value - position.maxScrollExtent;
+    }
+    if (value < -120.0) {
+      return value - (-120.0);
+    }
+    return super.applyBoundaryConditions(position, value);
+  }
+}
+
+// --- 3. MAIN VIEW ---
 class EventsTabView extends StatefulWidget {
   const EventsTabView({super.key});
 
@@ -16,114 +116,52 @@ class EventsTabView extends StatefulWidget {
 
 class _EventsTabViewState extends State<EventsTabView> {
   final EventRepository _repo = EventRepository();
+  final Set<String> _hasAnimatedIds = {};
 
-  Future<List<PostView>>? _future;
-  Object? _lastError;
+  final ScrollController _scrollController = ScrollController();
+  bool _showBackToTopButton = false;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
-  }
-
-  void _refresh() {
-    setState(() {
-      _lastError = null;
-      _future = _repo.fetchEvents();
+    _scrollController.addListener(() {
+      if (_scrollController.offset >= 500) {
+        if (!_showBackToTopButton) setState(() => _showBackToTopButton = true);
+      } else {
+        if (_showBackToTopButton) setState(() => _showBackToTopButton = false);
+      }
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return CustomScrollView(
-      key: const PageStorageKey('events_tab'),
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(4.0),
-            child: Column(
-              children: [
-                const SizedBox(height: 14),
-                const Center(child: EventToggle()),
-                ValueListenableBuilder(
-                  valueListenable: EventToggle.selectedIndexNotifier,
-                  builder: (context, int selectedIndex, _) {
-                    if (selectedIndex == 1) {
-                      return const Padding(
-                        padding: EdgeInsets.only(top: 20),
-                        child: NoEventsFoundWidget(),
-                      );
-                    }
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
-                    return Column(
-                      children: [
-                        const SizedBox(height: 8),
-                        const ExpandableSearchBar(hintText: 'Etkinlik ara...'),
-                        const SizedBox(height: 8),
-
-                        FutureBuilder<List<PostView>>(
-                          future: _future,
-                          builder: (context, snap) {
-                            if (snap.connectionState == ConnectionState.waiting) {
-                              // Keep 3 example cards while loading
-                              return Column(
-                                children: const [
-                                  _ExampleCard(),
-                                  _ExampleCard(),
-                                  _ExampleCard(),
-                                ],
-                              );
-                            }
-
-                            if (snap.hasError) {
-                              _lastError = snap.error;
-                              return _ErrorState(
-                                error: snap.error,
-                                onRetry: _refresh,
-                              );
-                            }
-
-                            final events = snap.data ?? const <PostView>[];
-
-                            if (events.isEmpty) {
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 20),
-                                child: _EmptyState(onRefresh: _refresh),
-                              );
-                            }
-
-                            // Real data
-                            return Column(
-                              children: events.map((e) => _eventToCard(context, e)).toList(),
-                            );
-                          },
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-      ],
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutQuart,
     );
   }
 
+  // Same helper mapping as before
   Widget _eventToCard(BuildContext context, PostView e) {
-    // Minimal defensive mapping. Your schema might be inconsistent at first.
     final imageUrl = (e.thubnailUrl.trim().isNotEmpty)
         ? e.thubnailUrl.trim()
         : (e.imageLinks.isNotEmpty ? e.imageLinks.first.trim() : '');
 
     final tags = e.tags.map((t) => EventTag(t, Icons.tag)).toList();
 
-    // Optional metadata fields if you store them
     final duration = _stringFromMeta(e, 'durationText');
     final datetime = _stringFromMeta(e, 'datetimeText') ?? 'Tarih yok';
-    final ticket = _stringFromMeta(e, 'ticketText') ??
-        (e.ticketPrice <= 0 ? 'Bilet: Ücretsiz' : 'Bilet: ₺${e.ticketPrice.toStringAsFixed(0)}');
+    final ticket =
+        _stringFromMeta(e, 'ticketText') ??
+        (e.ticketPrice <= 0
+            ? 'Bilet: Ücretsiz'
+            : 'Bilet: ₺${e.ticketPrice.toStringAsFixed(0)}');
     final capacity = (e.maxContributors > 0)
         ? 'Katılımcı: ${e.remainingContributors}/${e.maxContributors}'
         : null;
@@ -155,118 +193,103 @@ class _EventsTabViewState extends State<EventsTabView> {
     if (v is String && v.trim().isNotEmpty) return v.trim();
     return v.toString();
   }
-}
-
-class _ExampleCard extends StatelessWidget {
-  const _ExampleCard();
 
   @override
   Widget build(BuildContext context) {
-    return EventCard(
-      title: "Etkinlik Adı — Çok Uzun Başlık Buraya Sığar ve En Fazla İki Satır Olur",
-      datetimeText: "11:00 AM, Perş 23 Ağustos",
-      location: "Samsun Teknoloji Merkezi, Atakum, Samsun",
-      // Use a non-network placeholder since this is only for loading.
-      // Your EventCard already handles invalid URL with a fallback.
-      imageUrl: "",
-      durationText: "Süre: 2 saat • 11:00 - 13:00",
-      ticketText: "Bilet: Ücretsiz • Kayıt gerekli",
-      capacityText: "Katılımcı Sayısı: 150",
-      description: "Yükleniyor...",
-      tags: const [
-        EventTag("Ücretsiz", Icons.money_off, color: Colors.green),
-        EventTag("Siber Güvenlik", Icons.shield, color: Colors.blue),
-        EventTag("Konuklu", Icons.person, color: Colors.orange),
-        EventTag("Son 20 Bilet", Icons.radio_button_checked_sharp, color: Colors.purpleAccent),
-      ],
-      onJoin: null,
-      onBookmark: null,
-      onShare: null,
-    );
-  }
-}
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: StreamBuilder<List<PostView>>(
+        stream: _repo.eventsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Bir hata oluştu: ${snapshot.error}'));
+          }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.error, required this.onRetry});
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    "Etkinlikler yükleniyor",
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
 
-  final Object? error;
-  final VoidCallback onRetry;
+          final events = snapshot.data ?? [];
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    String msg = 'Bir hata oluştu.';
-    final s = error?.toString() ?? '';
-    if (s.contains('permission-denied')) msg = 'Erişim reddedildi.';
-    if (s.contains('unauthenticated')) msg = 'Giriş yapmalısınız.';
-    if (s.contains('unavailable')) msg = 'Servis şu an kullanılamıyor. İnternetinizi kontrol edin.';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(msg, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Text(
-              s.isEmpty ? 'Bilinmeyen hata' : s,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          return CustomScrollView(
+            controller: _scrollController,
+            key: const PageStorageKey('events_tab'),
+            physics: const RefreshSafeScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Tekrar dene'),
+            slivers: [
+              // Use standard refresh indicator for Slivers if needed,
+              // but since it's a Stream, explicit refresh isn't strictly necessary
+              // unless we want to force re-fetch or clear cache (which eventsStream doesn't strictly use in the same way).
+              // However, to be "similar to news tab", we can keep the visual control even if it doesn't do much for a stream.
+              // Or we can simple omit it if the stream is live.
+              // Usually Stream + Refresh is redundant for Firestore snapshots unless limits are Involved.
+              // I'll keep the sliver structure but maybe no refresh control needed for Stream
+              // OR I can use it to re-trigger something if needed.
+              // Let's stick to the visual structure.
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              if (events.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child:
+                        NoEventsFoundWidget(), // Removed onRefresh as stream updates automatically
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final event = events[index];
+
+                    // Animation Logic
+                    final bool hasAnimated = _hasAnimatedIds.contains(event.id);
+                    // If it hasn't animated yet, we animate it now
+                    final bool shouldAnimate = !hasAnimated;
+
+                    if (shouldAnimate) {
+                      _hasAnimatedIds.add(event.id);
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: 12.0,
+                        left: 16.0,
+                        right: 16.0,
+                      ),
+                      child: SlideInEntry(
+                        key: ValueKey(event.id),
+                        animate: shouldAnimate,
+                        child: _eventToCard(context, event),
+                      ),
+                    );
+                  }, childCount: events.length),
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onRefresh});
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
+              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+            ],
+          );
+        },
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.event_busy_outlined),
-          const SizedBox(width: 10),
-          const Expanded(child: Text('Henüz etkinlik yok.')),
-          TextButton.icon(
-            onPressed: onRefresh,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Yenile'),
-          ),
-        ],
-      ),
+      floatingActionButton: _showBackToTopButton
+          ? FloatingActionButton(
+              onPressed: _scrollToTop,
+              mini: true,
+              child: const Icon(Icons.arrow_upward),
+            )
+          : null,
     );
   }
 }

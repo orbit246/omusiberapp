@@ -7,10 +7,10 @@ class EventRepository {
     String collectionPath = 'events',
     Duration minRefreshDelay = const Duration(milliseconds: 600),
     Duration cacheTtl = const Duration(seconds: 30),
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _collectionPath = collectionPath,
-        _minRefreshDelay = minRefreshDelay,
-        _cacheTtl = cacheTtl;
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _collectionPath = collectionPath,
+       _minRefreshDelay = minRefreshDelay,
+       _cacheTtl = cacheTtl;
 
   final FirebaseFirestore _firestore;
   final String _collectionPath;
@@ -60,6 +60,62 @@ class EventRepository {
     return future;
   }
 
+  /// Returns a stream of events for real-time updates.
+  Stream<List<PostView>> eventsStream() {
+    // Returning 3 example events as requested
+    return Stream.value([
+      PostView(
+        id: 'mock_1',
+        title: 'Siber Güvenlik 101: Temeller',
+        description:
+            'Siber güvenliğe giriş eğitimi. Temel kavramlar, saldırı vektörleri ve savunma stratejileri hakkında kapsamlı bir başlangıç.',
+        tags: ['Eğitim', 'Siber Güvenlik', 'Başlangıç'],
+        maxContributors: 100,
+        remainingContributors: 85,
+        ticketPrice: 0,
+        location: 'Mühendislik Fakültesi, B-201',
+        thubnailUrl:
+            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80',
+        imageLinks: [],
+        metadata: {'datetimeText': '14 Ekim, 14:00', 'durationText': '2 Saat'},
+      ),
+      PostView(
+        id: 'mock_2',
+        title: 'CTF: Bayrağı Yakala Yarışması',
+        description:
+            'Takımını kur, yeteneklerini sergile! 24 saat sürecek hackaton tarzı yarışmamızda büyük ödüller sizi bekliyor.',
+        tags: ['Yarışma', 'Hackathon', 'Ödüllü'],
+        maxContributors: 50,
+        remainingContributors: 12,
+        ticketPrice: 50,
+        location: 'Teknopark Kuluçka Merkezi',
+        thubnailUrl:
+            'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
+        imageLinks: [],
+        metadata: {
+          'datetimeText': '20-21 Ekim',
+          'durationText': '24 Saat',
+          'ticketText': 'Katılım: ₺50',
+        },
+      ),
+      PostView(
+        id: 'mock_3',
+        title: 'Kariyer ve Networking Buluşması',
+        description:
+            'Sektör profesyonelleri ile tanışma fırsatı. CV incelemeleri, mülakat simülasyonları ve kariyer tavsiyeleri.',
+        tags: ['Kariyer', 'Networking', 'Sosyal'],
+        maxContributors: 40,
+        remainingContributors: 3,
+        ticketPrice: 0,
+        location: 'OMÜ Sosyal Tesisler',
+        thubnailUrl:
+            'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=800&q=80',
+        imageLinks: [],
+        metadata: {'datetimeText': '25 Ekim, 18:30', 'durationText': '3 Saat'},
+      ),
+    ]);
+  }
+
   /// Clears in-memory cache (useful after writes, logout, etc).
   void clearCache() {
     _cache = null;
@@ -72,14 +128,13 @@ class EventRepository {
     try {
       // Optional: try cache first then server by using Source.serverAndCache.
       // This still obeys security rules; it just uses local persistence when available.
-      final querySnapshot = await _eventsRef.get(const GetOptions(source: Source.serverAndCache));
+      final querySnapshot = await _eventsRef.get(
+        const GetOptions(source: Source.serverAndCache),
+      );
 
       final items = querySnapshot.docs.map((doc) {
         final data = doc.data();
-        return PostView.fromJson({
-          'id': doc.id,
-          ...data,
-        });
+        return PostView.fromJson({'id': doc.id, ...data});
       }).toList();
 
       _cache = items;
@@ -181,10 +236,7 @@ class EventRepoException implements Exception {
     );
   }
 
-  factory EventRepoException.unknown(
-    Object e, {
-    required String operation,
-  }) {
+  factory EventRepoException.unknown(Object e, {required String operation}) {
     return EventRepoException(
       kind: EventRepoErrorKind.unknown,
       operation: operation,

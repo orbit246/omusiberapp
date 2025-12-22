@@ -24,7 +24,9 @@ class AppTheme {
       error: const Color(0xFFCF6679),
     );
 
-    return _base(scheme).copyWith(extensions: <ThemeExtension<dynamic>>[CyberSemantic.dark(scheme)]);
+    return _base(scheme).copyWith(
+      extensions: <ThemeExtension<dynamic>>[CyberSemantic.dark(scheme)],
+    );
   }
 
   // LIGHT MODE: Uses Deep Indigo (primary) + Sharp Teal
@@ -43,43 +45,46 @@ class AppTheme {
 
       tertiary: AppColors.electricMagenta,
 
-      // 1. SURFACES: Use the new "Pale Pink" instead of pure White
-      surface: AppColors.palePink,
+      // 1. SURFACES: Use the new "subtleSurface" (White)
+      surface: AppColors.subtleSurface,
       onSurface: Colors.black87, // Ensure text is still readable
-      // 2. BACKGROUND: The darker pink
-      background: AppColors.mistyRose,
+      // 2. BACKGROUND: The "subtleBackground" (Violet 50)
+      background: AppColors.subtleBackground,
     );
 
     return _base(scheme).copyWith(
-      // 3. SCAFFOLD: Explicitly set to Misty Rose
-      scaffoldBackgroundColor: AppColors.mistyRose,
+      // 3. SCAFFOLD: Explicitly set to subtleBackground
+      scaffoldBackgroundColor: AppColors.subtleBackground,
 
-      // 4. APP BAR: Make it Pink (Misty Rose) to match the background
-      appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.mistyRose,
-        surfaceTintColor: Colors.transparent, // Prevents purple tint on scroll
-        scrolledUnderElevation: 0, // Keeps it flat and pink even when scrolling
-        iconTheme: const IconThemeData(color: Colors.black87),
+      // 4. APP BAR: Make it subtleBackground
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.subtleBackground,
+        surfaceTintColor: Colors.transparent, // Prevents tint on scroll
+        scrolledUnderElevation: 0, // Keeps it flat
+        iconTheme: IconThemeData(color: Colors.black87),
       ),
 
-      // 5. BOTTOM SHEETS & CARDS: Make them Pale Pink (Overlay color)
+      // 5. BOTTOM SHEETS & CARDS: Make them subtleSurface
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.palePink,
-        modalBackgroundColor: AppColors.palePink,
+        backgroundColor: AppColors.subtleSurface,
+        modalBackgroundColor: AppColors.subtleSurface,
         surfaceTintColor: Colors.transparent,
       ),
 
       cardTheme: CardThemeData(
-        color: AppColors.palePink, // The cards will now be slightly pink
+        color: AppColors.subtleSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          // Subtle border to separate the pale pink card from the misty rose bg
+          // Subtle border to separate from background
           side: BorderSide(color: AppColors.primary.withOpacity(0.05)),
         ),
       ),
 
-      dialogTheme: const DialogThemeData(backgroundColor: AppColors.palePink, surfaceTintColor: Colors.transparent),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: AppColors.subtleSurface,
+        surfaceTintColor: Colors.transparent,
+      ),
 
       extensions: <ThemeExtension<dynamic>>[CyberSemantic.light(scheme)],
     );
@@ -98,17 +103,52 @@ class AppTheme {
 
       textTheme: TextTheme(
         // Display - Large, bold, for hero sections
-        displayLarge: GoogleFonts.lexend(fontSize: 57, fontWeight: FontWeight.w800, height: 1.1, color: cs.onSurface),
-        displayMedium: GoogleFonts.lexend(fontSize: 45, fontWeight: FontWeight.w700, height: 1.15, color: cs.onSurface),
-        displaySmall: GoogleFonts.lexend(fontSize: 36, fontWeight: FontWeight.w700, height: 1.2, color: cs.onSurface),
+        displayLarge: GoogleFonts.lexend(
+          fontSize: 57,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+          color: cs.onSurface,
+        ),
+        displayMedium: GoogleFonts.lexend(
+          fontSize: 45,
+          fontWeight: FontWeight.w700,
+          height: 1.15,
+          color: cs.onSurface,
+        ),
+        displaySmall: GoogleFonts.lexend(
+          fontSize: 36,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+          color: cs.onSurface,
+        ),
 
         // Headline - Section headers
-        headlineLarge: GoogleFonts.lexend(fontSize: 32, fontWeight: FontWeight.bold, height: 1.25, color: cs.onSurface),
-        headlineMedium: GoogleFonts.lexend(fontSize: 28, fontWeight: FontWeight.w600, height: 1.3, color: cs.onSurface),
-        headlineSmall: GoogleFonts.lexend(fontSize: 24, fontWeight: FontWeight.w600, height: 1.35, color: cs.onSurface),
+        headlineLarge: GoogleFonts.lexend(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          height: 1.25,
+          color: cs.onSurface,
+        ),
+        headlineMedium: GoogleFonts.lexend(
+          fontSize: 28,
+          fontWeight: FontWeight.w600,
+          height: 1.3,
+          color: cs.onSurface,
+        ),
+        headlineSmall: GoogleFonts.lexend(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+          color: cs.onSurface,
+        ),
 
         // Title - Card headers, dialog titles
-        titleLarge: GoogleFonts.lexend(fontSize: 22, fontWeight: FontWeight.w600, height: 1.2, color: cs.onSurface),
+        titleLarge: GoogleFonts.lexend(
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+          color: cs.onSurface,
+        ),
         titleMedium: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w600,
@@ -173,11 +213,15 @@ class AppTheme {
         fillColor: isDark ? const Color(0xFF334155) : Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: isDark ? Colors.transparent : Colors.grey.shade300),
+          borderSide: BorderSide(
+            color: isDark ? Colors.transparent : Colors.grey.shade300,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: isDark ? Colors.transparent : Colors.grey.shade300),
+          borderSide: BorderSide(
+            color: isDark ? Colors.transparent : Colors.grey.shade300,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -190,7 +234,9 @@ class AppTheme {
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
@@ -199,12 +245,16 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: cs.secondary, // Uses Teal/Mint
           foregroundColor: cs.onSecondary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
 
       chipTheme: ChipThemeData(
-        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        backgroundColor: isDark
+            ? const Color(0xFF334155)
+            : const Color(0xFFE2E8F0),
         selectedColor: cs.primary.withOpacity(0.25),
         side: BorderSide.none, // Cleaner look
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -217,7 +267,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           // Light mode: grey border. Dark mode: no border.
-          side: isDark ? BorderSide.none : BorderSide(color: Colors.grey.shade200),
+          side: isDark
+              ? BorderSide.none
+              : BorderSide(color: Colors.grey.shade200),
         ),
       ),
     );
