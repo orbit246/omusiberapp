@@ -78,11 +78,15 @@ class _SettingsPageState extends State<SettingsPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      user.displayName ?? "Kullanıcı",
+                                      user.isAnonymous
+                                          ? "Misafir Kullanıcı"
+                                          : (user.displayName ?? "Kullanıcı"),
                                       style: theme.textTheme.titleMedium,
                                     ),
                                     Text(
-                                      user.email ?? "Anonim",
+                                      user.isAnonymous
+                                          ? "Anonim Hesap"
+                                          : (user.email ?? "E-posta yok"),
                                       style: theme.textTheme.bodyMedium,
                                     ),
                                   ],
@@ -91,15 +95,29 @@ class _SettingsPageState extends State<SettingsPage> {
                             ],
                           ),
                         ),
-                        // _buildSettingsTile(context,
-                        //     icon: Icons.person_outline,
-                        //     title: "Profil Düzenle",
-                        //     onTap: () {}),
-                        // _buildSettingsTile(context,
-                        //     icon: Icons.lock_outline,
-                        //     title: "Şifre ve Güvenlik",
-                        //     onTap: () {}),
+
+                        // If Anonymous, allow upgrading/switching to Google
+                        if (user.isAnonymous)
+                          _buildSettingsTile(
+                            context,
+                            icon: Icons.login,
+                            title: "Öğrenci Girişi Yap",
+                            subtitle: "Google ile giriş yapın",
+                            onTap: () async {
+                              try {
+                                await _authService.signInWithGoogle();
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(e.toString())),
+                                  );
+                                }
+                              }
+                            },
+                          ),
                       ] else ...[
+                        // Should technically not be reached if main.dart forces Anon Login
+                        // But keep it for safety.
                         _buildSettingsTile(
                           context,
                           icon: Icons.login,
@@ -107,7 +125,17 @@ class _SettingsPageState extends State<SettingsPage> {
                           subtitle: "Google ile giriş yapın",
                           onTap: () async {
                             try {
-                              await _authService.signInWithGoogle();
+                              final user = await _authService
+                                  .signInWithGoogle();
+                              if (user == null && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Giriş işlemi iptal edildi veya yapılandırma hatası oluştu.',
+                                    ),
+                                  ),
+                                );
+                              }
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -116,13 +144,6 @@ class _SettingsPageState extends State<SettingsPage> {
                               }
                             }
                           },
-                        ),
-                        _buildSettingsTile(
-                          context,
-                          icon: Icons.person_off_outlined,
-                          title: "Misafir Girişi",
-                          subtitle: "Kayıt olmadan devam et",
-                          onTap: () => _showAnonLoginDialog(context),
                         ),
                       ],
 
@@ -318,77 +339,6 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: subtitle != null ? Text(subtitle) : null,
         trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
       ),
-    );
-  }
-
-  void _showAnonLoginDialog(BuildContext context) {
-    bool tosAccepted = false;
-    bool privacyAccepted = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text("Misafir Girişi"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Misafir olarak devam etmek için aşağıdaki sözleşmeleri kabul etmelisiniz.",
-                  ),
-                  const SizedBox(height: 16),
-                  CheckboxListTile(
-                    title: const Text("Hizmet Şartları'nı kabul ediyorum"),
-                    value: tosAccepted,
-                    onChanged: (val) {
-                      setState(() => tosAccepted = val ?? false);
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Gizlilik Politikası'nı kabul ediyorum"),
-                    value: privacyAccepted,
-                    onChanged: (val) {
-                      setState(() => privacyAccepted = val ?? false);
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("İptal"),
-                ),
-                FilledButton(
-                  onPressed: (tosAccepted && privacyAccepted)
-                      ? () async {
-                          Navigator.pop(context); // Close dialog
-                          try {
-                            await _authService.signInAnonymously(
-                              acceptedTos: tosAccepted,
-                              acceptedPrivacy: privacyAccepted,
-                            );
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.toString())),
-                              );
-                            }
-                          }
-                        }
-                      : null,
-                  child: const Text("Devam Et"),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 }

@@ -7,6 +7,9 @@ import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/pages/agreement_page.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/auth/auth_service.dart';
+
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
@@ -26,7 +29,7 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           navigatorKey: navKey,
           debugShowCheckedModeBanner: false,
-          title: 'OMÜ Siber',
+          title: 'AkademiZ',
 
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
@@ -41,24 +44,53 @@ class MyApp extends StatelessWidget {
             'tr',
             'TR',
           ), // Varsayılan dili Türkçe yapabilirsiniz
-
           // -------------------------------
           themeMode: ThemeManager().themeMode,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          home: Constants.debugMode
-              ? MasterView()
-              : AgreementsPage(
-                  onContinue: (acceptance) async {
-                    if (acceptance.consent.accepted &&
-                        acceptance.privacy.accepted &&
-                        acceptance.terms.accepted) {
-                      navKey.currentState!.pushReplacement(
-                        MaterialPageRoute(builder: (_) => const MasterView()),
+          home: StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              // If we are waiting for the initial auth state, we could show a splash screen.
+              // But FirebaseAuth usually emits quickly.
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              // If we have a user (Anon or Google), go to MasterView
+              if (snapshot.hasData) {
+                print("Has Data");
+                return const MasterView();
+              }
+
+              // Otherwise, show AgreementsPage
+              // When they agree, we sign them in Anonymously.
+              return AgreementsPage(
+                onContinue: (acceptance) async {
+                  if (acceptance.consent.accepted &&
+                      acceptance.privacy.accepted &&
+                      acceptance.terms.accepted) {
+                    // Perform Anonymous Login
+                    // This will trigger the StreamBuilder to rebuild and show MasterView
+                    try {
+                      await AuthService().signInAnonymously(
+                        acceptedTos: acceptance.terms.accepted,
+                        acceptedPrivacy: acceptance.privacy.accepted,
                       );
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+                      }
                     }
-                  },
-                ),
+                  }
+                },
+              );
+            },
+          ),
         );
       },
     );

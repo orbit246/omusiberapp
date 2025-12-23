@@ -10,24 +10,22 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // google_sign_in 6.x: normal constructor is available again
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: <String>[
-      'email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-    ],
-  );
+  // google_sign_in 6.x: normal constructor is available again
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: <String>['email']);
 
   // --- SETTINGS ---
   // "ogr.omu.edu.tr" is the standard student email domain for OMÜ.
-  final String allowedDomain = 'ogr.omu.edu.tr';
+  final String allowedDomain = 'stu.omu.edu.tr';
 
   /// Google Sign-In + Firebase Auth + Firestore profile upsert.
   Future<User?> signInWithGoogle() async {
     try {
+      print('Starting Google Sign In...');
       // 1. Trigger the Google sign-in flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         // User cancelled the sign-in
+        print('Google Sign In cancelled by user.');
         return null;
       }
 
@@ -41,11 +39,33 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      // 4. Sign in to Firebase
-      final UserCredential userCred = await _auth.signInWithCredential(
-        credential,
-      );
-      final User? user = userCred.user;
+      // 4. Link or Sign in to Firebase
+      User? user;
+      final currentUser = _auth.currentUser;
+
+      if (currentUser != null && currentUser.isAnonymous) {
+        try {
+          print('Linking Google account to anonymous session...');
+          final userCred = await currentUser.linkWithCredential(credential);
+          user = userCred.user;
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'credential-already-in-use') {
+            print(
+              'Google account already exists. Signing in explicitly (dropping anon session)...',
+            );
+            // The Google account already exists, so we can't link.
+            // We just sign in to that account, effectively switching users.
+            final userCred = await _auth.signInWithCredential(credential);
+            user = userCred.user;
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        print('Signing in to Firebase...');
+        final userCred = await _auth.signInWithCredential(credential);
+        user = userCred.user;
+      }
 
       if (user == null) {
         throw Exception('Firebase sign-in returned no user.');
@@ -54,6 +74,7 @@ class AuthService {
       // 5. Enforce email domain
       final String? email = user.email;
       if (email == null || !email.endsWith('@$allowedDomain')) {
+        print('Email domain check failed for: $email');
         await signOut();
         throw AuthException(
           'Erişim reddedildi: Sadece @$allowedDomain uzantılı öğrenci mailleri kabul edilmektedir.',
@@ -65,8 +86,10 @@ class AuthService {
       final String studentId = _extractStudentId(email);
       await _upsertStudentProfile(user, studentId);
 
+      print('Google Sign In successful for: ${user.email}');
       return user;
     } catch (e) {
+      print('Google Sign In failed: $e');
       await signOut(); // Ensure clean state
       throw _handleAuthError(e);
     }
@@ -128,7 +151,7 @@ class AuthService {
       'email': user.email,
       'name': user.displayName ?? '',
       'photoUrl': user.photoURL ?? '',
-      'createdAt': FieldValue.serverTimestamp(),
+
       'lastLoginAt': FieldValue.serverTimestamp(),
       'isAllowed': true,
       'role': 'student',

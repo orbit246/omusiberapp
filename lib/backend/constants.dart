@@ -1,3 +1,3 @@
 class Constants {
-  static const bool debugMode = false;
+  static const bool debugMode = true;
 }
