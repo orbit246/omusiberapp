@@ -5,6 +5,8 @@ import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/no_events.dart';
+import 'package:omusiber/backend/auth/auth_service.dart';
+import 'package:omusiber/widgets/create_event_sheet.dart';
 
 // --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
 class SlideInEntry extends StatefulWidget {
@@ -96,13 +98,33 @@ class RefreshSafeScrollPhysics extends BouncingScrollPhysics {
 
   @override
   double applyBoundaryConditions(ScrollMetrics position, double value) {
-    if (value > position.maxScrollExtent) {
+    // If the scroll is within bounds, delegate to super (BouncingScrollPhysics uses this for standard bounce)
+    if (value >= position.minScrollExtent &&
+        value <= position.maxScrollExtent) {
+      return 0.0;
+    }
+
+    // We only want to restrict the *top* overscroll (negative values) to -120.0
+    // If trying to scroll past -120.0 (e.g. -130), we block the excess (-10).
+    if (value < position.minScrollExtent &&
+        position.minScrollExtent < position.pixels) {
+      // hit top edge
+      return value - position.minScrollExtent;
+    }
+    if (value > position.maxScrollExtent &&
+        position.maxScrollExtent > position.pixels) {
+      // hit bottom edge
       return value - position.maxScrollExtent;
     }
-    if (value < -120.0) {
-      return value - (-120.0);
+
+    if (value < -120.0 && position.pixels <= -120.0) {
+      // Already past limit, dragging further up.
+      // We block all further movement in that direction.
+      return value - position.pixels;
     }
-    return super.applyBoundaryConditions(position, value);
+
+    // Otherwise, standard bouncing behavior
+    return 0.0;
   }
 }
 
@@ -118,33 +140,45 @@ class _EventsTabViewState extends State<EventsTabView> {
   final EventRepository _repo = EventRepository();
   final Set<String> _hasAnimatedIds = {};
 
-  final ScrollController _scrollController = ScrollController();
+  // No explicit ScrollController; we rely on the PrimaryScrollController provided by NestedScrollView.
+  // This allows the inner list to work correctly with the outer NestedScrollView behavior.
+
   bool _showBackToTopButton = false;
+  bool _canCreateEvent = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.offset >= 500) {
-        if (!_showBackToTopButton) setState(() => _showBackToTopButton = true);
-      } else {
-        if (_showBackToTopButton) setState(() => _showBackToTopButton = false);
-      }
-    });
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    print("DEBUG: Checking permissions...");
+    final allowed = await AuthService().isWhitelisted();
+    print("DEBUG: isWhitelisted result: $allowed");
+    if (mounted) {
+      setState(() {
+        _canCreateEvent = allowed;
+        print("DEBUG: Updated _canCreateEvent to: $_canCreateEvent");
+      });
+    }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    // No controller to dispose
     super.dispose();
   }
 
   void _scrollToTop() {
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeOutQuart,
-    );
+    final primaryController = PrimaryScrollController.of(context);
+    if (primaryController.hasClients) {
+      primaryController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeOutQuart,
+      );
+    }
   }
 
   // Same helper mapping as before
@@ -179,7 +213,7 @@ class _EventsTabViewState extends State<EventsTabView> {
       onJoin: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => EventDetailsPage()),
+          MaterialPageRoute(builder: (_) => EventDetailsPage(event: e)),
         );
       },
       onBookmark: () {},
@@ -192,6 +226,54 @@ class _EventsTabViewState extends State<EventsTabView> {
     if (v == null) return null;
     if (v is String && v.trim().isNotEmpty) return v.trim();
     return v.toString();
+  }
+
+  Future<void> _handleRefresh() async {
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) {
+      _showToast("Yeni etkinlik bulunamadı", Icons.info_rounded, false);
+    }
+  }
+
+  void _showToast(String msg, IconData icon, bool isSuccess) {
+    final colorScheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        shape: const StadiumBorder(),
+        backgroundColor: isSuccess
+            ? colorScheme.primary
+            : colorScheme.surfaceContainerHighest,
+        elevation: 6,
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSuccess
+                  ? colorScheme.onPrimary
+                  : colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                msg,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: isSuccess
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -223,73 +305,110 @@ class _EventsTabViewState extends State<EventsTabView> {
 
           final events = snapshot.data ?? [];
 
-          return CustomScrollView(
-            controller: _scrollController,
-            key: const PageStorageKey('events_tab'),
-            physics: const RefreshSafeScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              // Use standard refresh indicator for Slivers if needed,
-              // but since it's a Stream, explicit refresh isn't strictly necessary
-              // unless we want to force re-fetch or clear cache (which eventsStream doesn't strictly use in the same way).
-              // However, to be "similar to news tab", we can keep the visual control even if it doesn't do much for a stream.
-              // Or we can simple omit it if the stream is live.
-              // Usually Stream + Refresh is redundant for Firestore snapshots unless limits are Involved.
-              // I'll keep the sliver structure but maybe no refresh control needed for Stream
-              // OR I can use it to re-trigger something if needed.
-              // Let's stick to the visual structure.
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-              if (events.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child:
-                        NoEventsFoundWidget(), // Removed onRefresh as stream updates automatically
-                  ),
-                )
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final event = events[index];
-
-                    // Animation Logic
-                    final bool hasAnimated = _hasAnimatedIds.contains(event.id);
-                    // If it hasn't animated yet, we animate it now
-                    final bool shouldAnimate = !hasAnimated;
-
-                    if (shouldAnimate) {
-                      _hasAnimatedIds.add(event.id);
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: 12.0,
-                        left: 16.0,
-                        right: 16.0,
-                      ),
-                      child: SlideInEntry(
-                        key: ValueKey(event.id),
-                        animate: shouldAnimate,
-                        child: _eventToCard(context, event),
-                      ),
-                    );
-                  }, childCount: events.length),
+          return NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (scrollInfo.metrics.axis == Axis.vertical) {
+                // Determine if we show the back-to-top button
+                if (scrollInfo.metrics.pixels >= 500) {
+                  if (!_showBackToTopButton)
+                    setState(() => _showBackToTopButton = true);
+                } else {
+                  if (_showBackToTopButton)
+                    setState(() => _showBackToTopButton = false);
+                }
+              }
+              return false; // let the notification bubble up to NestedScrollView
+            },
+            child: CustomScrollView(
+              // No 'controller' property is set, so it uses the inherited PrimaryScrollController
+              key: const PageStorageKey('events_tab'),
+              physics: const RefreshSafeScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                CupertinoSliverRefreshControl(
+                  onRefresh: _handleRefresh,
+                  refreshTriggerPullDistance: 60.0,
+                  refreshIndicatorExtent: 40.0,
                 ),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-            ],
+                if (events.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child:
+                          NoEventsFoundWidget(), // Removed onRefresh as stream updates automatically
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final event = events[index];
+
+                      // Animation Logic
+                      final bool hasAnimated = _hasAnimatedIds.contains(
+                        event.id,
+                      );
+                      // If it hasn't animated yet, we animate it now
+                      final bool shouldAnimate = !hasAnimated;
+
+                      if (shouldAnimate) {
+                        _hasAnimatedIds.add(event.id);
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: 12.0,
+                          left: 16.0,
+                          right: 16.0,
+                        ),
+                        child: SlideInEntry(
+                          key: ValueKey(event.id),
+                          animate: shouldAnimate,
+                          child: _eventToCard(context, event),
+                        ),
+                      );
+                    }, childCount: events.length),
+                  ),
+
+                const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+              ],
+            ),
           );
         },
       ),
-      floatingActionButton: _showBackToTopButton
-          ? FloatingActionButton(
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Whitelisting Check FAB
+          if (_canCreateEvent)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: FloatingActionButton(
+                heroTag: 'createEvent',
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => const CreateEventSheet(),
+                  );
+                },
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
+            ),
+
+          if (_showBackToTopButton)
+            FloatingActionButton(
+              heroTag: 'backToTop',
               onPressed: _scrollToTop,
               mini: true,
               child: const Icon(Icons.arrow_upward),
-            )
-          : null,
+            ),
+        ],
+      ),
     );
   }
 }

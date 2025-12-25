@@ -12,7 +12,8 @@ class MasterView extends StatefulWidget {
   State<MasterView> createState() => _MasterViewState();
 }
 
-class _MasterViewState extends State<MasterView> with SingleTickerProviderStateMixin {
+class _MasterViewState extends State<MasterView>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _appBarTitle = "Haberler";
 
@@ -50,7 +51,9 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
   }
 
   void _openSettingsPage() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
   }
 
   void _showCreateEventSheet() {
@@ -61,7 +64,8 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
       showDragHandle: true,
       useRootNavigator: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      builder: (context) => CreateEventSheet(onCreate: (data) {}, onFinishLater: (data) {}),
+      builder: (context) =>
+          CreateEventSheet(onCreate: (data) {}, onFinishLater: (data) {}),
     );
   }
 
@@ -93,14 +97,18 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
             // but the content is wide (14px) during the animation.
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(), // User can't scroll it
+              physics:
+                  const NeverScrollableScrollPhysics(), // User can't scroll it
               child: Row(
                 children: [
                   const SizedBox(width: 6), // The Gap
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.redAccent),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.redAccent,
+                    ),
                   ),
                 ],
               ),
@@ -124,13 +132,6 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-
-      floatingActionButton: _tabController.index == 1
-          ? FloatingActionButton(
-              onPressed: _showCreateEventSheet,
-              child: Icon(Icons.add, color: colorScheme.onPrimaryContainer),
-            )
-          : null,
 
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -190,7 +191,11 @@ class _MasterViewState extends State<MasterView> with SingleTickerProviderStateM
         },
         body: TabBarView(
           controller: _tabController,
-          children: const [NewsTabView(), EventsTabView(), NotificationsTabView()],
+          children: const [
+            NewsTabView(),
+            EventsTabView(),
+            NotificationsTabView(),
+          ],
         ),
       ),
     );

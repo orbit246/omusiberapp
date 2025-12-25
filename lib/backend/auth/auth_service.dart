@@ -84,7 +84,19 @@ class AuthService {
       // 6. Upsert Firestore user profile
       // Use UID as document ID, but store studentId inside
       final String studentId = _extractStudentId(email);
-      await _upsertStudentProfile(user, studentId);
+      try {
+        await _upsertStudentProfile(user, studentId);
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          print(
+            'Warning: Failed to create student profile due to permissions: ${e.message}',
+          );
+        } else {
+          print('Warning: Failed to create student profile: $e');
+        }
+      } catch (e) {
+        print('Warning: Failed to create student profile: $e');
+      }
 
       print('Google Sign In successful for: ${user.email}');
       return user;
@@ -116,11 +128,26 @@ class AuthService {
       }
 
       // Upsert anonymous profile
-      await _upsertAnonymousProfile(
-        user,
-        acceptedTos: acceptedTos,
-        acceptedPrivacy: acceptedPrivacy,
-      );
+      try {
+        await _upsertAnonymousProfile(
+          user,
+          acceptedTos: acceptedTos,
+          acceptedPrivacy: acceptedPrivacy,
+        );
+      } on FirebaseException catch (e) {
+        // If the backend refuses to write (e.g. permission-denied),
+        // we should still allow the user to log in rather than blocking them entirely.
+        if (e.code == 'permission-denied') {
+          print(
+            'Warning: Failed to create anonymous profile due to permissions: ${e.message}',
+          );
+        } else {
+          // If it's another error, we might want to know, but likely non-fatal for login session
+          print('Warning: Failed to create anonymous profile: $e');
+        }
+      } catch (e) {
+        print('Warning: Failed to create anonymous profile: $e');
+      }
 
       return user;
     } catch (e) {
@@ -188,7 +215,32 @@ class AuthService {
     }, SetOptions(merge: true));
   }
 
-  /// Sign out from Google and Firebase
+  /// Check if the current user is in the 'allowedStudents' whitelist.
+  /// NOTE: This requires Firestore rules to allow 'read' access to 'allowedStudents/{id}' for the owner.
+  Future<bool> isWhitelisted() async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous || user.email == null) {
+      print("User is null or anonymous or email is null");
+      return false;
+    }
+
+    try {
+      final studentId = _extractStudentId(user.email!);
+      final doc = await _firestore
+          .collection('allowedStudents')
+          .doc(studentId)
+          .get();
+
+      print("Whitelist check result: ${doc.exists}");
+      return doc.exists;
+    } catch (e) {
+      print('Whitelist check failed (Rules likely prevent read): $e');
+      return false;
+    }
+  }
+
+  /// Sign out from Google and Firebase, then immediately sign in anonymously.
+  /// This ensures the user is "dropped" back to an anonymous session instead of the Agreements page.
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
@@ -198,8 +250,13 @@ class AuthService {
 
     try {
       await _auth.signOut();
-    } catch (_) {
-      // ignore
+      print('Signed out from Firebase. Creating fallback anonymous session...');
+
+      // Implicitly accept TOS/Privacy because the user was already using the app.
+      await signInAnonymously(acceptedTos: true, acceptedPrivacy: true);
+    } catch (e) {
+      print('Error during sign out / anon-sign-in: $e');
+      // If anon sign-in fails, the user remains signed out.
     }
   }
 }
@@ -255,6 +312,9 @@ AuthException _handleAuthError(Object e) {
       default:
         return AuthException('Bir hata oluştu: ${e.message}', code: e.code);
     }
+  } else if (e is FirebaseException) {
+    // Handle generic Firebase errors (Firestore, Storage, etc.)
+    return AuthException('Firebase hatası: ${e.message}', code: e.code);
   } else if (e is AuthException) {
     return e;
   } else {

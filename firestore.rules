@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Safely get student ID from email
+    // Returns the part before '@' if email exists, otherwise returns empty string
+    function studentId() {
+      return request.auth != null && request.auth.token.email != null
+        ? request.auth.token.email.split('@')[0]
+        : '';
+    }
+
+    // Helper: Check if user is whitelisted
+    function isWhitelisted() {
+      let sid = studentId();
+      return sid != '' && exists(/databases/$(database)/documents/allowedStudents/$(sid));
+    }
+
+    // EVENTS: Public read, Whitelisted write
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if isWhitelisted();
+    }
+
+    // ALLOWED STUDENTS: 
+    // Allow a user to read ONLY their own whitelist entry.
+    // This allows the app (AuthService) to run: collection('allowedStudents').doc(myStudentId).get()
+    match /allowedStudents/{id} {
+      allow read: if studentId() == id;
+      allow write: if false;
+    }
+
+    // USER PROFILES:
+    // Users can read/write only their own profile
+    match /students/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

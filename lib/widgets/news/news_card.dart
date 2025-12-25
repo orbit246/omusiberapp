@@ -63,7 +63,7 @@ class NewsCard extends StatelessWidget {
 
               // Content Section
               Padding(
-                padding: const EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -146,7 +146,7 @@ class NewsCard extends StatelessWidget {
                                 !view.isFavorited,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             _ActionButton(
                               icon: Icons.chat_bubble_outline_rounded,
                               label: view.commentCount > 0
@@ -154,7 +154,7 @@ class NewsCard extends StatelessWidget {
                                   : null,
                               onTap: view.onComment,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             _ActionButton(
                               icon: Icons.share_outlined,
                               onTap: view.onShare,
@@ -178,7 +178,7 @@ class NewsCard extends StatelessWidget {
                                 color: colorScheme.outline,
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             InkWell(
                               onTap:
                                   view.onOpen ??
@@ -270,7 +270,7 @@ class _ActionButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
