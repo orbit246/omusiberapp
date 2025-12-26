@@ -62,8 +62,7 @@ class EventRepository {
 
   /// Returns a stream of events for real-time updates.
   Stream<List<PostView>> eventsStream() {
-    // Returning 3 example events as requested
-    return Stream.value([
+    final mockEvents = [
       PostView(
         id: 'mock_1',
         title: 'Siber Güvenlik 101: Temeller',
@@ -113,7 +112,19 @@ class EventRepository {
         imageLinks: [],
         metadata: {'datetimeText': '25 Ekim, 18:30', 'durationText': '3 Saat'},
       ),
-    ]);
+    ];
+
+    return _eventsRef
+        .orderBy('metadata.eventDate', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          final realEvents = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return PostView.fromJson({'id': doc.id, ...data});
+          }).toList();
+
+          return [...mockEvents, ...realEvents];
+        });
   }
 
   /// Clears in-memory cache (useful after writes, logout, etc).

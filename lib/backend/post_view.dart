@@ -9,7 +9,7 @@ class PostView {
   final String location;
   final String thubnailUrl;
   final List<String> imageLinks;
-  final Map<String, Object> metadata;
+  final Map<String, dynamic> metadata;
 
   PostView({
     required this.id,
@@ -37,7 +37,7 @@ class PostView {
       location: json['location'] as String,
       thubnailUrl: json['thubnailUrl'] as String,
       imageLinks: List<String>.from(json['imageLinks'] as List),
-      metadata: json['metadata'] as Map<String, Object>,
+      metadata: (json['metadata'] as Map?)?.cast<String, dynamic>() ?? {},
     );
   }
 
