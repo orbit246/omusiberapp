@@ -88,45 +88,8 @@ class _SlideInEntryState extends State<SlideInEntry>
 }
 
 // --- 2. CUSTOM PHYSICS (Copied from NewsTabView) ---
-class RefreshSafeScrollPhysics extends BouncingScrollPhysics {
-  const RefreshSafeScrollPhysics({super.parent});
-
-  @override
-  RefreshSafeScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return RefreshSafeScrollPhysics(parent: buildParent(ancestor));
-  }
-
-  @override
-  double applyBoundaryConditions(ScrollMetrics position, double value) {
-    // If the scroll is within bounds, delegate to super (BouncingScrollPhysics uses this for standard bounce)
-    if (value >= position.minScrollExtent &&
-        value <= position.maxScrollExtent) {
-      return 0.0;
-    }
-
-    // We only want to restrict the *top* overscroll (negative values) to -120.0
-    // If trying to scroll past -120.0 (e.g. -130), we block the excess (-10).
-    if (value < position.minScrollExtent &&
-        position.minScrollExtent < position.pixels) {
-      // hit top edge
-      return value - position.minScrollExtent;
-    }
-    if (value > position.maxScrollExtent &&
-        position.maxScrollExtent > position.pixels) {
-      // hit bottom edge
-      return value - position.maxScrollExtent;
-    }
-
-    if (value < -120.0 && position.pixels <= -120.0) {
-      // Already past limit, dragging further up.
-      // We block all further movement in that direction.
-      return value - position.pixels;
-    }
-
-    // Otherwise, standard bouncing behavior
-    return 0.0;
-  }
-}
+// --- 2. CUSTOM PHYSICS (Removed to fix overscroll error) ---
+// We will use standard AlwaysScrollableScrollPhysics instead.
 
 // --- 3. MAIN VIEW ---
 class EventsTabView extends StatefulWidget {
@@ -322,9 +285,7 @@ class _EventsTabViewState extends State<EventsTabView> {
             child: CustomScrollView(
               // No 'controller' property is set, so it uses the inherited PrimaryScrollController
               key: const PageStorageKey('events_tab'),
-              physics: const RefreshSafeScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
+              physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 CupertinoSliverRefreshControl(
                   onRefresh: _handleRefresh,
