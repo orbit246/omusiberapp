@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
+import 'package:omusiber/pages/excel_viewer_page.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -18,6 +21,20 @@ class _NewsItemPageState extends State<NewsItemPage> {
   final CarouselSliderController _carouselController =
       CarouselSliderController();
   int _currentImageIndex = 0;
+  late bool _isFavorited;
+  late int _viewCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorited = widget.view.isFavorited;
+    _viewCount = widget.view.viewCount;
+
+    if (widget.view.id > 0) {
+      _viewCount += 1;
+      unawaited(NewsFetcher().trackNewsView(widget.view.id));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +290,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                                   const SizedBox(width: 6),
                                   Text(
                                     // Use format if available, simpler fallback here or duplicate method
-                                    '${view.viewCount}',
+                                    '$_viewCount',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -295,6 +312,72 @@ class _NewsItemPageState extends State<NewsItemPage> {
                             fontWeight: FontWeight.w400,
                           ),
                         ),
+
+                        if (view.excelAttachments.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          const Divider(),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Ekler / Dosyalar",
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ...view.excelAttachments.map((attachment) {
+                            final url = attachment['url'] as String?;
+                            final name = Uri.decodeComponent(
+                              url?.split('/').last ?? 'İsimsiz Dosya.xlsx',
+                            );
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              elevation: 0,
+                              color: colorScheme.surfaceContainerHighest
+                                  .withOpacity(0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: colorScheme.outlineVariant,
+                                ),
+                              ),
+                              child: ListTile(
+                                leading: const Icon(
+                                  Icons.table_chart,
+                                  color: Colors.green,
+                                ),
+                                title: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: const Text("Excel Dosyası"),
+                                trailing: const Icon(Icons.download_rounded),
+                                onTap: () {
+                                  if (url != null) {
+                                    if (name.endsWith('.xlsx') ||
+                                        name.endsWith('.xls')) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ExcelViewerPage(
+                                            fileUrl: url,
+                                            title: name,
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      launchUrl(
+                                        Uri.parse(url),
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            );
+                          }),
+                        ],
 
                         // Extra space for FAB/BottomBar
                         const SizedBox(height: 120),
@@ -343,15 +426,27 @@ class _NewsItemPageState extends State<NewsItemPage> {
                       // Bookmark
                       IconButton(
                         onPressed: () {
-                          view.onToggleFavorite?.call(!view.isFavorited);
-                          setState(() {});
+                          final nextValue = !_isFavorited;
+                          setState(() {
+                            _isFavorited = nextValue;
+                          });
+                          if (view.onToggleFavorite != null) {
+                            view.onToggleFavorite!(nextValue);
+                          } else {
+                            unawaited(
+                              NewsFetcher().trackNewsLike(
+                                view.id,
+                                isLiked: nextValue,
+                              ),
+                            );
+                          }
                         },
                         icon: Icon(
-                          view.isFavorited
+                          _isFavorited
                               ? Icons.bookmark
                               : Icons.bookmark_border,
                         ),
-                        color: view.isFavorited ? colorScheme.primary : null,
+                        color: _isFavorited ? colorScheme.primary : null,
                       ),
 
                       const Spacer(),

@@ -15,7 +15,7 @@ class EventImageBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: _NetworkThumb(url: imageUrl, height: height, width: width),
     );
   }

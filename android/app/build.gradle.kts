@@ -5,6 +5,15 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "me.orbitium.akademiz"
     compileSdk = flutter.compileSdkVersion
@@ -30,9 +39,25 @@ compileOptions {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val alias = keystoreProperties.getProperty("keyAlias")?.trim()
+            val keyPass = keystoreProperties.getProperty("keyPassword")?.trim()
+            val storePass = keystoreProperties.getProperty("storePassword")?.trim()
+            val storeFilePath = keystoreProperties.getProperty("storeFile")?.trim()
+
+            if (alias != null && keyPass != null && storePass != null && storeFilePath != null) {
+                keyAlias = alias
+                keyPassword = keyPass
+                storeFile = file(storeFilePath)
+                storePassword = storePass
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

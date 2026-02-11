@@ -3,35 +3,8 @@ import 'package:flutter/material.dart';
 /// Lightweight view model for NewsCard & NewsItemPage.
 /// Put *all* text/data here so the widgets stay presentational.
 class NewsView {
-  const NewsView({
-    // Core
-    required this.title,
-    required this.summary,
-    required this.authorName,
-    required this.heroImage,
-
-    // Metadata / extra info
-    this.detailUrl,
-    this.publishedAt,
-    this.publishedAtText,
-    this.tags = const <String>[],
-    this.imageUrls = const <String>[],
-    this.fullText,
-
-    // Visual / UX
-    this.authorAvatar,
-    this.commentCount = 0,
-    this.viewCount = 0,
-    this.isFavorited = false,
-    this.readMoreLabel = 'Devamını Oku',
-    this.commentLabelSuffix = ' Yorum',
-
-    // Actions (callbacks)
-    this.onOpen,
-    this.onToggleFavorite,
-    this.onComment,
-    this.onShare,
-  });
+  /// Unique ID from the API
+  final int id;
 
   /// Main title of the news.
   final String title;
@@ -43,10 +16,9 @@ class NewsView {
   final String authorName;
 
   /// Big cover image for the card.
-  /// NOTE: In your widgets you can decide whether this is [AssetImage] or [NetworkImage].
   final String? heroImage;
 
-  /// URL of the news detail page (if you want to open in browser, share, etc.).
+  /// URL of the news detail page.
   final String? detailUrl;
 
   /// Machine-friendly publish date.
@@ -59,12 +31,13 @@ class NewsView {
   final List<String> tags;
 
   /// All images for the detail page carousel.
-  /// You can store absolute URLs or asset paths; the widget decides how to render.
   final List<String> imageUrls;
 
   /// Full body text for the detail page.
-  /// If null, you can fall back to [summary].
   final String? fullText;
+
+  /// Excel attachments containing parsed data
+  final List<Map<String, dynamic>> excelAttachments;
 
   /// Small circle avatar (optional).
   final ImageProvider? authorAvatar;
@@ -72,6 +45,7 @@ class NewsView {
   /// Counters
   final int commentCount;
   final int viewCount;
+  final int likeCount;
 
   /// Favorite state for the heart icon.
   final bool isFavorited;
@@ -86,7 +60,34 @@ class NewsView {
   final VoidCallback? onComment;
   final VoidCallback? onShare;
 
+  const NewsView({
+    this.id = 0, // Default to 0 if not provided (e.g. fallback)
+    required this.title,
+    required this.summary,
+    required this.authorName,
+    required this.heroImage,
+    this.detailUrl,
+    this.publishedAt,
+    this.publishedAtText,
+    this.tags = const <String>[],
+    this.imageUrls = const <String>[],
+    this.fullText,
+    this.excelAttachments = const [],
+    this.authorAvatar,
+    this.commentCount = 0,
+    this.viewCount = 0,
+    this.likeCount = 0,
+    this.isFavorited = false,
+    this.readMoreLabel = 'Devamını Oku',
+    this.commentLabelSuffix = ' Yorum',
+    this.onOpen,
+    this.onToggleFavorite,
+    this.onComment,
+    this.onShare,
+  });
+
   NewsView copyWith({
+    int? id,
     String? title,
     String? summary,
     String? authorName,
@@ -97,9 +98,11 @@ class NewsView {
     List<String>? tags,
     List<String>? imageUrls,
     String? fullText,
+    List<Map<String, dynamic>>? excelAttachments,
     ImageProvider? authorAvatar,
     int? commentCount,
     int? viewCount,
+    int? likeCount,
     bool? isFavorited,
     String? readMoreLabel,
     String? commentLabelSuffix,
@@ -109,6 +112,7 @@ class NewsView {
     VoidCallback? onShare,
   }) {
     return NewsView(
+      id: id ?? this.id,
       title: title ?? this.title,
       summary: summary ?? this.summary,
       authorName: authorName ?? this.authorName,
@@ -119,9 +123,11 @@ class NewsView {
       tags: tags ?? this.tags,
       imageUrls: imageUrls ?? this.imageUrls,
       fullText: fullText ?? this.fullText,
+      excelAttachments: excelAttachments ?? this.excelAttachments,
       authorAvatar: authorAvatar ?? this.authorAvatar,
       commentCount: commentCount ?? this.commentCount,
       viewCount: viewCount ?? this.viewCount,
+      likeCount: likeCount ?? this.likeCount,
       isFavorited: isFavorited ?? this.isFavorited,
       readMoreLabel: readMoreLabel ?? this.readMoreLabel,
       commentLabelSuffix: commentLabelSuffix ?? this.commentLabelSuffix,
@@ -132,15 +138,13 @@ class NewsView {
     );
   }
 
-  // This tells Dart: "Two news items are equal if they have the same URL"
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
 
-    return other is NewsView &&
-        other.detailUrl == detailUrl; // Assuming URL is unique for every news
+    return other is NewsView && other.id == id && other.title == title;
   }
 
   @override
-  int get hashCode => detailUrl.hashCode;
+  int get hashCode => Object.hash(id, title);
 }

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 
 // --- 1. ANIMATION WRAPPER ---
@@ -9,13 +12,19 @@ class SlideInEntry extends StatefulWidget {
   final Duration delay;
   final bool animate;
 
-  const SlideInEntry({super.key, required this.child, this.delay = Duration.zero, this.animate = true});
+  const SlideInEntry({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+    this.animate = true,
+  });
 
   @override
   State<SlideInEntry> createState() => _SlideInEntryState();
 }
 
-class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderStateMixin {
+class _SlideInEntryState extends State<SlideInEntry>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _offsetAnimation;
   late Animation<double> _fadeAnimation;
@@ -24,7 +33,10 @@ class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
 
     _offsetAnimation = Tween<Offset>(
       begin: const Offset(-0.5, 0.0),
@@ -33,7 +45,10 @@ class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderSt
 
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
-    _sizeAnimation = CurvedAnimation(parent: _controller, curve: Curves.fastOutSlowIn);
+    _sizeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.fastOutSlowIn,
+    );
 
     if (!widget.animate) {
       _controller.value = 1.0;
@@ -70,26 +85,7 @@ class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderSt
   }
 }
 
-// --- 2. CUSTOM PHYSICS ---
-class RefreshSafeScrollPhysics extends BouncingScrollPhysics {
-  const RefreshSafeScrollPhysics({super.parent});
-
-  @override
-  RefreshSafeScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return RefreshSafeScrollPhysics(parent: buildParent(ancestor));
-  }
-
-  @override
-  double applyBoundaryConditions(ScrollMetrics position, double value) {
-    if (value > position.maxScrollExtent) {
-      return value - position.maxScrollExtent;
-    }
-    if (value < -120.0) {
-      return value - (-120.0);
-    }
-    return super.applyBoundaryConditions(position, value);
-  }
-}
+// --- 2. CUSTOM PHYSICS (Removed to fix overscroll error) ---
 
 // --- 3. MAIN VIEW ---
 class NewsTabView extends StatefulWidget {
@@ -100,48 +96,46 @@ class NewsTabView extends StatefulWidget {
 }
 
 class _NewsTabViewState extends State<NewsTabView> {
-  final List<dynamic> _articles = [];
-  final Set<dynamic> _animateAllowedSet = {};
-  final Set<dynamic> _hasAnimatedSet = {};
+  final List<NewsView> _articles = [];
+  final Set<NewsView> _animateAllowedSet = {};
+  final Set<NewsView> _hasAnimatedSet = {};
 
   bool _isInitialLoading = true;
   String? _errorMessage;
 
-  final ScrollController _scrollController = ScrollController();
   bool _showBackToTopButton = false;
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
-
-    _scrollController.addListener(() {
-      if (_scrollController.offset >= 500) {
-        if (!_showBackToTopButton) setState(() => _showBackToTopButton = true);
-      } else {
-        if (_showBackToTopButton) setState(() => _showBackToTopButton = false);
-      }
-    });
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
     super.dispose();
   }
 
   void _scrollToTop() {
-    _scrollController.animateTo(0, duration: const Duration(milliseconds: 600), curve: Curves.easeOutQuart);
+    final primaryController = PrimaryScrollController.of(context);
+    if (primaryController.hasClients) {
+      primaryController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeOutQuart,
+      );
+    }
   }
 
   Future<void> _loadInitialData() async {
     try {
       final newData = await NewsFetcher().fetchLatestNews();
+      final hydratedData = _bindNewsActions(newData);
       if (mounted) {
         setState(() {
           _isInitialLoading = false;
-          _animateAllowedSet.addAll(newData);
-          _articles.addAll(newData);
+          _animateAllowedSet.addAll(hydratedData);
+          _articles.addAll(hydratedData);
         });
       }
     } catch (e) {
@@ -156,10 +150,12 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _handleRefresh() async {
     try {
-      final fetchedData = await NewsFetcher().fetchLatestNews();
+      final fetchedData = _bindNewsActions(
+        await NewsFetcher().fetchLatestNews(),
+      );
       if (!mounted) return;
 
-      final List<dynamic> newItems = fetchedData.where((newItem) {
+      final List<NewsView> newItems = fetchedData.where((newItem) {
         return !_articles.contains(newItem);
       }).toList();
 
@@ -169,7 +165,11 @@ class _NewsTabViewState extends State<NewsTabView> {
         });
 
         if (mounted) {
-          _showToast("Yeni ${newItems.length} haber yüklendi", Icons.check_circle_rounded, true);
+          _showToast(
+            "Yeni ${newItems.length} haber yüklendi",
+            Icons.check_circle_rounded,
+            true,
+          );
         }
       } else {
         if (mounted) {
@@ -181,6 +181,34 @@ class _NewsTabViewState extends State<NewsTabView> {
     }
   }
 
+  List<NewsView> _bindNewsActions(List<NewsView> items) {
+    return items.map(_bindNewsActionsForItem).toList(growable: false);
+  }
+
+  NewsView _bindNewsActionsForItem(NewsView item) {
+    return item.copyWith(
+      onToggleFavorite: (isLiked) => _handleNewsLikeToggle(item.id, isLiked),
+    );
+  }
+
+  void _handleNewsLikeToggle(int newsId, bool isLiked) {
+    final index = _articles.indexWhere((item) => item.id == newsId);
+    if (index == -1) return;
+
+    final current = _articles[index];
+    final nextLikeCount = isLiked
+        ? current.likeCount + 1
+        : (current.likeCount > 0 ? current.likeCount - 1 : 0);
+
+    setState(() {
+      _articles[index] = _bindNewsActionsForItem(
+        current.copyWith(isFavorited: isLiked, likeCount: nextLikeCount),
+      );
+    });
+
+    unawaited(NewsFetcher().trackNewsLike(newsId, isLiked: isLiked));
+  }
+
   void _showToast(String msg, IconData icon, bool isSuccess) {
     final colorScheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -189,18 +217,28 @@ class _NewsTabViewState extends State<NewsTabView> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: const StadiumBorder(),
-        backgroundColor: isSuccess ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+        backgroundColor: isSuccess
+            ? colorScheme.primary
+            : colorScheme.surfaceContainerHighest,
         elevation: 6,
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSuccess ? colorScheme.onPrimary : colorScheme.onSurfaceVariant, size: 20),
+            Icon(
+              icon,
+              color: isSuccess
+                  ? colorScheme.onPrimary
+                  : colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 msg,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: isSuccess ? colorScheme.onPrimary : colorScheme.onSurface,
+                  color: isSuccess
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -225,86 +263,115 @@ class _NewsTabViewState extends State<NewsTabView> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text("Haberler yükleniyor", style: TextStyle(fontSize: 14, color: Colors.grey)),
+            Text(
+              "Haberler yükleniyor",
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
           ],
         ),
       );
     }
 
-    if (_errorMessage != null) return Center(child: Text("Hata: $_errorMessage"));
+    if (_errorMessage != null)
+      return Center(child: Text("Hata: $_errorMessage"));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: CustomScrollView(
-        controller: _scrollController,
-        key: const PageStorageKey('news_tab'),
-        physics: const RefreshSafeScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        slivers: [
-          CupertinoSliverRefreshControl(
-            onRefresh: _handleRefresh,
-            refreshTriggerPullDistance: 60.0,
-            refreshIndicatorExtent: 40.0,
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-          // The List of News
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final newsItem = _articles[index];
-
-              final bool isAllowed = _animateAllowedSet.contains(newsItem);
-              final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
-              final bool shouldAnimate = isAllowed && !hasAnimated;
-
-              if (shouldAnimate) {
-                _hasAnimatedSet.add(newsItem);
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification scrollInfo) {
+          if (scrollInfo.metrics.axis == Axis.vertical) {
+            if (scrollInfo.metrics.pixels >= 500) {
+              if (!_showBackToTopButton) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && !_showBackToTopButton) {
+                    setState(() => _showBackToTopButton = true);
+                  }
+                });
               }
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0, left: 16.0, right: 16.0),
-                child: SlideInEntry(
-                  key: ValueKey(newsItem),
-                  animate: shouldAnimate,
-                  child: NewsCard(view: newsItem),
-                ),
-              );
-            }, childCount: _articles.length),
-          ),
-
-          // --- FOOTER SECTION ---
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text("Built by ", style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-                  Text(
-                    "Samet Demiral",
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.primary, // Using Primary Color for the name
-                      fontWeight: FontWeight.bold,
+            } else {
+              if (_showBackToTopButton) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _showBackToTopButton) {
+                    setState(() => _showBackToTopButton = false);
+                  }
+                });
+              }
+            }
+          }
+          return false;
+        },
+        child: CustomScrollView(
+          key: const PageStorageKey('news_tab'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            CupertinoSliverRefreshControl(
+              onRefresh: _handleRefresh,
+              refreshTriggerPullDistance: 60.0,
+              refreshIndicatorExtent: 40.0,
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            // The List of News
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final newsItem = _articles[index];
+                final bool isAllowed = _animateAllowedSet.contains(newsItem);
+                final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
+                final bool shouldAnimate = isAllowed && !hasAnimated;
+                if (shouldAnimate) {
+                  _hasAnimatedSet.add(newsItem);
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: SlideInEntry(
+                    key: ValueKey(newsItem),
+                    animate: shouldAnimate,
+                    child: NewsCard(view: newsItem),
+                  ),
+                );
+              }, childCount: _articles.length),
+            ),
+            // --- FOOTER SECTION ---
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Built by ",
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  Text(" with ", style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-                  Icon(
-                    Icons.favorite,
-                    color: colorScheme.primary, // Red heart
-                    size: 14,
-                  ),
-                ],
+                    Text(
+                      "NortixLabs",
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      " with ",
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Icon(Icons.favorite, color: colorScheme.primary, size: 14),
+                  ],
+                ),
               ),
             ),
-          ),
-
-          // Bottom padding to ensure FAB doesn't cover content
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
-        ],
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          ],
+        ),
       ),
       floatingActionButton: _showBackToTopButton
-          ? FloatingActionButton(onPressed: _scrollToTop, mini: true, child: const Icon(Icons.arrow_upward))
+          ? FloatingActionButton(
+              onPressed: _scrollToTop,
+              mini: true,
+              child: const Icon(Icons.arrow_upward),
+            )
           : null,
     );
   }

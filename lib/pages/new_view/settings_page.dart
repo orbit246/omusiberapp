@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/theme_manager.dart';
+import 'package:omusiber/backend/tab_badge_service.dart';
+
+import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
+import 'package:omusiber/pages/new_view/about_page.dart';
+import 'package:omusiber/pages/new_view/feedback_page.dart';
 import 'dart:math';
 
 // SettingsPage must be a StatefulWidget to hold the initial random state for the easter egg
@@ -155,14 +160,34 @@ class _SettingsPageState extends State<SettingsPage> {
                         context,
                         icon: Icons.notifications_outlined,
                         title: "Bildirimler",
-                        onTap: () {},
+                        onTap: () {
+                          TabBadgeService().markNotifsViewed();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => Scaffold(
+                                appBar: AppBar(
+                                  title: const Text("Bildirimler"),
+                                ),
+                                body: const NotificationsTabView(),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       _buildSettingsTile(
                         context,
                         icon: Icons.language,
                         title: "Dil / Language",
                         subtitle: "Türkçe",
-                        onTap: () {},
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                "Farklı Dil desteği yakında geliyor!",
+                              ),
+                            ),
+                          );
+                        },
                       ),
 
                       // Dark Mode Switch (Toggle)
@@ -257,7 +282,28 @@ class _SettingsPageState extends State<SettingsPage> {
                         context,
                         icon: Icons.info_outline,
                         title: "Hakkında",
-                        onTap: () {},
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            isScrollControlled: true,
+                            builder: (context) => const AboutBottomSheet(),
+                          );
+                        },
+                      ),
+
+                      _buildSettingsTile(
+                        context,
+                        icon: Icons.feedback_outlined,
+                        title: "Geri Dönüş",
+                        subtitle: "Hata bildirimi ve öneriler",
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const FeedbackPage(),
+                            ),
+                          );
+                        },
                       ),
 
                       // Sign Out Button (Only if logged in)

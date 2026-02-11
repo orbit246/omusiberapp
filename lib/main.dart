@@ -1,20 +1,26 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:omusiber/backend/constants.dart';
+
 import 'package:omusiber/colors/app_theme.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/pages/agreement_page.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
+import 'package:omusiber/backend/notifications/simple_push.dart';
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Register background handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   runApp(const MyApp());
 }
 

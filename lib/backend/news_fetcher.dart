@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:html/parser.dart' as html_parser;
+import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 
 class NewsFetcher {
@@ -11,16 +13,13 @@ class NewsFetcher {
   factory NewsFetcher() => _instance;
   NewsFetcher._internal();
 
-  final int maxNewsCount = 7;
+  String get _baseUrl => Constants.baseUrl;
   final Duration timeout = const Duration(seconds: 30);
 
-  // Headers to mimic a real browser
-  final Map<String, String> headers = {
-    'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept':
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Connection': 'keep-alive',
+  // Headers to mimic a real browser or API client
+  final Map<String, String> _headers = {
+    'User-Agent': 'OmusiberApp/1.0',
+    'Accept': 'application/json',
   };
 
   static const String _fallbackImage =
@@ -29,6 +28,30 @@ class NewsFetcher {
   List<NewsView>? _cachedNews;
   DateTime? _lastFetchTime;
   static const Duration _cacheDuration = Duration(minutes: 30);
+
+  Future<String> _getAuthToken() async {
+    var user = FirebaseAuth.instance.currentUser;
+    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
+    if (user == null) {
+      throw Exception('Authentication failed: no Firebase user available.');
+    }
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication failed: empty Firebase ID token.');
+    }
+    return token;
+  }
+
+  Future<Map<String, String>> _authorizedHeaders({
+    bool includeJsonContentType = false,
+  }) async {
+    final token = await _getAuthToken();
+    return {
+      ..._headers,
+      if (includeJsonContentType) 'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
 
   void _log(String msg) {
     debugPrint('📝 [NewsFetcher] $msg');
@@ -47,190 +70,184 @@ class NewsFetcher {
       }
     }
 
-    const listUrl = 'https://carsambamyo.omu.edu.tr/tr/haberler';
-    _log('Fetching list from: $listUrl');
+    _log('Fetching news from: $_baseUrl/news');
 
     List<NewsView> result = [];
 
     try {
-      // Step 1: Get the list of links
-      final readMoreLinks = await fetchReadMoreLinks(listUrl);
+      final headers = await _authorizedHeaders();
+      final response = await http
+          .get(Uri.parse('$_baseUrl/news'), headers: headers)
+          .timeout(timeout);
 
-      if (readMoreLinks.isEmpty) {
-        _logError(
-          'No links found!',
-          'Selector .btn.btn-theme.read-more might be wrong.',
+      if (response.statusCode != 200) {
+        throw HttpException(
+          'HTTP ${response.statusCode}',
+          uri: Uri.parse('$_baseUrl/news'),
         );
-      } else {
-        _log(
-          'Found ${readMoreLinks.length} links. Fetching top $maxNewsCount...',
-        );
-
-        final limitedLinks = readMoreLinks.take(maxNewsCount).toList();
-
-        // We use a loop here instead of Future.wait to debug easier and not crash everything on one fail
-        for (final uri in limitedLinks) {
-          final newsItem = await _safeFetchNewsDetail(uri);
-          if (newsItem != null) {
-            result.add(newsItem);
-          }
-        }
       }
-    } catch (e, stack) {
+
+      final List<dynamic> data = json.decode(response.body);
+      result = data
+          .map((jsonItem) => _parseNewsItem(jsonItem))
+          .whereType<NewsView>()
+          .toList();
+
+      _log('Fetched ${result.length} items from API.');
+    } catch (e) {
       _logError('CRITICAL FAILURE in fetchLatestNews', e);
-      debugPrintStack(stackTrace: stack);
+      // debugPrintStack(stackTrace: stack);
+      // Fallback if cache is empty
+      if (_cachedNews == null || _cachedNews!.isEmpty) {
+        return [_getExampleNews()];
+      }
     }
 
-    // 3. Save to Cache (even if some items are partial)
+    // 3. Save to Cache
     if (result.isNotEmpty) {
       _cachedNews = result;
       _lastFetchTime = DateTime.now();
-      _log('Fetch Complete. Loaded ${result.length} items.');
       return result;
+    }
+
+    // If cache is empty and fetch failed, return fallback
+    if (_cachedNews != null && _cachedNews!.isNotEmpty) {
+      return _cachedNews!;
     }
 
     _log('returning fallback data because result list is empty.');
     return [_getExampleNews()];
   }
 
-  Future<NewsView?> _safeFetchNewsDetail(Uri url) async {
+  NewsView? _parseNewsItem(Map<String, dynamic> json) {
     try {
-      return await fetchNewsDetail(url);
+      final id = json['id'] as int? ?? 0;
+      final title = json['title'] as String? ?? 'Başlıksız';
+      final summary = json['summary'] as String? ?? '';
+      final authorName = json['authorName'] as String? ?? 'Bilinmeyen Yazar';
+      String? heroImage = json['heroImage'] as String?;
+
+      if (heroImage == null || heroImage.isEmpty) {
+        heroImage = _fallbackImage;
+      } else if (!heroImage.startsWith('http')) {
+        // Handle relative URLs if any (though API says they are mostly full URLs or need base)
+        // API docs say "Full URL in production", but for uploads it says relative.
+        // Assuming heroImage from News is absolute based on example "https://example.com/image.jpg"
+        // If it starts with /, prepend base url.
+        if (heroImage.startsWith('/')) {
+          heroImage = '$_baseUrl$heroImage';
+        }
+      }
+
+      final detailUrl = json['detailUrl'] as String?;
+      final publishedAtStr = json['publishedAt'] as String?;
+      final publishedAt = publishedAtStr != null
+          ? DateTime.tryParse(publishedAtStr)
+          : null;
+
+      final viewCount = json['views'] as int? ?? 0;
+      final likeCount = json['likes'] as int? ?? 0;
+
+      // JSON Strings Parsing
+      List<String> tags = [];
+      if (json['tags'] is String) {
+        try {
+          tags = List<String>.from(jsonDecode(json['tags']));
+        } catch (_) {}
+      }
+
+      List<String> imageUrls = [];
+      if (json['imageUrls'] is String) {
+        try {
+          imageUrls = List<String>.from(jsonDecode(json['imageUrls']));
+        } catch (_) {}
+      }
+
+      // Handle Excel Attachments (Array of objects)
+      // New API says: "excelAttachments": [ { "url": "...", "content": [...] } ]
+      List<Map<String, dynamic>> excelAttachments = [];
+      if (json['excelAttachments'] is List) {
+        excelAttachments = List<Map<String, dynamic>>.from(
+          (json['excelAttachments'] as List).map(
+            (e) => e as Map<String, dynamic>,
+          ),
+        );
+      }
+
+      return NewsView(
+        id: id,
+        title: title,
+        summary: summary,
+        heroImage: heroImage,
+        authorName: authorName,
+        detailUrl: detailUrl,
+        publishedAt: publishedAt,
+        publishedAtText:
+            json['publishedAtText'] as String? ?? _formatDate(publishedAt),
+        tags: tags,
+        imageUrls: imageUrls,
+        fullText: json['fullText'] as String?,
+        excelAttachments: excelAttachments,
+        viewCount: viewCount,
+        likeCount: likeCount,
+      );
     } catch (e) {
-      // If a specific news item fails or is invalid, we return null to skip it
-      _logError('Failed to parse details for $url', e);
+      _logError('Failed to parse news item', e);
       return null;
     }
   }
 
-  Future<NewsView?> fetchNewsDetail(Uri url) async {
-    _log('Requesting detail: $url');
-
-    // Check for redirects and fetch using a Client to control behaviour
-    final client = http.Client();
-    try {
-      // Create request ensuring we don't follow redirects
-      final request = http.Request('GET', url)
-        ..headers.addAll(headers)
-        ..followRedirects = false;
-
-      final streamedResponse = await client.send(request).timeout(timeout);
-
-      // 1. Check for Redirects (3xx)
-      // The user requested: "fetch only if the given link does not redirect to a different URL"
-      if (streamedResponse.statusCode >= 300 &&
-          streamedResponse.statusCode < 400) {
-        _log(
-          'Skipping $url because it redirects (Status: ${streamedResponse.statusCode})',
-        );
-        return null;
-      }
-
-      // 2. Check for Success
-      if (streamedResponse.statusCode != 200) {
-        throw HttpException('HTTP ${streamedResponse.statusCode}', uri: url);
-      }
-
-      // Get body
-      final responseBody = await streamedResponse.stream.bytesToString();
-      final doc = html_parser.parse(responseBody);
-
-      // --- PARSING ---
-
-      // Title
-      var title = doc.querySelector('h1.heading-title')?.text.trim();
-      if (title == null || title.isEmpty) {
-        _log('⚠️ [PARSER WARNING] Title missing for $url');
-        // User requested: "do not return the result if the content is [not] fully available"
-        return null;
-      }
-
-      // Author
-      String authorName = 'Bilinmeyen Yazar';
-      final meta = doc.querySelector('.news-item .meta.text-muted');
-      if (meta != null) {
-        final authorEl = meta.querySelector('a');
-        if (authorEl != null) authorName = authorEl.text.trim();
-      }
-
-      // Image
-      String? heroImage;
-      final heroSrc = doc
-          .querySelector('.news-item .featured-image img')
-          ?.attributes['src'];
-      if (heroSrc != null && heroSrc.trim().isNotEmpty) {
-        final raw = heroSrc.trim();
-        heroImage = raw.startsWith('http') ? raw : url.resolve(raw).toString();
-      }
-
-      // Summary (Content)
-      String summary = '';
-      final article = doc.querySelector('article.news-item');
-      if (article != null) {
-        final paragraphs = article
-            .querySelectorAll('p')
-            .map((p) => p.text.trim())
-            .where(
-              (t) =>
-                  t.isNotEmpty &&
-                  !t.startsWith('Yazar:') &&
-                  !t.contains('Tarih:'),
-            )
-            .toList();
-        summary = paragraphs.join('\n\n');
-      }
-
-      if (summary.isEmpty) {
-        _log('⚠️ [PARSER WARNING] Content (summary) empty for $url');
-        // User requested: "do not return the result if the content is [not] fully available"
-        return null;
-      }
-
-      return NewsView(
-        title: title,
-        summary: summary,
-        heroImage: heroImage ?? _fallbackImage,
-        authorName: authorName,
-        authorAvatar: null,
-        detailUrl: url.toString(),
-      );
-    } finally {
-      client.close();
-    }
-  }
-
-  Future<List<Uri>> fetchReadMoreLinks(String websiteUrl) async {
-    final uri = Uri.parse(websiteUrl);
-    final response = await http.get(uri, headers: headers).timeout(timeout);
-
-    if (response.statusCode != 200) {
-      throw HttpException('HTTP ${response.statusCode}', uri: uri);
-    }
-
-    final doc = html_parser.parse(response.body);
-    // Selector for OMU news buttons
-    final elements = doc.querySelectorAll('.btn.btn-theme.read-more');
-
-    final out = <Uri>{};
-    for (final el in elements) {
-      String? href = el.attributes['href'] ?? el.attributes['data-href'];
-      if (href != null && href.trim().isNotEmpty) {
-        Uri link = Uri.parse(href.trim());
-        if (!link.hasScheme) link = uri.resolveUri(link);
-        out.add(link);
-      }
-    }
-    return out.toList();
+  String? _formatDate(DateTime? date) {
+    if (date == null) return null;
+    return '${date.day}.${date.month}.${date.year}';
   }
 
   NewsView _getExampleNews() {
     return NewsView(
+      id: -1,
       title: "Bağlantı Sorunu",
-      summary: "İnternet bağlantınızı kontrol edin.",
+      summary: "Haberler yüklenemedi. İnternet bağlantınızı kontrol edin.",
       heroImage: _fallbackImage,
       authorName: "Sistem",
       authorAvatar: null,
-      detailUrl: "https://carsambamyo.omu.edu.tr/tr/haberler",
+      detailUrl: null,
+      publishedAt: DateTime(2025, 2, 10), // Fixed older date
+      publishedAtText: _formatDate(DateTime(2025, 2, 10)),
     );
+  }
+
+  Future<void> trackNewsView(int newsId) async {
+    if (newsId <= 0) return;
+    await _postNewsInteraction(endpoint: 'view', newsId: newsId);
+  }
+
+  Future<void> trackNewsLike(int newsId, {required bool isLiked}) async {
+    if (newsId <= 0 || !isLiked) return;
+    await _postNewsInteraction(endpoint: 'like', newsId: newsId);
+  }
+
+  Future<void> _postNewsInteraction({
+    required String endpoint,
+    required int newsId,
+  }) async {
+    try {
+      final headers = await _authorizedHeaders(includeJsonContentType: true);
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/news/$endpoint'),
+            headers: headers,
+            body: jsonEncode({'id': newsId}),
+          )
+          .timeout(timeout);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        _log(
+          'news/$endpoint failed for id=$newsId '
+          '(HTTP ${response.statusCode}): ${response.body}',
+        );
+      }
+    } catch (e) {
+      _logError('Failed to send news/$endpoint for id=$newsId', e);
+    }
   }
 }

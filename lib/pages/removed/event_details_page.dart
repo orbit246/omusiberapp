@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -16,8 +18,15 @@ class EventDetailsPage extends StatefulWidget {
 class _EventDetailsPageState extends State<EventDetailsPage> {
   final CarouselSliderController _carouselController =
       CarouselSliderController();
+  final EventRepository _repo = EventRepository();
   int _currentImageIndex = 0;
   bool _isFavorited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_repo.trackEventView(widget.event.id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -329,6 +338,11 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           setState(() {
                             _isFavorited = !_isFavorited;
                           });
+                          if (_isFavorited) {
+                            unawaited(
+                              _repo.trackEventLike(event.id, isLiked: true),
+                            );
+                          }
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(

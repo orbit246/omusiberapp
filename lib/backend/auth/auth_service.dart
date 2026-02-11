@@ -11,7 +11,12 @@ class AuthService {
 
   // google_sign_in 6.x: normal constructor is available again
   // google_sign_in 6.x: normal constructor is available again
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: <String>['email']);
+  // google_sign_in 6.x: normal constructor is available again
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: <String>['email'],
+    // serverClientId is often required for Android release builds to verify the token correctly on backend
+    // serverClientId: "YOUR_WEB_CLIENT_ID_FROM_FIREBASE_CONSOLE.apps.googleusercontent.com",
+  );
 
   // --- SETTINGS ---
   // "ogr.omu.edu.tr" is the standard student email domain for OMÜ.
@@ -258,6 +263,12 @@ class AuthService {
       print('Error during sign out / anon-sign-in: $e');
       // If anon sign-in fails, the user remains signed out.
     }
+  }
+
+  Future<String?> getIdToken() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return await user.getIdToken();
   }
 }
 

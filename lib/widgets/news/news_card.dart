@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/news_item_page.dart';
 
@@ -12,35 +15,16 @@ class NewsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(isDark ? 0.2 : 0.6),
-          width: 1,
-        ),
-        boxShadow: [
-          // 1. Soft ambient shadow (Modern, diffused)
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(isDark ? 0.3 : 0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-            spreadRadius: -4,
-          ),
-          // 2. Tighter separation shadow
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(isDark ? 0.1 : 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         child: Material(
           color: Colors.transparent,
           child: Column(
@@ -140,13 +124,26 @@ class NewsCard extends StatelessWidget {
                               icon: view.isFavorited
                                   ? Icons.favorite
                                   : Icons.favorite_border,
+                              label: view.likeCount > 0
+                                  ? _formatCompactTR(view.likeCount)
+                                  : null,
                               isActive: view.isFavorited,
                               activeColor: Colors.redAccent,
-                              onTap: () => view.onToggleFavorite?.call(
-                                !view.isFavorited,
-                              ),
+                              onTap: () {
+                                final nextValue = !view.isFavorited;
+                                if (view.onToggleFavorite != null) {
+                                  view.onToggleFavorite!(nextValue);
+                                } else {
+                                  unawaited(
+                                    NewsFetcher().trackNewsLike(
+                                      view.id,
+                                      isLiked: nextValue,
+                                    ),
+                                  );
+                                }
+                              },
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 16),
                             _ActionButton(
                               icon: Icons.chat_bubble_outline_rounded,
                               label: view.commentCount > 0
@@ -154,7 +151,7 @@ class NewsCard extends StatelessWidget {
                                   : null,
                               onTap: view.onComment,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 16),
                             _ActionButton(
                               icon: Icons.share_outlined,
                               onTap: view.onShare,
@@ -168,17 +165,17 @@ class NewsCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.remove_red_eye_outlined,
-                              size: 14,
-                              color: colorScheme.outline,
+                              size: 16,
+                              color: Colors.grey.shade400,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               _formatCompactTR(view.viewCount),
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.outline,
+                                color: Colors.grey.shade500,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
                             InkWell(
                               onTap:
                                   view.onOpen ??
@@ -191,21 +188,21 @@ class NewsCard extends StatelessWidget {
                                       ),
                                     );
                                   },
-                              borderRadius: BorderRadius.circular(30),
+                              borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(30),
+                                  color: colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   view.readMoreLabel,
                                   style: theme.textTheme.labelLarge?.copyWith(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),

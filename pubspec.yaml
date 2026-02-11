@@ -54,6 +54,12 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
+  excel: ^4.0.6
+  flutter_markdown: ^0.7.7+1
+  path_provider: ^2.1.5
+  http: ^1.6.0
+  syncfusion_flutter_pdfviewer: ^32.2.4
+  device_info_plus: ^12.3.0
 
 dev_dependencies:
   flutter_test:
@@ -73,9 +79,9 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/logo/app_logo.png"
+  image_path: "assets/logo/app_logo.jpeg"
   adaptive_icon_background: "#0175C2"
-  adaptive_icon_foreground: "assets/logo/app_logo.png"
+  adaptive_icon_foreground: "assets/logo/app_logo.jpeg"
 
 # The following section is specific to Flutter packages.
 flutter:

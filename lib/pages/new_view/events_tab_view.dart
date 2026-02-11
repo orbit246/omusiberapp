@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
+import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
+import 'package:omusiber/backend/mock_events.dart';
 
 // --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
 class SlideInEntry extends StatefulWidget {
@@ -109,9 +113,12 @@ class _EventsTabViewState extends State<EventsTabView> {
   bool _showBackToTopButton = false;
   bool _canCreateEvent = false;
 
+  late Stream<List<PostView>> _eventsStream;
+
   @override
   void initState() {
     super.initState();
+    _eventsStream = _repo.eventsStream();
     _checkPermissions();
   }
 
@@ -179,7 +186,10 @@ class _EventsTabViewState extends State<EventsTabView> {
           MaterialPageRoute(builder: (_) => EventDetailsPage(event: e)),
         );
       },
-      onBookmark: () {},
+      onBookmark: (isBookmarked) {
+        if (!isBookmarked) return;
+        unawaited(_repo.trackEventLike(e.id, isLiked: true));
+      },
       onShare: () {},
     );
   }
@@ -192,51 +202,13 @@ class _EventsTabViewState extends State<EventsTabView> {
   }
 
   Future<void> _handleRefresh() async {
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      _showToast("Yeni etkinlik bulunamadı", Icons.info_rounded, false);
-    }
-  }
-
-  void _showToast(String msg, IconData icon, bool isSuccess) {
-    final colorScheme = Theme.of(context).colorScheme;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: const StadiumBorder(),
-        backgroundColor: isSuccess
-            ? colorScheme.primary
-            : colorScheme.surfaceContainerHighest,
-        elevation: 6,
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSuccess
-                  ? colorScheme.onPrimary
-                  : colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                msg,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: isSuccess
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    // Update the stream to fetch new data
+    setState(() {
+      _eventsStream = _repo.eventsStream(forceRefresh: true);
+    });
+    // Wait for the stream to emit a value (optional, depends on UX)
+    // For now purely relying on StreamBuilder update is fine.
+    // However, StreamBuilder will go to waiting state.
   }
 
   @override
@@ -244,7 +216,7 @@ class _EventsTabViewState extends State<EventsTabView> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StreamBuilder<List<PostView>>(
-        stream: _repo.eventsStream(),
+        stream: _eventsStream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('Bir hata oluştu: ${snapshot.error}'));
@@ -266,18 +238,29 @@ class _EventsTabViewState extends State<EventsTabView> {
             );
           }
 
-          final events = snapshot.data ?? [];
+          final fetchedEvents = snapshot.data ?? [];
+          final events = [...mockEvents, ...fetchedEvents];
 
           return NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification scrollInfo) {
               if (scrollInfo.metrics.axis == Axis.vertical) {
                 // Determine if we show the back-to-top button
                 if (scrollInfo.metrics.pixels >= 500) {
-                  if (!_showBackToTopButton)
-                    setState(() => _showBackToTopButton = true);
+                  if (!_showBackToTopButton) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && !_showBackToTopButton) {
+                        setState(() => _showBackToTopButton = true);
+                      }
+                    });
+                  }
                 } else {
-                  if (_showBackToTopButton)
-                    setState(() => _showBackToTopButton = false);
+                  if (_showBackToTopButton) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _showBackToTopButton) {
+                        setState(() => _showBackToTopButton = false);
+                      }
+                    });
+                  }
                 }
               }
               return false; // let the notification bubble up to NestedScrollView
@@ -297,9 +280,55 @@ class _EventsTabViewState extends State<EventsTabView> {
                 if (events.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: Center(
-                      child:
-                          NoEventsFoundWidget(), // Removed onRefresh as stream updates automatically
+                    child: Column(
+                      children: [
+                        Expanded(child: Center(child: NoEventsFoundWidget())),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Built by ",
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                              Text(
+                                "NortixLabs",
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary, // Using Primary Color for the name
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              Text(
+                                " with ",
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                              Icon(
+                                Icons.favorite,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary, // Red heart
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 80),
+                      ],
                     ),
                   )
                 else
@@ -319,11 +348,7 @@ class _EventsTabViewState extends State<EventsTabView> {
                       }
 
                       return Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: 12.0,
-                          left: 16.0,
-                          right: 16.0,
-                        ),
+                        padding: const EdgeInsets.only(bottom: 12.0),
                         child: SlideInEntry(
                           key: ValueKey(event.id),
                           animate: shouldAnimate,
@@ -332,6 +357,54 @@ class _EventsTabViewState extends State<EventsTabView> {
                       );
                     }, childCount: events.length),
                   ),
+
+                // --- FOOTER SECTION ---
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "Built by ",
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        Text(
+                          "NortixLabs",
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary, // Using Primary Color for the name
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        Text(
+                          " with ",
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        Icon(
+                          Icons.favorite,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary, // Red heart
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
                 const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
               ],

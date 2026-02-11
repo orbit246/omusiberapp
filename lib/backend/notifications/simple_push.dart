@@ -1,42 +1,74 @@
 import 'dart:convert';
-
+import 'package:firebase_core/firebase_core.dart'; // Added
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  await SimpleNotifications.saveMessage(message);
+}
+
 class SimpleNotifications {
   static const _topic = 'events_all';
-  static const _prefsKey = 'saved_notifications_v1';
 
   final FirebaseMessaging _fcm;
 
   SimpleNotifications({FirebaseMessaging? fcm})
     : _fcm = fcm ?? FirebaseMessaging.instance;
 
+  static bool _isInitializing = false;
+  static const String _staticPrefsKey = 'saved_notifications_v1';
+
   Future<void> init() async {
-    // Permissions
-    await _fcm.requestPermission(alert: true, badge: true, sound: true);
+    if (_isInitializing) return;
+    _isInitializing = true;
 
-    // Subscribe to topic
-    await _fcm.subscribeToTopic(_topic);
+    try {
+      // Background handler must be set before init or inside init but as top-level
+      // FirebaseMessaging.onBackgroundMessage is usually set in main.dart
+      // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler); // This should be called in main.dart
 
-    // Foreground handler
-    FirebaseMessaging.onMessage.listen((msg) async {
-      await _save(msg);
-    });
+      // Permissions
+      try {
+        await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      } catch (e) {
+        // "A request for permissions is already running" or denied
+        // We can swallow this as we can't do much about it here.
+      }
 
-    // Background open handler
-    FirebaseMessaging.onMessageOpenedApp.listen((msg) async {
-      await _save(msg); // save anyway
-    });
+      // Subscribe to topic
+      await _fcm.subscribeToTopic(_topic);
 
-    // Cold start: opened from terminated
-    final initial = await _fcm.getInitialMessage();
-    if (initial != null) {
-      await _save(initial);
+      // Foreground handler
+      FirebaseMessaging.onMessage.listen((msg) async {
+        await saveMessage(msg);
+      });
+
+      // Background open handler
+      FirebaseMessaging.onMessageOpenedApp.listen((msg) async {
+        await saveMessage(msg); // save anyway
+      });
+
+      // Cold start: opened from terminated
+      final initial = await _fcm.getInitialMessage();
+      if (initial != null) {
+        await saveMessage(initial);
+      }
+    } catch (e) {
+      // General error during init
+    } finally {
+      // _isInitializing stays true? Or resets?
+      // Usually init runs once per app lifecycle.
+      // But if we want to allow retries on failure, we might reset it.
+      // However, listeners should only be attached once.
+      // So keeping it true is probably safer to avoid duplicate listeners.
     }
   }
 
-  Future<void> _save(RemoteMessage msg) async {
+  /// Saves a message to notification history.
+  /// Static so it can be called from background handlers.
+  static Future<void> saveMessage(RemoteMessage msg) async {
     final n = msg.notification;
     if (n == null) return;
 
@@ -47,22 +79,35 @@ class SimpleNotifications {
       data: msg.data,
     );
 
-    final prefs = await SharedPreferences.getInstance();
-    final current = prefs.getStringList(_prefsKey) ?? <String>[];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = prefs.getStringList(_staticPrefsKey) ?? <String>[];
 
-    // Keep it bounded to avoid infinite growth
-    const maxItems = 50;
-    current.insert(0, jsonEncode(item.toJson()));
-    if (current.length > maxItems) {
-      current.removeRange(maxItems, current.length);
+      // Prevent duplicate saving of the same message ID
+      if (msg.messageId != null &&
+          current.any((s) => s.contains(msg.messageId!))) {
+        return;
+      }
+
+      // Keep it bounded to avoid infinite growth
+      const maxItems = 50;
+      current.insert(
+        0,
+        jsonEncode(item.toJson()..['messageId'] = msg.messageId),
+      );
+      if (current.length > maxItems) {
+        current.removeRange(maxItems, current.length);
+      }
+
+      await prefs.setStringList(_staticPrefsKey, current);
+    } catch (e) {
+      // Silently fail if storage error
     }
-
-    await prefs.setStringList(_prefsKey, current);
   }
 
   Future<List<SavedNotification>> loadSaved() async {
     final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_prefsKey) ?? <String>[];
+    final list = prefs.getStringList(_staticPrefsKey) ?? <String>[];
     return list.map((s) {
       final j = jsonDecode(s) as Map<String, dynamic>;
       return SavedNotification.fromJson(j);
@@ -71,7 +116,7 @@ class SimpleNotifications {
 
   Future<void> clearSaved() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_prefsKey);
+    await prefs.remove(_staticPrefsKey);
   }
 }
 

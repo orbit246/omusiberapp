@@ -1,308 +1,241 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/post_view.dart';
 
 class EventRepository {
   EventRepository({
-    FirebaseFirestore? firestore,
-    String collectionPath = 'events',
-    Duration minRefreshDelay = const Duration(milliseconds: 600),
-    Duration cacheTtl = const Duration(seconds: 30),
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _collectionPath = collectionPath,
-       _minRefreshDelay = minRefreshDelay,
-       _cacheTtl = cacheTtl;
+    // Keep constructor parameters optional to avoid breaking existing calls
+    dynamic firestore,
+    String? collectionPath,
+    Duration? minRefreshDelay,
+    Duration? cacheTtl,
+  });
 
-  final FirebaseFirestore _firestore;
-  final String _collectionPath;
+  String get _baseUrl => Constants.baseUrl;
 
-  /// Minimum time a refresh call should take (prevents UI flicker).
-  final Duration _minRefreshDelay;
-
-  /// In-memory cache TTL.
-  final Duration _cacheTtl;
-
-  List<PostView>? _cache;
-  DateTime? _cacheAt;
-
-  Future<List<PostView>>? _inFlight;
-
-  CollectionReference<Map<String, dynamic>> get _eventsRef =>
-      _firestore.collection(_collectionPath);
-
-  /// Fetch events with:
-  /// - basic in-memory cache (TTL)
-  /// - request coalescing (concurrent callers share one Future)
-  /// - minimum refresh delay (optional UX smoothing)
-  ///
-  /// Set [forceRefresh] to bypass cache.
-  Future<List<PostView>> fetchEvents({bool forceRefresh = false}) {
-    final now = DateTime.now();
-
-    if (!forceRefresh && _cache != null && _cacheAt != null) {
-      final age = now.difference(_cacheAt!);
-      if (age <= _cacheTtl) {
-        return Future.value(_cache);
-      }
+  Future<String> _getAuthToken() async {
+    var user = FirebaseAuth.instance.currentUser;
+    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
+    if (user == null) {
+      throw Exception('Authentication failed: no Firebase user available.');
     }
-
-    // If a fetch is already running, reuse it.
-    final existing = _inFlight;
-    if (existing != null) return existing;
-
-    final future = _fetchAndCache();
-    _inFlight = future;
-
-    // Clear in-flight when done.
-    future.whenComplete(() {
-      if (identical(_inFlight, future)) _inFlight = null;
-    });
-
-    return future;
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication failed: empty Firebase ID token.');
+    }
+    return token;
   }
 
-  /// Returns a stream of events for real-time updates.
-  Stream<List<PostView>> eventsStream() {
-    final mockEvents = [
-      PostView(
-        id: 'mock_1',
-        title: 'Siber Güvenlik 101: Temeller',
-        description:
-            'Siber güvenliğe giriş eğitimi. Temel kavramlar, saldırı vektörleri ve savunma stratejileri hakkında kapsamlı bir başlangıç.',
-        tags: ['Eğitim', 'Siber Güvenlik', 'Başlangıç'],
-        maxContributors: 100,
-        remainingContributors: 85,
-        ticketPrice: 0,
-        location: 'Mühendislik Fakültesi, B-201',
-        thubnailUrl:
-            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80',
-        imageLinks: [],
-        metadata: {'datetimeText': '14 Ekim, 14:00', 'durationText': '2 Saat'},
-      ),
-      PostView(
-        id: 'mock_2',
-        title: 'CTF: Bayrağı Yakala Yarışması',
-        description:
-            'Takımını kur, yeteneklerini sergile! 24 saat sürecek hackaton tarzı yarışmamızda büyük ödüller sizi bekliyor.',
-        tags: ['Yarışma', 'Hackathon', 'Ödüllü'],
-        maxContributors: 50,
-        remainingContributors: 12,
-        ticketPrice: 50,
-        location: 'Teknopark Kuluçka Merkezi',
-        thubnailUrl:
-            'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
-        imageLinks: [],
-        metadata: {
-          'datetimeText': '20-21 Ekim',
-          'durationText': '24 Saat',
-          'ticketText': 'Katılım: ₺50',
-        },
-      ),
-      PostView(
-        id: 'mock_3',
-        title: 'Kariyer ve Networking Buluşması',
-        description:
-            'Sektör profesyonelleri ile tanışma fırsatı. CV incelemeleri, mülakat simülasyonları ve kariyer tavsiyeleri.',
-        tags: ['Kariyer', 'Networking', 'Sosyal'],
-        maxContributors: 40,
-        remainingContributors: 3,
-        ticketPrice: 0,
-        location: 'OMÜ Sosyal Tesisler',
-        thubnailUrl:
-            'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=800&q=80',
-        imageLinks: [],
-        metadata: {'datetimeText': '25 Ekim, 18:30', 'durationText': '3 Saat'},
-      ),
-    ];
-
-    return _eventsRef
-        .orderBy('metadata.eventDate', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          final realEvents = snapshot.docs.map((doc) {
-            final data = doc.data();
-            return PostView.fromJson({'id': doc.id, ...data});
-          }).toList();
-
-          return [...mockEvents, ...realEvents];
-        });
+  Future<Map<String, String>> _authorizedHeaders({
+    bool includeJsonContentType = false,
+  }) async {
+    final token = await _getAuthToken();
+    return {
+      if (includeJsonContentType) 'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
   }
 
-  /// Clears in-memory cache (useful after writes, logout, etc).
-  void clearCache() {
-    _cache = null;
-    _cacheAt = null;
-  }
-
-  Future<List<PostView>> _fetchAndCache() async {
-    final start = DateTime.now();
-
+  Future<List<PostView>> fetchEvents({bool forceRefresh = false}) async {
     try {
-      // Optional: try cache first then server by using Source.serverAndCache.
-      // This still obeys security rules; it just uses local persistence when available.
-      final querySnapshot = await _eventsRef.get(
-        const GetOptions(source: Source.serverAndCache),
-      );
+      final headers = await _authorizedHeaders();
+      final response = await http.get(Uri.parse('$_baseUrl/events'), headers: headers);
 
-      final items = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        return PostView.fromJson({'id': doc.id, ...data});
-      }).toList();
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
 
-      _cache = items;
-      _cacheAt = DateTime.now();
+      final List<dynamic> data = json.decode(response.body);
 
-      await _enforceMinDelay(start);
-      return items;
-    } on FirebaseException catch (e) {
-      await _enforceMinDelay(start);
-      throw EventRepoException.fromFirebase(e, operation: 'fetchEvents');
+      // Use the updated PostView.fromJson which handles the new API fields
+      final List<PostView> events = data
+          .map<PostView>((jsonItem) => PostView.fromJson(jsonItem))
+          .toList();
+
+      return events;
     } catch (e) {
-      await _enforceMinDelay(start);
-      throw EventRepoException.unknown(e, operation: 'fetchEvents');
+      debugPrint('Error fetching events from API: $e');
+      // Return just the example event on error, so the user can see it
+      return [
+        PostView(
+          id: 'example-event-error',
+          title: 'Siber Güvenlik Konferansı (Offline)',
+          description: 'Ağ hatası oluştu veya sunucuya erişilemiyor.',
+          tags: ['Siber Güvenlik', 'Örnek'],
+          maxContributors: 100,
+          remainingContributors: 50,
+          ticketPrice: 0.0,
+          location: 'Mühendislik Fakültesi',
+          thubnailUrl:
+              'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80',
+          imageLinks: [],
+          metadata: {
+            'datetimeText': '20 Ekim 2025',
+            'eventDate': DateTime.now().toIso8601String(),
+          },
+        ),
+      ];
     }
   }
 
-  Future<void> _enforceMinDelay(DateTime start) async {
-    final elapsed = DateTime.now().difference(start);
-    final remaining = _minRefreshDelay - elapsed;
-    if (remaining > Duration.zero) {
-      await Future.delayed(remaining);
-    }
+  Stream<List<PostView>> eventsStream({bool forceRefresh = false}) {
+    // Return a single-event stream for compatibility
+    return Stream.fromFuture(fetchEvents(forceRefresh: forceRefresh));
   }
 
   Future<void> addEvent(PostView event) async {
+    final dynamic rawEventDate = event.metadata['eventDate'];
+    final String eventDate = rawEventDate is DateTime
+        ? rawEventDate.toIso8601String()
+        : rawEventDate?.toString() ?? DateTime.now().toIso8601String();
+    final dynamic rawEventLength = event.metadata['eventLength'];
+    final double? eventLength = rawEventLength is num
+        ? rawEventLength.toDouble()
+        : double.tryParse(rawEventLength?.toString() ?? '');
+
+    // Prepare content for API
+    final Map<String, dynamic> body = {
+      'title': event.title,
+      'date': eventDate,
+      'description': event.description,
+      'tags': jsonEncode(event.tags), // Send as JSON string
+    };
+
+    if (eventLength != null) {
+      body['eventLength'] = eventLength;
+    }
+    if (event.location.trim().isNotEmpty) {
+      body['location'] = event.location.trim();
+    }
+    if (event.maxContributors > 0) {
+      body['maxJoiners'] = event.maxContributors;
+    }
+    if (event.thubnailUrl.trim().isNotEmpty) {
+      body['thumbnailUrl'] = event.thubnailUrl;
+    }
+    if (event.imageLinks.isNotEmpty) {
+      body['carouselImages'] = jsonEncode(event.imageLinks);
+    }
+
     try {
-      await _eventsRef.doc(event.id).set(event.toJson());
-      // Cache is now potentially stale.
-      clearCache();
-    } on FirebaseException catch (e) {
-      throw EventRepoException.fromFirebase(e, operation: 'addEvent');
+      final headers = await _authorizedHeaders(includeJsonContentType: true);
+      final response = await http.post(
+        Uri.parse('$_baseUrl/events/create'),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        debugPrint('Event created successfully.');
+        return;
+      } else {
+        throw Exception(
+          'Failed to create event: ${response.statusCode} ${response.body}',
+        );
+      }
     } catch (e) {
-      throw EventRepoException.unknown(e, operation: 'addEvent');
+      debugPrint('Error creating event via API: $e');
+      rethrow;
     }
   }
 
   Future<void> deleteEvent(String eventId) async {
     try {
-      await _eventsRef.doc(eventId).delete();
-      clearCache();
-    } on FirebaseException catch (e) {
-      throw EventRepoException.fromFirebase(e, operation: 'deleteEvent');
+      final headers = await _authorizedHeaders(includeJsonContentType: true);
+      // API expects integer ID if possible, but our ID is String.
+      // We try to parse it. If it's not a number (like 'example-event'), it will fail on server side or we skip.
+      final int? idAsInt = int.tryParse(eventId);
+      if (idAsInt == null) {
+        debugPrint('Cannot delete event with non-integer ID: $eventId');
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/events/delete'),
+        headers: headers,
+        body: jsonEncode({'id': idAsInt}),
+      );
+      if (response.statusCode != 200) {
+        debugPrint('Failed to delete event: ${response.statusCode}');
+      }
     } catch (e) {
-      throw EventRepoException.unknown(e, operation: 'deleteEvent');
+      debugPrint('Error deleting event: $e');
     }
+  }
+
+  Future<void> joinEvent(String eventId) async {
+    // API expects int ID usually
+    final int? idAsInt = int.tryParse(eventId);
+    final bodyId = idAsInt ?? eventId;
+
+    try {
+      final headers = await _authorizedHeaders(includeJsonContentType: true);
+      final response = await http.post(
+        Uri.parse('$_baseUrl/events/join'),
+        headers: headers,
+        body: jsonEncode({'id': bodyId}),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Katılma başarısız: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint("Error joining event: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> trackEventView(String eventId) async {
+    final bodyId = _eventBodyId(eventId);
+    if (bodyId == null) return;
+    await _postEventInteraction(endpoint: 'view', bodyId: bodyId);
+  }
+
+  Future<void> trackEventLike(String eventId, {required bool isLiked}) async {
+    if (!isLiked) return;
+    final bodyId = _eventBodyId(eventId);
+    if (bodyId == null) return;
+    await _postEventInteraction(endpoint: 'like', bodyId: bodyId);
   }
 
   Future<void> updateEvent(String eventId, PostView updatedEvent) async {
+    debugPrint('updateEvent called but API update is not yet implemented.');
+  }
+
+  dynamic _eventBodyId(String eventId) {
+    final idAsInt = int.tryParse(eventId);
+    if (idAsInt != null) return idAsInt;
+    if (eventId.trim().isEmpty) return null;
+    return eventId;
+  }
+
+  Future<void> _postEventInteraction({
+    required String endpoint,
+    required dynamic bodyId,
+  }) async {
     try {
-      await _eventsRef.doc(eventId).update(updatedEvent.toJson());
-      clearCache();
-    } on FirebaseException catch (e) {
-      throw EventRepoException.fromFirebase(e, operation: 'updateEvent');
+      final headers = await _authorizedHeaders(includeJsonContentType: true);
+      final response = await http.post(
+        Uri.parse('$_baseUrl/events/$endpoint'),
+        headers: headers,
+        body: jsonEncode({'id': bodyId}),
+      );
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        debugPrint(
+          'Failed to send events/$endpoint for id=$bodyId: '
+          '${response.statusCode} ${response.body}',
+        );
+      }
     } catch (e) {
-      throw EventRepoException.unknown(e, operation: 'updateEvent');
+      debugPrint('Error sending events/$endpoint for id=$bodyId: $e');
     }
   }
-}
 
-/// Typed exception you can handle in UI.
-enum EventRepoErrorKind {
-  permissionDenied,
-  unauthenticated,
-  notFound,
-  alreadyExists,
-  invalidArgument,
-  quotaExceeded,
-  unavailable,
-  cancelled,
-  unknown,
-}
-
-class EventRepoException implements Exception {
-  EventRepoException({
-    required this.kind,
-    required this.operation,
-    required this.message,
-    this.code,
-    this.original,
-  });
-
-  final EventRepoErrorKind kind;
-  final String operation;
-  final String message;
-  final String? code;
-  final Object? original;
-
-  factory EventRepoException.fromFirebase(
-    FirebaseException e, {
-    required String operation,
-  }) {
-    final kind = _mapFirebaseCode(e.code);
-    return EventRepoException(
-      kind: kind,
-      operation: operation,
-      code: e.code,
-      message: _defaultMessage(kind, e.message),
-      original: e,
-    );
-  }
-
-  factory EventRepoException.unknown(Object e, {required String operation}) {
-    return EventRepoException(
-      kind: EventRepoErrorKind.unknown,
-      operation: operation,
-      message: 'Unknown error during $operation',
-      original: e,
-    );
-  }
-
-  @override
-  String toString() =>
-      'EventRepoException(kind: $kind, op: $operation, code: $code, message: $message)';
-}
-
-EventRepoErrorKind _mapFirebaseCode(String code) {
-  switch (code) {
-    case 'permission-denied':
-      return EventRepoErrorKind.permissionDenied;
-    case 'unauthenticated':
-      return EventRepoErrorKind.unauthenticated;
-    case 'not-found':
-      return EventRepoErrorKind.notFound;
-    case 'already-exists':
-      return EventRepoErrorKind.alreadyExists;
-    case 'invalid-argument':
-      return EventRepoErrorKind.invalidArgument;
-    case 'resource-exhausted':
-      return EventRepoErrorKind.quotaExceeded;
-    case 'unavailable':
-      return EventRepoErrorKind.unavailable;
-    case 'cancelled':
-      return EventRepoErrorKind.cancelled;
-    default:
-      return EventRepoErrorKind.unknown;
-  }
-}
-
-String _defaultMessage(EventRepoErrorKind kind, String? firebaseMessage) {
-  switch (kind) {
-    case EventRepoErrorKind.permissionDenied:
-      return 'Permission denied';
-    case EventRepoErrorKind.unauthenticated:
-      return 'You are not signed in';
-    case EventRepoErrorKind.notFound:
-      return 'Document not found';
-    case EventRepoErrorKind.alreadyExists:
-      return 'Document already exists';
-    case EventRepoErrorKind.invalidArgument:
-      return 'Invalid data sent to server';
-    case EventRepoErrorKind.quotaExceeded:
-      return 'Quota exceeded';
-    case EventRepoErrorKind.unavailable:
-      return 'Service unavailable or network issue';
-    case EventRepoErrorKind.cancelled:
-      return 'Request cancelled';
-    case EventRepoErrorKind.unknown:
-      return firebaseMessage ?? 'Unknown error';
+  void clearCache() {
+    // No-op for now
   }
 }

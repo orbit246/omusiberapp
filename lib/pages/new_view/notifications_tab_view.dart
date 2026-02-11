@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
+import 'package:omusiber/backend/mock_notifications.dart';
 
 class NotificationsTabView extends StatefulWidget {
   const NotificationsTabView({super.key});
@@ -40,7 +41,8 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
           return Center(child: Text("Hata: ${snapshot.error}"));
         }
 
-        final notifications = snapshot.data ?? [];
+        final fetched = snapshot.data ?? [];
+        final notifications = [...mockNotifications, ...fetched];
 
         if (notifications.isEmpty) {
           return RefreshIndicator(
@@ -70,6 +72,53 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
                     ),
                   ),
                 ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "Built by ",
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        Text(
+                          "NortixLabs",
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary, // Using Primary Color for the name
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        Text(
+                          " with ",
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        Icon(
+                          Icons.favorite,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary, // Red heart
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
               ],
             ),
           );
@@ -81,31 +130,7 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
             key: const PageStorageKey('notifs_tab'),
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () async {
-                          await SimpleNotifications().clearSaved();
-                          _refresh();
-                        },
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: Colors.red,
-                        ),
-                        label: const Text(
-                          "Tümünü Temizle",
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
               SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverList(
@@ -131,12 +156,29 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
                             notif.title,
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          subtitle: Text(
-                            timeStr,
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                              fontSize: 12,
-                            ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (notif.body.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4.0),
+                                  child: Text(
+                                    notif.body,
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                timeStr,
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         Divider(
@@ -147,6 +189,55 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
                   }, childCount: notifications.length),
                 ),
               ),
+              // --- FOOTER SECTION ---
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Built by ",
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      Text(
+                        "NortixLabs",
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary, // Using Primary Color for the name
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      Text(
+                        " with ",
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      Icon(
+                        Icons.favorite,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary, // Red heart
+                        size: 14,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
           ),
         );

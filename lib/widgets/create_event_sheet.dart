@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -266,11 +265,6 @@ class _CreateEventSheetState extends State<CreateEventSheet> {
         setState(() => _loadingStatus = "Etkinlik kaydediliyor...");
 
         final eventRepo = EventRepository();
-        final eventId = FirebaseFirestore.instance
-            .collection('events')
-            .doc()
-            .id;
-
         final locationStr =
             data.manualAddress ??
             (data.latitude != null
@@ -278,7 +272,7 @@ class _CreateEventSheetState extends State<CreateEventSheet> {
                 : 'Konum Belirtilmedi');
 
         final postView = PostView(
-          id: eventId,
+          id: 'pending-create',
           title: data.title,
           description: data.description,
           tags: data.tags,

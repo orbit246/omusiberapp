@@ -1,44 +1,30 @@
 import 'package:flutter/material.dart';
 
-/// Updated with the "Cyber Grape & Teal" palette from the playground
 class AppColors {
-  // Primary Brand Colors
-  // Primary Brand Colors
+  // Primary
   static const primary = Color(
-    0xFF4F46E5,
-  ); // Modern Electric Indigo (Brighter, more vibrant)
-  static const primaryAccent = Color(
-    0xFFC7B8FF,
-  ); // Soft Lavender (Dark Mode Primary)
+    0xFF2563EB,
+  ); // Inter Blue - Professional & Academic
+  static const primaryAccent = Color(0xFF3B82F6); // Lighter Blue
 
-  // Accents (Teal/Mint)
-  static const cyberTeal = Color(0xFF00BFA5); // Sharp Teal (Light Mode Accent)
-  static const neonMint = Color(0xFF64FFDA); // Glowing Mint (Dark Mode Accent)
+  // Accents
+  static const cyberTeal = Color(0xFF0D9488); // Teal 600 - Muted Teal
+  static const neonMint = Color(0xFF14B8A6); // Teal 500
 
-  // Neutrals & Backgrounds
-  static const deepBackground = Color(0xFF0F172A); // Slate 900 (Dark Mode Bg)
-  static const surfaceDark = Color(0xFF1E293B); // Slate 800 (Dark Mode Surface)
-  static const offWhite = Color(
-    0xFFF8FAFC,
-  ); // Cool White (Light Mode Bg backup)
-  static const coolGray = Color(0xFF94A3B8);
-  static const jetBlack = Color(0xFF102A43);
+  // Neutrals / Backgrounds
+  static const deepBackground = Color(0xFF0f172a); // Slate 900 (Dark Mode)
+  static const surfaceDark = Color(0xFF1e293b); // Slate 800
 
-  // Functional Colors
-  static const amberGlow = Color(0xFFFFD54F); // Warning
-  static const electricMagenta = Color(0xFFFF4081); // Tertiary/Pink Accent
+  static const offWhite = Color(0xFFF8FAFC); // Slate 50 (Light Mode Bg)
+  static const coolGray = Color(0xFF64748B); // Slate 500
 
-  // Legacy/Unused from original mapped to new palette
-  static const deepPurple = Color(0xFF12005E);
-  static const softLavender = Color(0xFFD1C4E9);
+  // Functional
+  static const amberGlow = Color(0xFFF59E0B); // Amber 500
+  static const electricMagenta = Color(0xFFEC4899); // Pink 500 (Less neon)
 
-  // Updated Surface/Backgrounds for "Modern" feel (Pink-ish modern)
-  static const Color subtleBackground = Color(
-    0xFFFFF5F9,
-  ); // Very light modern pink
-  static const Color subtleSurface = Color(
-    0xFFFFFFFF,
-  ); // Pure white for crisp contrast
+  // Subtle application
+  static const Color subtleBackground = Color(0xFFF8FAFC); // Slate 50
+  static const Color subtleSurface = Color(0xFFFFFFFF); // Pure White
 }
 
 /// Semantic tokens updated to use the new palette
