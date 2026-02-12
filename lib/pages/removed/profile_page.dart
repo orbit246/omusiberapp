@@ -68,7 +68,7 @@ class ProfilePageState extends State<ProfilePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Admin OmuSiber",
+                            "Admin AkademiZ",
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w500),
                           ),

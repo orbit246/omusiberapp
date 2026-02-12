@@ -145,14 +145,6 @@ class NewsCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 16),
                             _ActionButton(
-                              icon: Icons.chat_bubble_outline_rounded,
-                              label: view.commentCount > 0
-                                  ? '${view.commentCount}'
-                                  : null,
-                              onTap: view.onComment,
-                            ),
-                            const SizedBox(width: 16),
-                            _ActionButton(
                               icon: Icons.share_outlined,
                               onTap: view.onShare,
                             ),
@@ -165,46 +157,48 @@ class NewsCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.remove_red_eye_outlined,
-                              size: 16,
-                              color: Colors.grey.shade400,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               _formatCompactTR(view.viewCount),
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: Colors.grey.shade500,
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(width: 16),
-                            InkWell(
-                              onTap:
-                                  view.onOpen ??
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            NewsItemPage(view: view),
-                                      ),
-                                    );
-                                  },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primary,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  view.readMoreLabel,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                            TextButton(
+                              onPressed: () {
+                                if (view.onOpen != null) {
+                                  view.onOpen!();
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => NewsItemPage(view: view),
+                                    ),
+                                  );
+                                }
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: colorScheme.primary,
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 0),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    view.readMoreLabel,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
                                   ),
-                                ),
+                                  const Icon(Icons.chevron_right, size: 16),
+                                ],
                               ),
                             ),
                           ],
@@ -221,53 +215,45 @@ class NewsCard extends StatelessWidget {
     );
   }
 
-  static String _formatCompactTR(int n) {
-    if (n < 1000) return '$n';
-    if (n < 1000000) {
-      final v = (n / 1000);
-      return '${_trimZero(v)} Bin';
+  String _formatCompactTR(int count) {
+    if (count < 1000) return count.toString();
+    if (count < 1000000) {
+      double thousands = count / 1000;
+      return '${thousands.toStringAsFixed(thousands >= 10 ? 0 : 1)}B';
     }
-    if (n < 1000000000) {
-      final v = (n / 1000000);
-      return '${_trimZero(v)} M';
-    }
-    final v = (n / 1000000000);
-    return '${_trimZero(v)} Mr';
-  }
-
-  static String _trimZero(double v) {
-    final s = v.toStringAsFixed(1).replaceAll('.', ',');
-    return s.endsWith(',0') ? s.substring(0, s.length - 2) : s;
+    double millions = count / 1000000;
+    return '${millions.toStringAsFixed(millions >= 10 ? 0 : 1)}M';
   }
 }
 
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String? label;
+  final VoidCallback? onTap;
   final bool isActive;
   final Color? activeColor;
-  final VoidCallback? onTap;
 
   const _ActionButton({
     required this.icon,
     this.label,
+    this.onTap,
     this.isActive = false,
     this.activeColor,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final color = isActive
-        ? (activeColor ?? theme.colorScheme.primary)
-        : theme.colorScheme.onSurfaceVariant;
+        ? (activeColor ?? colorScheme.primary)
+        : colorScheme.onSurfaceVariant;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -278,7 +264,7 @@ class _ActionButton extends StatelessWidget {
                 label!,
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: color,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],

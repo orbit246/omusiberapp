@@ -35,7 +35,7 @@ class AboutBottomSheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                "OmuSiber",
+                "AkademiZ",
                 style: GoogleFonts.outfit(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -58,7 +58,7 @@ class AboutBottomSheet extends StatelessWidget {
 
           // Description
           Text(
-            "OmuSiber, Ondokuz Mayıs Üniversitesi Siber Güvenlik Topluluğu'nun resmi uygulamasıdır. Topluluğumuzdaki gelişmeleri takip edebilir ve etkinliklere katılabilirsiniz.",
+            "AkademiZ, Ondokuz Mayıs Üniversitesi'nin resmi olmayan ancak kapsamlı öğrenci uygulamasıdır. Kampüs içindeki gelişmeleri takip edebilir ve topluluğumuza katılabilirsiniz.",
             style: GoogleFonts.inter(
               fontSize: 14,
               height: 1.5,
@@ -110,7 +110,7 @@ class AboutBottomSheet extends StatelessWidget {
           const SizedBox(height: 8),
 
           Text(
-            "© 2024 NortixLabs. Tüm hakları saklıdır.",
+            "© 2026 NortixLabs. Tüm hakları saklıdır.",
             style: GoogleFonts.inter(
               fontSize: 10,
               color: colorScheme.onSurfaceVariant.withOpacity(0.5),

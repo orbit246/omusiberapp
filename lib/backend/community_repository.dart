@@ -16,14 +16,13 @@ class CommunityRepository {
   List<CommunityPost> get _mockPosts => [
     CommunityPost(
       id: 'mock-1',
-      authorName: 'OmuSiber Admin',
+      authorName: 'AkademiZ Admin',
       authorImage:
           'https://ui-avatars.com/api/?name=OM&background=0D8ABC&color=fff',
       content:
           'Hoşgeldiniz! Topluluğumuzda fikirlerinizi paylaşabilir, sorular sorabilirsiniz.',
       createdAt: DateTime(2025, 2, 11, 10, 0), // Fixed older date
       likes: 12,
-      comments: 3,
       imageUrl:
           'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
     ),
@@ -35,16 +34,14 @@ class CommunityRepository {
           'Flutter ile mobil uygulama geliştirme etkinliği çok verimliydi, teşekkürler!',
       createdAt: DateTime(2025, 2, 10, 10, 0),
       likes: 5,
-      comments: 0,
     ),
     CommunityPost(
       id: 'mock-3',
-      authorName: 'OmuSiber Anket',
+      authorName: 'AkademiZ Anket',
       authorImage: null,
       content: 'Hangi programlama dilini daha çok seviyorsunuz?',
       createdAt: DateTime(2025, 2, 11, 14, 0),
       likes: 42,
-      comments: 15,
       poll: PollModel(
         id: 'poll-1',
         question: 'Favori diliniz hangisi?',
@@ -59,12 +56,11 @@ class CommunityRepository {
     ),
     CommunityPost(
       id: 'mock-4',
-      authorName: 'OmuSiber Etkinlik',
+      authorName: 'AkademiZ Etkinlik',
       authorImage: null,
       content: 'Gelecek haftaki buluşma için hangi gün size daha uygun?',
       createdAt: DateTime(2025, 2, 11, 15, 0),
       likes: 25,
-      comments: 8,
       poll: PollModel(
         id: 'poll-2',
         question: 'Etkinlik Günü',
@@ -128,7 +124,6 @@ class CommunityRepository {
       imageUrl: imageUrl,
       createdAt: DateTime.now(),
       likes: 0,
-      comments: 0,
     );
 
     // Optimistic update
@@ -179,7 +174,6 @@ class CommunityRepository {
           imageUrl: post.imageUrl,
           createdAt: post.createdAt,
           likes: post.likes,
-          comments: post.comments,
           isLiked: post.isLiked,
           poll: newPoll,
         );

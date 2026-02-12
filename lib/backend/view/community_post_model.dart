@@ -6,7 +6,6 @@ class CommunityPost {
   final String? imageUrl;
   final DateTime createdAt;
   final int likes;
-  final int comments;
   final bool isLiked;
   final PollModel? poll; // Added Poll
 
@@ -18,7 +17,6 @@ class CommunityPost {
     this.imageUrl,
     required this.createdAt,
     this.likes = 0,
-    this.comments = 0,
     this.isLiked = false,
     this.poll,
   });
@@ -34,7 +32,6 @@ class CommunityPost {
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
           : DateTime.now(),
       likes: json['likes'] ?? 0,
-      comments: json['comments'] ?? 0,
       isLiked: json['isLiked'] ?? false,
       poll: json['poll'] != null ? PollModel.fromJson(json['poll']) : null,
     );
@@ -48,7 +45,6 @@ class CommunityPost {
     'imageUrl': imageUrl,
     'createdAt': createdAt.toIso8601String(),
     'likes': likes,
-    'comments': comments,
     'isLiked': isLiked,
     'poll': poll?.toJson(),
   };

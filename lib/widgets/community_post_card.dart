@@ -7,14 +7,8 @@ import 'package:omusiber/widgets/poll_widget.dart';
 class CommunityPostCard extends StatelessWidget {
   final CommunityPost post;
   final VoidCallback? onLike;
-  final VoidCallback? onComment;
 
-  const CommunityPostCard({
-    super.key,
-    required this.post,
-    this.onLike,
-    this.onComment,
-  });
+  const CommunityPostCard({super.key, required this.post, this.onLike});
 
   @override
   Widget build(BuildContext context) {
@@ -135,13 +129,6 @@ class CommunityPostCard extends StatelessWidget {
                         ? Colors.redAccent
                         : cs.onSurfaceVariant,
                     onTap: onLike ?? () {},
-                  ),
-                  const SizedBox(width: 24),
-                  _ActionButton(
-                    icon: Icons.chat_bubble_outline,
-                    label: post.comments > 0 ? '${post.comments}' : 'Yorum',
-                    color: cs.onSurfaceVariant,
-                    onTap: onComment ?? () {},
                   ),
                   const Spacer(),
                   IconButton(

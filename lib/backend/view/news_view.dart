@@ -43,7 +43,6 @@ class NewsView {
   final ImageProvider? authorAvatar;
 
   /// Counters
-  final int commentCount;
   final int viewCount;
   final int likeCount;
 
@@ -52,12 +51,10 @@ class NewsView {
 
   /// Labels (override if needed for localization/custom text)
   final String readMoreLabel;
-  final String commentLabelSuffix;
 
   /// Actions (wire these to your app logic)
   final VoidCallback? onOpen;
   final ValueChanged<bool>? onToggleFavorite;
-  final VoidCallback? onComment;
   final VoidCallback? onShare;
 
   const NewsView({
@@ -74,15 +71,12 @@ class NewsView {
     this.fullText,
     this.excelAttachments = const [],
     this.authorAvatar,
-    this.commentCount = 0,
     this.viewCount = 0,
     this.likeCount = 0,
     this.isFavorited = false,
     this.readMoreLabel = 'Devamını Oku',
-    this.commentLabelSuffix = ' Yorum',
     this.onOpen,
     this.onToggleFavorite,
-    this.onComment,
     this.onShare,
   });
 
@@ -100,15 +94,12 @@ class NewsView {
     String? fullText,
     List<Map<String, dynamic>>? excelAttachments,
     ImageProvider? authorAvatar,
-    int? commentCount,
     int? viewCount,
     int? likeCount,
     bool? isFavorited,
     String? readMoreLabel,
-    String? commentLabelSuffix,
     VoidCallback? onOpen,
     ValueChanged<bool>? onToggleFavorite,
-    VoidCallback? onComment,
     VoidCallback? onShare,
   }) {
     return NewsView(
@@ -125,15 +116,12 @@ class NewsView {
       fullText: fullText ?? this.fullText,
       excelAttachments: excelAttachments ?? this.excelAttachments,
       authorAvatar: authorAvatar ?? this.authorAvatar,
-      commentCount: commentCount ?? this.commentCount,
       viewCount: viewCount ?? this.viewCount,
       likeCount: likeCount ?? this.likeCount,
       isFavorited: isFavorited ?? this.isFavorited,
       readMoreLabel: readMoreLabel ?? this.readMoreLabel,
-      commentLabelSuffix: commentLabelSuffix ?? this.commentLabelSuffix,
       onOpen: onOpen ?? this.onOpen,
       onToggleFavorite: onToggleFavorite ?? this.onToggleFavorite,
-      onComment: onComment ?? this.onComment,
       onShare: onShare ?? this.onShare,
     );
   }

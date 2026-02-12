@@ -223,7 +223,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
             backgroundColor: const Color(0xFF2C2C2C),
             title: const Icon(Icons.info, color: Colors.grey, size: 32),
             content: const Text(
-              "Save changes?",
+              "Değişiklikler kaydedilsin mi?",
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white, fontSize: 18),
             ),
@@ -234,14 +234,14 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                 ),
-                child: const Text("Discard"),
+                child: const Text("Vazgeç"),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF4CAF50),
                 ),
-                child: const Text("Save"),
+                child: const Text("Kaydet"),
               ),
             ],
           ),
@@ -298,7 +298,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                 ),
                 cursorColor: textColor,
                 decoration: InputDecoration(
-                  hintText: "Title",
+                  hintText: "Başlık",
                   hintStyle: GoogleFonts.inter(
                     fontSize: 34,
                     fontWeight: FontWeight.w600,
@@ -383,7 +383,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                         ),
                         cursorColor: textColor,
                         decoration: InputDecoration(
-                          hintText: "Type something...",
+                          hintText: "Bir şeyler yazın...",
                           hintStyle: GoogleFonts.inter(
                             fontSize: 17,
                             color: isDarkBg ? Colors.white24 : Colors.black26,
@@ -489,7 +489,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "Choose Background",
+              "Arka Plan Seçin",
               style: GoogleFonts.inter(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,

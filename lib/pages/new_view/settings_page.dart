@@ -7,6 +7,7 @@ import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/about_page.dart';
 import 'package:omusiber/pages/new_view/feedback_page.dart';
+import 'package:omusiber/backend/update_service.dart';
 import 'dart:math';
 
 // SettingsPage must be a StatefulWidget to hold the initial random state for the easter egg
@@ -187,6 +188,22 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                             ),
                           );
+                        },
+                      ),
+                      _buildSettingsTile(
+                        context,
+                        icon: Icons.system_update_outlined,
+                        title: "Güncellemeleri Denetle",
+                        onTap: () async {
+                          final started = await UpdateService()
+                              .checkForUpdate();
+                          if (!started && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Sürümünüz güncel."),
+                              ),
+                            );
+                          }
                         },
                       ),
 

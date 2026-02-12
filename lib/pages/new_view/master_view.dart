@@ -9,6 +9,7 @@ import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/notes_tab_view.dart';
 import 'package:omusiber/pages/new_view/community_tab_view.dart';
+import 'package:omusiber/backend/update_service.dart';
 
 import 'package:omusiber/pages/new_view/settings_page.dart';
 import 'package:omusiber/pages/new_view/food_menu_page.dart';
@@ -49,6 +50,9 @@ class _MasterViewState extends State<MasterView>
 
     // Check for badges
     _checkBadges();
+
+    // Check for updates
+    UpdateService().checkForUpdate();
   }
 
   Future<void> _checkBadges() async {
