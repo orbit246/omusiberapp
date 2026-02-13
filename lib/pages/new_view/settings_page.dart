@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/models/user_badge.dart';
+import 'package:omusiber/widgets/badge_widget.dart';
 
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/about_page.dart';
@@ -21,9 +24,47 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final themeManager = ThemeManager();
   final AuthService _authService = AuthService();
+  final UserProfileService _profileService = UserProfileService();
 
   // State to hold the result of the 1/1000 random chance
   bool _isEasterEggMode = false;
+
+  // State to hold user badges
+  List<UserBadge> _userBadges = [];
+  bool _loadingBadges = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserBadges();
+  }
+
+  /// Load user badges from backend
+  Future<void> _loadUserBadges() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return;
+
+    setState(() {
+      _loadingBadges = true;
+    });
+
+    try {
+      final badges = await _profileService.fetchUserBadges(user.uid);
+      if (mounted) {
+        setState(() {
+          _userBadges = badges;
+          _loadingBadges = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading badges: $e');
+      if (mounted) {
+        setState(() {
+          _loadingBadges = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,36 +109,114 @@ class _SettingsPageState extends State<SettingsPage> {
                                 .withOpacity(0.5),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
+                          child: Column(
                             children: [
-                              CircleAvatar(
-                                backgroundImage: user.photoURL != null
-                                    ? NetworkImage(user.photoURL!)
-                                    : null,
-                                child: user.photoURL == null
-                                    ? const Icon(Icons.person)
-                                    : null,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      user.isAnonymous
-                                          ? "Misafir Kullanıcı"
-                                          : (user.displayName ?? "Kullanıcı"),
-                                      style: theme.textTheme.titleMedium,
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundImage: user.photoURL != null
+                                        ? NetworkImage(user.photoURL!)
+                                        : null,
+                                    child: user.photoURL == null
+                                        ? const Icon(Icons.person)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          user.isAnonymous
+                                              ? "Misafir Kullanıcı"
+                                              : (user.displayName ??
+                                                    "Kullanıcı"),
+                                          style: theme.textTheme.titleMedium,
+                                        ),
+                                        Text(
+                                          user.isAnonymous
+                                              ? "Anonim Hesap"
+                                              : (user.email ?? "E-posta yok"),
+                                          style: theme.textTheme.bodyMedium,
+                                        ),
+                                      ],
                                     ),
-                                    Text(
-                                      user.isAnonymous
-                                          ? "Anonim Hesap"
-                                          : (user.email ?? "E-posta yok"),
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
+
+                              // Display badges if not anonymous
+                              if (!user.isAnonymous) ...[
+                                const SizedBox(height: 16),
+                                const Divider(height: 1),
+                                const SizedBox(height: 12),
+
+                                // Badges section
+                                if (_loadingBadges)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else if (_userBadges.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline,
+                                          size: 16,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Henüz rozetiniz yok',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: Colors.grey.shade600,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.workspace_premium_rounded,
+                                            size: 16,
+                                            color: colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Rozetler',
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color: colorScheme.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      BadgeList(badges: _userBadges),
+                                    ],
+                                  ),
+                              ],
                             ],
                           ),
                         ),
