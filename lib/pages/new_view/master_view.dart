@@ -15,6 +15,7 @@ import 'package:omusiber/pages/new_view/settings_page.dart';
 import 'package:omusiber/pages/new_view/food_menu_page.dart';
 import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/pages/new_view/academic_calendar_page.dart';
+import 'package:omusiber/pages/new_view/user_search_page.dart';
 
 class MasterView extends StatefulWidget {
   const MasterView({super.key});
@@ -328,6 +329,18 @@ class _MasterViewState extends State<MasterView>
                       ),
                     ],
                   ),
+                  // User Search Button (Only for Community Tab)
+                  if (_tabController.index == 3)
+                    IconButton(
+                      icon: Icon(Icons.search, color: colorScheme.onSurface),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const UserSearchPage(),
+                          ),
+                        );
+                      },
+                    ),
                   // Notifications Button
                   IconButton(
                     icon: Badge(
