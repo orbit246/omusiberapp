@@ -79,6 +79,38 @@ class UserProfileService {
     }
   }
 
+  /// Migrate profile info from an old UID to a new UID
+  /// Should be called while authenticated as the NEW user.
+  Future<void> migrateProfile(
+    String oldUid,
+    String newUid,
+    UserProfile sourceProfile,
+  ) async {
+    try {
+      final updates = {
+        'name': sourceProfile.name,
+        'age': sourceProfile.age,
+        'department': sourceProfile.department,
+        'gender': sourceProfile.gender,
+        'campus': sourceProfile.campus,
+        'isPrivate': sourceProfile.isPrivate,
+      };
+
+      await updateUserProfile(
+        newUid,
+        updates,
+      ); // Wait, this uses the OLD uid if I pass sourceProfile.uid
+      // Actually sourceProfile.uid is oldUid.
+      // But updateUserProfile(uid, updates) uses common endpoint users/profile which updates current user.
+      // So passed uid is ignored by the backend if it uses "me" or similar.
+      // But looking at updateUserProfile:
+      // Uri.parse('${Constants.baseUrl}/users/profile')
+      // It doesn't use the uid parameter!
+    } catch (e) {
+      print('Error migrating profile: $e');
+    }
+  }
+
   /// Update user profile details
   Future<void> updateUserProfile(
     String uid,

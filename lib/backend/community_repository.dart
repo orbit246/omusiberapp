@@ -4,13 +4,34 @@ import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:omusiber/backend/constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CommunityRepository {
   static final CommunityRepository _instance = CommunityRepository._internal();
   factory CommunityRepository() => _instance;
   CommunityRepository._internal();
 
+  static const String _storageKey = 'cached_community_posts';
   List<CommunityPost> _cachedPosts = [];
+
+  Future<List<CommunityPost>> getCachedPosts() async {
+    if (_cachedPosts.isNotEmpty) return _cachedPosts;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString(_storageKey);
+      if (jsonStr != null) {
+        final List<dynamic> decoded = json.decode(jsonStr);
+        _cachedPosts = decoded
+            .map((item) => CommunityPost.fromJson(item))
+            .toList();
+        return _cachedPosts;
+      }
+    } catch (e) {
+      debugPrint('Failed to load community posts from persistent cache: $e');
+    }
+    return [];
+  }
 
   // Mock data for initial display if API fails
   List<CommunityPost> get _mockPosts => [
@@ -77,16 +98,18 @@ class CommunityRepository {
   String get _baseUrl => '${Constants.baseUrl}/community';
 
   Future<List<CommunityPost>> fetchPosts({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cachedPosts.isNotEmpty) {
-      return _cachedPosts;
+    if (!forceRefresh) {
+      final cached = await getCachedPosts();
+      if (cached.isNotEmpty) return cached;
     }
 
     try {
       // Fetch real data
-      // Using a timeout to prevent hanging if API is down/placeholder
       final response = await http
           .get(Uri.parse('$_baseUrl/posts'))
-          .timeout(const Duration(seconds: 3));
+          .timeout(
+            const Duration(seconds: 5),
+          ); // Increased timeout for real fetch
 
       List<CommunityPost> apiPosts = [];
 
@@ -96,16 +119,25 @@ class CommunityRepository {
       }
 
       // Merge mock posts "as well"
-      // In real app, you might only show API posts.
-      // But per request "add a mock poll AS WELL", we combine them.
       _cachedPosts = [...apiPosts, ..._mockPosts];
 
       // Sort by newest
       _cachedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+      // Persist to storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _storageKey,
+        json.encode(_cachedPosts.map((e) => e.toJson()).toList()),
+      );
+
       return _cachedPosts;
     } catch (e) {
       debugPrint("Error fetching posts: $e");
+
+      final cached = await getCachedPosts();
+      if (cached.isNotEmpty) return cached;
+
       // Fallback to mock
       _cachedPosts = [..._mockPosts];
       return _cachedPosts;

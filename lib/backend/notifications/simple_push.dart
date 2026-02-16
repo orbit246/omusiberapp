@@ -30,12 +30,7 @@ class SimpleNotifications {
       // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler); // This should be called in main.dart
 
       // Permissions
-      try {
-        await _fcm.requestPermission(alert: true, badge: true, sound: true);
-      } catch (e) {
-        // "A request for permissions is already running" or denied
-        // We can swallow this as we can't do much about it here.
-      }
+      await requestPermission();
 
       // Subscribe to topic
       await _fcm.subscribeToTopic(_topic);
@@ -59,11 +54,21 @@ class SimpleNotifications {
       // General error during init
     } finally {
       // _isInitializing stays true? Or resets?
-      // Usually init runs once per app lifecycle.
-      // But if we want to allow retries on failure, we might reset it.
-      // However, listeners should only be attached once.
-      // So keeping it true is probably safer to avoid duplicate listeners.
     }
+  }
+
+  Future<void> requestPermission() async {
+    try {
+      await _fcm.requestPermission(alert: true, badge: true, sound: true);
+    } catch (e) {
+      // "A request for permissions is already running" or denied
+    }
+  }
+
+  /// Returns true if permission is granted, false otherwise.
+  Future<bool> checkPermission() async {
+    final settings = await _fcm.getNotificationSettings();
+    return settings.authorizationStatus == AuthorizationStatus.authorized;
   }
 
   /// Saves a message to notification history.

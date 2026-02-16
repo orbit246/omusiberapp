@@ -45,24 +45,41 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadUserProfile();
   }
 
-  /// Load user profile from Firestore
+  /// Load user profile from Firestore or Backend
   Future<void> _loadUserProfile() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) return;
+    if (user == null) return;
 
     setState(() => _loadingProfile = true);
 
     try {
       final profile = await _profileService.fetchUserProfile(user.uid);
-      if (mounted && profile != null) {
+      if (mounted) {
         setState(() {
-          _userProfile = profile;
-          _isPrivate = profile.isPrivate;
+          if (profile != null) {
+            _userProfile = profile;
+            _isPrivate = profile.isPrivate;
+          } else {
+            // Default profile for Guest / First time
+            _userProfile = UserProfile(
+              uid: user.uid,
+              studentId: user.isAnonymous
+                  ? "misafir"
+                  : (user.email?.split('@')[0] ?? "unknown"),
+              name:
+                  user.displayName ??
+                  (user.isAnonymous ? "Misafir Kullanıcı" : "Öğrenci"),
+              role: user.isAnonymous ? "guest" : "student",
+              photoUrl: user.photoURL,
+              email: user.email,
+            );
+            _isPrivate = false;
+          }
           _loadingProfile = false;
         });
       }
     } catch (e) {
-      print('Error loading profile: $e');
+      debugPrint('Error loading profile: $e');
       if (mounted) setState(() => _loadingProfile = false);
     }
   }
@@ -70,7 +87,7 @@ class _SettingsPageState extends State<SettingsPage> {
   /// Load user badges from backend
   Future<void> _loadUserBadges() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) return;
+    if (user == null) return;
 
     setState(() {
       _loadingBadges = true;
@@ -96,7 +113,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _togglePrivacy(bool val) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) return;
+    if (user == null) return;
 
     setState(() {
       _isPrivate = val;
@@ -237,8 +254,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                                 style:
                                                     theme.textTheme.bodyMedium,
                                               ),
-                                              if (!user.isAnonymous &&
-                                                  _userProfile != null) ...[
+                                              if (_userProfile != null) ...[
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   "${_userProfile?.department ?? 'Bölüm belirtilmedi'} • ${_userProfile?.campus ?? 'Kampüs belirtilmedi'}",
@@ -254,8 +270,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                             ],
                                           ),
                                         ),
-                                        if (!user.isAnonymous &&
-                                            _userProfile != null)
+                                        if (_userProfile != null)
                                           IconButton(
                                             onPressed: () async {
                                               final updated =
@@ -287,131 +302,127 @@ class _SettingsPageState extends State<SettingsPage> {
                                       ],
                                     ),
 
-                                    // Display badges if not anonymous
-                                    if (!user.isAnonymous) ...[
-                                      const SizedBox(height: 16),
-                                      const Divider(height: 1),
-                                      const SizedBox(height: 12),
+                                    // Display badges
+                                    const SizedBox(height: 16),
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 12),
 
-                                      // Badges section
-                                      if (_loadingBadges)
-                                        const Center(
-                                          child: Padding(
-                                            padding: EdgeInsets.all(8.0),
-                                            child: SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
+                                    // Badges section
+                                    if (_loadingBadges)
+                                      const Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(8.0),
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
                                           ),
-                                        )
-                                      else if (_userBadges.isEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                          child: Row(
+                                        ),
+                                      )
+                                    else if (_userBadges.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              size: 16,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Henüz rozetiniz yok',
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    else
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
                                             children: [
                                               Icon(
-                                                Icons.info_outline,
+                                                Icons.workspace_premium_rounded,
                                                 size: 16,
-                                                color: Colors.grey.shade600,
+                                                color: colorScheme.primary,
                                               ),
-                                              const SizedBox(width: 8),
+                                              const SizedBox(width: 6),
                                               Text(
-                                                'Henüz rozetiniz yok',
-                                                style: theme.textTheme.bodySmall
+                                                'Rozetler',
+                                                style: theme
+                                                    .textTheme
+                                                    .labelMedium
                                                     ?.copyWith(
                                                       color:
-                                                          Colors.grey.shade600,
+                                                          colorScheme.primary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                               ),
                                             ],
                                           ),
-                                        )
-                                      else
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons
-                                                      .workspace_premium_rounded,
-                                                  size: 16,
-                                                  color: colorScheme.primary,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  'Rozetler',
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelMedium
-                                                      ?.copyWith(
-                                                        color:
-                                                            colorScheme.primary,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            BadgeList(badges: _userBadges),
-                                          ],
-                                        ),
-
-                                      const SizedBox(height: 16),
-                                      const Divider(height: 1),
-                                      const SizedBox(height: 8),
-
-                                      // Privacy Toggle
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  "Gizli Profil",
-                                                  style: theme
-                                                      .textTheme
-                                                      .bodyMedium
-                                                      ?.copyWith(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                ),
-                                                Text(
-                                                  "Aratıldığında profiliniz görünmez",
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelSmall
-                                                      ?.copyWith(
-                                                        color: colorScheme
-                                                            .onSurfaceVariant,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Switch(
-                                            value: _isPrivate,
-                                            onChanged: (val) {
-                                              if (val) {
-                                                _showPrivacyConfirmation();
-                                              } else {
-                                                _togglePrivacy(false);
-                                              }
-                                            },
-                                          ),
+                                          const SizedBox(height: 8),
+                                          BadgeList(badges: _userBadges),
                                         ],
                                       ),
-                                    ],
+
+                                    const SizedBox(height: 16),
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 8),
+
+                                    // Privacy Toggle
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "Gizli Profil",
+                                                style: theme
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                              ),
+                                              Text(
+                                                "Aratıldığında profiliniz görünmez",
+                                                style: theme
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: _isPrivate,
+                                          onChanged: (val) {
+                                            if (val) {
+                                              _showPrivacyConfirmation();
+                                            } else {
+                                              _togglePrivacy(false);
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                         ),

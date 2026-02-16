@@ -4,12 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/constants.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/backend/view/user_profile_model.dart';
 
 class AuthService {
   // --- DEPENDENCIES ---
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
   final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: <String>['email']);
+  final UserProfileService _profileService = UserProfileService();
 
   // --- SETTINGS ---
   final String allowedDomain = 'stu.omu.edu.tr';
@@ -41,6 +43,12 @@ class AuthService {
       User? user;
       final currentUser = _auth.currentUser;
 
+      // Capture anonymous profile for migration if needed
+      UserProfile? anonProfile;
+      if (currentUser != null && currentUser.isAnonymous) {
+        anonProfile = await _profileService.fetchUserProfile(currentUser.uid);
+      }
+
       if (currentUser != null && currentUser.isAnonymous) {
         try {
           print('Linking Google account to anonymous session...');
@@ -53,6 +61,16 @@ class AuthService {
             );
             final userCred = await _auth.signInWithCredential(credential);
             user = userCred.user;
+
+            // Migrate profile to the new UID since it changed
+            if (user != null && anonProfile != null) {
+              print('Migrating anonymous profile to new OAuth account...');
+              await _profileService.migrateProfile(
+                currentUser.uid,
+                user.uid,
+                anonProfile,
+              );
+            }
           } else {
             rethrow;
           }

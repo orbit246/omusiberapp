@@ -5,8 +5,12 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/post_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EventRepository {
+  static const String _storageKey = 'cached_events_list';
+  List<PostView>? _cachedEvents;
+
   EventRepository({
     // Keep constructor parameters optional to avoid breaking existing calls
     dynamic firestore,
@@ -14,6 +18,24 @@ class EventRepository {
     Duration? minRefreshDelay,
     Duration? cacheTtl,
   });
+
+  Future<List<PostView>> getCachedEvents() async {
+    if (_cachedEvents != null && _cachedEvents!.isNotEmpty)
+      return _cachedEvents!;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString(_storageKey);
+      if (jsonStr != null) {
+        final List<dynamic> decoded = json.decode(jsonStr);
+        _cachedEvents = decoded.map((item) => PostView.fromJson(item)).toList();
+        return _cachedEvents!;
+      }
+    } catch (e) {
+      debugPrint('Failed to load events from persistent cache: $e');
+    }
+    return [];
+  }
 
   String get _baseUrl => Constants.baseUrl;
 
@@ -41,9 +63,18 @@ class EventRepository {
   }
 
   Future<List<PostView>> fetchEvents({bool forceRefresh = false}) async {
+    // 1. Return cached events if available and not forcing refresh
+    if (!forceRefresh) {
+      final cached = await getCachedEvents();
+      if (cached.isNotEmpty) return cached;
+    }
+
     try {
       final headers = await _authorizedHeaders();
-      final response = await http.get(Uri.parse('$_baseUrl/events'), headers: headers);
+      final response = await http.get(
+        Uri.parse('$_baseUrl/events'),
+        headers: headers,
+      );
 
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
@@ -56,9 +87,22 @@ class EventRepository {
           .map<PostView>((jsonItem) => PostView.fromJson(jsonItem))
           .toList();
 
+      // Persist to storage
+      _cachedEvents = events;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _storageKey,
+        json.encode(events.map((e) => e.toJson()).toList()),
+      );
+
       return events;
     } catch (e) {
       debugPrint('Error fetching events from API: $e');
+
+      // Try fallback to cache
+      final cached = await getCachedEvents();
+      if (cached.isNotEmpty) return cached;
+
       // Return just the example event on error, so the user can see it
       return [
         PostView(

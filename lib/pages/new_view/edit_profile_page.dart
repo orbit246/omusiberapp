@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 
@@ -169,8 +170,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   filled: true,
                   fillColor: colorScheme.surface,
                 ),
-                validator: (val) =>
-                    val == null || val.isEmpty ? "Ad soyad gerekli" : null,
+                maxLength: 32,
+                validator: (val) {
+                  if (val == null || val.isEmpty) return "Ad soyad gerekli";
+                  if (val.length > 32) return "En fazla 32 karakter";
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -191,6 +196,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         fillColor: colorScheme.surface,
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return null;
+                        final age = int.tryParse(val);
+                        if (age == null) return "Geçersiz";
+                        if (age <= 13 || age >= 70) return "14-69 olmalı";
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -198,6 +211,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   Expanded(
                     flex: 2,
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       value: _selectedGender,
                       decoration: InputDecoration(
                         labelText: "Cinsiyet",
@@ -210,7 +224,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       ),
                       items: _genders
                           .map(
-                            (g) => DropdownMenuItem(value: g, child: Text(g)),
+                            (g) => DropdownMenuItem(
+                              value: g,
+                              child: Text(g, overflow: TextOverflow.ellipsis),
+                            ),
                           )
                           .toList(),
                       onChanged: (val) => setState(() => _selectedGender = val),
@@ -241,11 +258,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   filled: true,
                   fillColor: colorScheme.surface,
                 ),
+                maxLength: 32,
+                validator: (val) {
+                  if (val != null && val.length > 32)
+                    return "En fazla 32 karakter";
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
               // Campus
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: _selectedCampus,
                 decoration: InputDecoration(
                   labelText: "Yerleşke / Kampüs",
@@ -257,7 +281,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   fillColor: colorScheme.surface,
                 ),
                 items: _campuses
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
                     .toList(),
                 onChanged: (val) => setState(() => _selectedCampus = val),
               ),

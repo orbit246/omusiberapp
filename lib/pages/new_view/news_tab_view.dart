@@ -129,17 +129,46 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _loadInitialData() async {
     try {
-      final newData = await NewsFetcher().fetchLatestNews();
+      // 1. Load from cache first (no network)
+      final cachedData = await NewsFetcher().getCachedNews();
+      final hydratedCached = _bindNewsActions(cachedData);
+
+      if (mounted) {
+        setState(() {
+          if (hydratedCached.isNotEmpty) {
+            _isInitialLoading = false;
+            _animateAllowedSet.addAll(hydratedCached);
+            _articles.addAll(hydratedCached);
+          }
+        });
+      }
+
+      // 2. Schedule a refresh AFTER the app has fully rendered
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshInBackground();
+      });
+    } catch (e) {
+      debugPrint("Failed to load initial news cache: $e");
+      if (_articles.isEmpty) {
+        _refreshInBackground();
+      }
+    }
+  }
+
+  Future<void> _refreshInBackground() async {
+    try {
+      final newData = await NewsFetcher().fetchLatestNews(forceRefresh: true);
       final hydratedData = _bindNewsActions(newData);
       if (mounted) {
         setState(() {
           _isInitialLoading = false;
-          _animateAllowedSet.addAll(hydratedData);
+          _articles.clear();
           _articles.addAll(hydratedData);
+          _animateAllowedSet.addAll(hydratedData);
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _articles.isEmpty) {
         setState(() {
           _isInitialLoading = false;
           _errorMessage = e.toString();
@@ -151,7 +180,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   Future<void> _handleRefresh() async {
     try {
       final fetchedData = _bindNewsActions(
-        await NewsFetcher().fetchLatestNews(),
+        await NewsFetcher().fetchLatestNews(forceRefresh: true),
       );
       if (!mounted) return;
 
@@ -300,70 +329,74 @@ class _NewsTabViewState extends State<NewsTabView> {
           }
           return false;
         },
-        child: CustomScrollView(
-          key: const PageStorageKey('news_tab'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            CupertinoSliverRefreshControl(
-              onRefresh: _handleRefresh,
-              refreshTriggerPullDistance: 60.0,
-              refreshIndicatorExtent: 40.0,
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            // The List of News
-            SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final newsItem = _articles[index];
-                final bool isAllowed = _animateAllowedSet.contains(newsItem);
-                final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
-                final bool shouldAnimate = isAllowed && !hasAnimated;
-                if (shouldAnimate) {
-                  _hasAnimatedSet.add(newsItem);
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: SlideInEntry(
-                    key: ValueKey(newsItem),
-                    animate: shouldAnimate,
-                    child: NewsCard(view: newsItem),
-                  ),
-                );
-              }, childCount: _articles.length),
-            ),
-            // --- FOOTER SECTION ---
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Built by ",
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+        child: RefreshIndicator(
+          onRefresh: _handleRefresh,
+          displacement: 20,
+          edgeOffset: 0,
+          child: CustomScrollView(
+            key: const PageStorageKey('news_tab'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              // The List of News
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final newsItem = _articles[index];
+                  final bool isAllowed = _animateAllowedSet.contains(newsItem);
+                  final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
+                  final bool shouldAnimate = isAllowed && !hasAnimated;
+                  if (shouldAnimate) {
+                    _hasAnimatedSet.add(newsItem);
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: SlideInEntry(
+                      key: ValueKey(newsItem),
+                      animate: shouldAnimate,
+                      child: NewsCard(view: newsItem),
                     ),
-                    Text(
-                      "NortixLabs",
-                      style: theme.textTheme.labelMedium?.copyWith(
+                  );
+                }, childCount: _articles.length),
+              ),
+              // --- FOOTER SECTION ---
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Built by ",
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        "NortixLabs",
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        " with ",
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Icon(
+                        Icons.favorite,
                         color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
+                        size: 14,
                       ),
-                    ),
-                    Text(
-                      " with ",
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Icon(Icons.favorite, color: colorScheme.primary, size: 14),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            ],
+          ),
         ),
       ),
       floatingActionButton: _showBackToTopButton

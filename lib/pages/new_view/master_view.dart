@@ -54,13 +54,61 @@ class _MasterViewState extends State<MasterView>
 
     // Check for updates
     UpdateService().checkForUpdate();
+
+    // Notification permission reminder after 30s
+    _startPermissionReminder();
+  }
+
+  void _startPermissionReminder() {
+    Future.delayed(const Duration(seconds: 30), () async {
+      if (!mounted) return;
+      final hasPermission = await SimpleNotifications().checkPermission();
+      if (!hasPermission && mounted) {
+        _showPermissionBanner();
+      }
+    });
+  }
+
+  void _showPermissionBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      MaterialBanner(
+        elevation: 1,
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        leading: Icon(
+          Icons.notifications_active_outlined,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+        content: Text(
+          "Önemli duyurulardan haberdar olmak için bildirimleri açın.",
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            },
+            child: const Text("BİRAZDAN"),
+          ),
+          TextButton(
+            onPressed: () async {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              await SimpleNotifications().requestPermission();
+            },
+            child: const Text("ŞİMDİ AÇ"),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkBadges() async {
     // 0: News
     final lastViewedNews = await _badgeService.getLastViewedNews();
     if (lastViewedNews != null) {
-      final news = await NewsFetcher().fetchLatestNews(); // Use cache if avail
+      // Use getCachedNews instead of fetchLatestNews to avoid network on startup
+      final news = await NewsFetcher().getCachedNews();
       if (news.isNotEmpty) {
         final latest = news.first.publishedAt ?? DateTime.now();
         if (latest.isAfter(lastViewedNews)) {
@@ -76,7 +124,8 @@ class _MasterViewState extends State<MasterView>
     // 1: Events
     final lastViewedEvents = await _badgeService.getLastViewedEvents();
     if (lastViewedEvents != null) {
-      final events = await EventRepository().fetchEvents();
+      // Use getCachedEvents to avoid network
+      final events = await EventRepository().getCachedEvents();
       if (events.isNotEmpty) {
         DateTime? latestEventDate;
         for (final e in events) {
@@ -114,12 +163,10 @@ class _MasterViewState extends State<MasterView>
       }
     }
 
-    // 2: Notes (No badge usually)
-    // _unreadStates[2] = false;
-
     // 3: Community
     final lastViewedCommunity = await _badgeService.getLastViewedCommunity();
-    final posts = await CommunityRepository().fetchPosts();
+    // CommunityRepository currently doesn't have persistent cache, but it has mock data
+    final posts = await CommunityRepository().getCachedPosts();
     if (posts.isNotEmpty) {
       final latest = posts.first.createdAt;
       if (lastViewedCommunity == null || latest.isAfter(lastViewedCommunity)) {

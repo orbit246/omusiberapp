@@ -135,4 +135,50 @@ class NewsView {
 
   @override
   int get hashCode => Object.hash(id, title);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'summary': summary,
+      'authorName': authorName,
+      'heroImage': heroImage,
+      'detailUrl': detailUrl,
+      'publishedAt': publishedAt?.toIso8601String(),
+      'publishedAtText': publishedAtText,
+      'tags': tags,
+      'imageUrls': imageUrls,
+      'fullText': fullText,
+      'excelAttachments': excelAttachments,
+      'viewCount': viewCount,
+      'likeCount': likeCount,
+      'isFavorited': isFavorited,
+      'readMoreLabel': readMoreLabel,
+    };
+  }
+
+  factory NewsView.fromJson(Map<String, dynamic> json) {
+    return NewsView(
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? '',
+      summary: json['summary'] as String? ?? '',
+      authorName: json['authorName'] as String? ?? '',
+      heroImage: json['heroImage'] as String?,
+      detailUrl: json['detailUrl'] as String?,
+      publishedAt: json['publishedAt'] != null
+          ? DateTime.tryParse(json['publishedAt'] as String)
+          : null,
+      publishedAtText: json['publishedAtText'] as String?,
+      tags: List<String>.from(json['tags'] ?? []),
+      imageUrls: List<String>.from(json['imageUrls'] ?? []),
+      fullText: json['fullText'] as String?,
+      excelAttachments: List<Map<String, dynamic>>.from(
+        json['excelAttachments'] ?? [],
+      ),
+      viewCount: json['viewCount'] as int? ?? 0,
+      likeCount: json['likeCount'] as int? ?? 0,
+      isFavorited: json['isFavorited'] as bool? ?? false,
+      readMoreLabel: json['readMoreLabel'] as String? ?? 'Devamını Oku',
+    );
+  }
 }

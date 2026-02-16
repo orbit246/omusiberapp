@@ -91,11 +91,7 @@ class _SlideInEntryState extends State<SlideInEntry>
   }
 }
 
-// --- 2. CUSTOM PHYSICS (Copied from NewsTabView) ---
-// --- 2. CUSTOM PHYSICS (Removed to fix overscroll error) ---
-// We will use standard AlwaysScrollableScrollPhysics instead.
-
-// --- 3. MAIN VIEW ---
+// --- 2. MAIN VIEW ---
 class EventsTabView extends StatefulWidget {
   const EventsTabView({super.key});
 
@@ -107,36 +103,82 @@ class _EventsTabViewState extends State<EventsTabView> {
   final EventRepository _repo = EventRepository();
   final Set<String> _hasAnimatedIds = {};
 
-  // No explicit ScrollController; we rely on the PrimaryScrollController provided by NestedScrollView.
-  // This allows the inner list to work correctly with the outer NestedScrollView behavior.
-
   bool _showBackToTopButton = false;
   bool _canCreateEvent = false;
 
-  late Stream<List<PostView>> _eventsStream;
+  final List<PostView> _events = [];
+  bool _isInitialLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _eventsStream = _repo.eventsStream();
+    _loadInitialData();
     _checkPermissions();
   }
 
+  Future<void> _loadInitialData() async {
+    try {
+      // 1. Load from cache first (no network)
+      final cached = await _repo.getCachedEvents();
+      if (mounted) {
+        setState(() {
+          if (cached.isNotEmpty) {
+            _isInitialLoading = false;
+            _events.clear();
+            _events.addAll(freshWithMocks(cached));
+          }
+        });
+      }
+
+      // 2. Schedule refresh AFTER render
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshInBackground();
+      });
+    } catch (e) {
+      debugPrint("Failed to load initial events cache: $e");
+      if (_events.isEmpty) {
+        _refreshInBackground();
+      }
+    }
+  }
+
+  Future<void> _refreshInBackground() async {
+    try {
+      final fresh = await _repo.fetchEvents(forceRefresh: true);
+      if (mounted) {
+        setState(() {
+          _isInitialLoading = false;
+          _events.clear();
+          _events.addAll(freshWithMocks(fresh));
+        });
+      }
+    } catch (e) {
+      debugPrint("Background refresh failed: $e");
+      if (mounted && _events.isEmpty) {
+        setState(() {
+          _isInitialLoading = false;
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  List<PostView> freshWithMocks(List<PostView> fresh) {
+    return [...mockEvents, ...fresh];
+  }
+
   Future<void> _checkPermissions() async {
-    print("DEBUG: Checking permissions...");
     final allowed = await AuthService().isWhitelisted();
-    print("DEBUG: isWhitelisted result: $allowed");
     if (mounted) {
       setState(() {
         _canCreateEvent = allowed;
-        print("DEBUG: Updated _canCreateEvent to: $_canCreateEvent");
       });
     }
   }
 
   @override
   void dispose() {
-    // No controller to dispose
     super.dispose();
   }
 
@@ -151,7 +193,6 @@ class _EventsTabViewState extends State<EventsTabView> {
     }
   }
 
-  // Same helper mapping as before
   Widget _eventToCard(BuildContext context, PostView e) {
     final imageUrl = (e.thubnailUrl.trim().isNotEmpty)
         ? e.thubnailUrl.trim()
@@ -202,220 +243,110 @@ class _EventsTabViewState extends State<EventsTabView> {
   }
 
   Future<void> _handleRefresh() async {
-    // Update the stream to fetch new data
-    setState(() {
-      _eventsStream = _repo.eventsStream(forceRefresh: true);
-    });
-    // Wait for the stream to emit a value (optional, depends on UX)
-    // For now purely relying on StreamBuilder update is fine.
-    // However, StreamBuilder will go to waiting state.
+    await _refreshInBackground();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitialLoading && _events.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              "Etkinlikler yükleniyor",
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_errorMessage != null && _events.isEmpty) {
+      return Center(child: Text('Bir hata oluştu: $_errorMessage'));
+    }
+
+    final events = _events;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: StreamBuilder<List<PostView>>(
-        stream: _eventsStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Bir hata oluştu: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text(
-                    "Etkinlikler yükleniyor",
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final fetchedEvents = snapshot.data ?? [];
-          final events = [...mockEvents, ...fetchedEvents];
-
-          return NotificationListener<ScrollNotification>(
-            onNotification: (ScrollNotification scrollInfo) {
-              if (scrollInfo.metrics.axis == Axis.vertical) {
-                // Determine if we show the back-to-top button
-                if (scrollInfo.metrics.pixels >= 500) {
-                  if (!_showBackToTopButton) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && !_showBackToTopButton) {
-                        setState(() => _showBackToTopButton = true);
-                      }
-                    });
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification scrollInfo) {
+          if (scrollInfo.metrics.axis == Axis.vertical) {
+            if (scrollInfo.metrics.pixels >= 500) {
+              if (!_showBackToTopButton) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && !_showBackToTopButton) {
+                    setState(() => _showBackToTopButton = true);
                   }
-                } else {
-                  if (_showBackToTopButton) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && _showBackToTopButton) {
-                        setState(() => _showBackToTopButton = false);
-                      }
-                    });
-                  }
-                }
+                });
               }
-              return false; // let the notification bubble up to NestedScrollView
-            },
-            child: CustomScrollView(
-              // No 'controller' property is set, so it uses the inherited PrimaryScrollController
-              key: const PageStorageKey('events_tab'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                CupertinoSliverRefreshControl(
-                  onRefresh: _handleRefresh,
-                  refreshTriggerPullDistance: 60.0,
-                  refreshIndicatorExtent: 40.0,
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                if (events.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Column(
-                      children: [
-                        Expanded(child: Center(child: NoEventsFoundWidget())),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                "Built by ",
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                              Text(
-                                "NortixLabs",
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary, // Using Primary Color for the name
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              Text(
-                                " with ",
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                              Icon(
-                                Icons.favorite,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary, // Red heart
-                                size: 14,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 80),
-                      ],
-                    ),
-                  )
-                else
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final event = events[index];
-
-                      // Animation Logic
-                      final bool hasAnimated = _hasAnimatedIds.contains(
-                        event.id,
-                      );
-                      // If it hasn't animated yet, we animate it now
-                      final bool shouldAnimate = !hasAnimated;
-
-                      if (shouldAnimate) {
-                        _hasAnimatedIds.add(event.id);
-                      }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: SlideInEntry(
-                          key: ValueKey(event.id),
-                          animate: shouldAnimate,
-                          child: _eventToCard(context, event),
-                        ),
-                      );
-                    }, childCount: events.length),
-                  ),
-
-                // --- FOOTER SECTION ---
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "Built by ",
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                        Text(
-                          "NortixLabs",
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary, // Using Primary Color for the name
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        Text(
-                          " with ",
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                        Icon(
-                          Icons.favorite,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary, // Red heart
-                          size: 14,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-              ],
-            ),
-          );
+            } else {
+              if (_showBackToTopButton) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _showBackToTopButton) {
+                    setState(() => _showBackToTopButton = false);
+                  }
+                });
+              }
+            }
+          }
+          return false;
         },
+        child: RefreshIndicator(
+          onRefresh: _handleRefresh,
+          displacement: 20,
+          edgeOffset: 0,
+          child: CustomScrollView(
+            key: const PageStorageKey('events_tab'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              if (events.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Column(
+                    children: [
+                      Expanded(child: Center(child: NoEventsFoundWidget())),
+                      _buildFooter(context),
+                      const SizedBox(height: 80),
+                    ],
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final event = events[index];
+                    final bool hasAnimated = _hasAnimatedIds.contains(event.id);
+                    final bool shouldAnimate = !hasAnimated;
+
+                    if (shouldAnimate) {
+                      _hasAnimatedIds.add(event.id);
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: SlideInEntry(
+                        key: ValueKey(event.id),
+                        animate: shouldAnimate,
+                        child: _eventToCard(context, event),
+                      ),
+                    );
+                  }, childCount: events.length),
+                ),
+
+              SliverToBoxAdapter(child: _buildFooter(context)),
+              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Whitelisting Check FAB
           if (_canCreateEvent)
             Padding(
               padding: const EdgeInsets.only(bottom: 12.0),
@@ -441,6 +372,42 @@ class _EventsTabViewState extends State<EventsTabView> {
               mini: true,
               child: const Icon(Icons.arrow_upward),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "Built by ",
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            "NortixLabs",
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            " with ",
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Icon(
+            Icons.favorite,
+            color: Theme.of(context).colorScheme.primary,
+            size: 14,
+          ),
         ],
       ),
     );

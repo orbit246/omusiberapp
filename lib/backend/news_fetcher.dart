@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/news_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NewsFetcher {
   static final NewsFetcher _instance = NewsFetcher._internal();
@@ -25,9 +26,28 @@ class NewsFetcher {
   static const String _fallbackImage =
       'https://carsambamyo.omu.edu.tr/user/themes/fakulte/assets/images/omu-default-img_tr.jpeg';
 
+  static const String _storageKey = 'cached_news_list';
   List<NewsView>? _cachedNews;
   DateTime? _lastFetchTime;
   static const Duration _cacheDuration = Duration(minutes: 30);
+
+  Future<List<NewsView>> getCachedNews() async {
+    if (_cachedNews != null && _cachedNews!.isNotEmpty) return _cachedNews!;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString(_storageKey);
+      if (jsonStr != null) {
+        final List<dynamic> decoded = json.decode(jsonStr);
+        _cachedNews = decoded.map((item) => NewsView.fromJson(item)).toList();
+        _log('Loaded ${_cachedNews!.length} items from persistent cache.');
+        return _cachedNews!;
+      }
+    } catch (e) {
+      _logError('Failed to load news from persistent cache', e);
+    }
+    return [];
+  }
 
   Future<String> _getAuthToken() async {
     var user = FirebaseAuth.instance.currentUser;
@@ -62,10 +82,18 @@ class NewsFetcher {
   }
 
   Future<List<NewsView>> fetchLatestNews({bool forceRefresh = false}) async {
-    // 1. Cache Check
+    // 1. Cache Check (Memory)
     if (!forceRefresh && _cachedNews != null && _lastFetchTime != null) {
       if (DateTime.now().difference(_lastFetchTime!) < _cacheDuration) {
-        _log('Returning cached data.');
+        _log('Returning memory cached data.');
+        return _cachedNews!;
+      }
+    }
+
+    // if memory cache is empty, try to load from persistent storage
+    if (_cachedNews == null || _cachedNews!.isEmpty) {
+      await getCachedNews();
+      if (!forceRefresh && _cachedNews != null && _cachedNews!.isNotEmpty) {
         return _cachedNews!;
       }
     }
@@ -94,23 +122,28 @@ class NewsFetcher {
           .toList();
 
       _log('Fetched ${result.length} items from API.');
+
+      // Persist to storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _storageKey,
+        json.encode(result.map((e) => e.toJson()).toList()),
+      );
     } catch (e) {
       _logError('CRITICAL FAILURE in fetchLatestNews', e);
-      // debugPrintStack(stackTrace: stack);
-      // Fallback if cache is empty
-      if (_cachedNews == null || _cachedNews!.isEmpty) {
-        return [_getExampleNews()];
+      if (_cachedNews != null && _cachedNews!.isNotEmpty) {
+        return _cachedNews!;
       }
+      return [_getExampleNews()];
     }
 
-    // 3. Save to Cache
+    // 3. Save to Memory Cache
     if (result.isNotEmpty) {
       _cachedNews = result;
       _lastFetchTime = DateTime.now();
       return result;
     }
 
-    // If cache is empty and fetch failed, return fallback
     if (_cachedNews != null && _cachedNews!.isNotEmpty) {
       return _cachedNews!;
     }

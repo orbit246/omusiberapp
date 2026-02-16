@@ -18,26 +18,51 @@ class _CommunityTabViewState extends State<CommunityTabView> {
   @override
   void initState() {
     super.initState();
-    _loadPosts();
+    _loadInitialData();
   }
 
-  Future<void> _loadPosts() async {
-    final posts = await _repo.fetchPosts();
-    if (mounted) {
-      setState(() {
-        _posts = posts;
-        _isLoading = false;
+  Future<void> _loadInitialData() async {
+    try {
+      // 1. Load from cache first
+      final cached = await _repo.getCachedPosts();
+      if (mounted && cached.isNotEmpty) {
+        setState(() {
+          _posts = cached;
+          _isLoading = false;
+        });
+      }
+
+      // 2. Schedule refresh
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshInBackground();
       });
+    } catch (e) {
+      debugPrint("Failed to load initial community cache: $e");
+      if (_posts.isEmpty) {
+        _refreshInBackground();
+      }
+    }
+  }
+
+  Future<void> _refreshInBackground() async {
+    try {
+      final posts = await _repo.fetchPosts(forceRefresh: true);
+      if (mounted) {
+        setState(() {
+          _posts = posts;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Background refresh failed: $e");
+      if (mounted && _posts.isEmpty) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _handleRefresh() async {
-    final posts = await _repo.fetchPosts(forceRefresh: true);
-    if (mounted) {
-      setState(() {
-        _posts = posts;
-      });
-    }
+    await _refreshInBackground();
   }
 
   @override
