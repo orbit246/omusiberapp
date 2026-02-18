@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:omusiber/backend/community_repository.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/widgets/community_post_card.dart';
@@ -65,6 +66,35 @@ class _CommunityTabViewState extends State<CommunityTabView> {
     await _refreshInBackground();
   }
 
+  void _toggleLike(CommunityPost post) {
+    final int index = _posts.indexWhere((p) => p.id == post.id);
+    if (index == -1) return;
+
+    final current = _posts[index];
+    final nextLiked = !current.isLiked;
+    final nextLikes = nextLiked
+        ? current.likes + (current.isLiked ? 0 : 1)
+        : (current.likes - (current.isLiked ? 1 : 0)).clamp(0, 1 << 30);
+
+    setState(() {
+      _posts[index] = current.copyWith(isLiked: nextLiked, likes: nextLikes);
+    });
+
+    unawaited(
+      _repo.setPostLike(postId: post.id, isLiked: nextLiked).catchError((
+        error,
+      ) {
+        if (!mounted) return;
+        setState(() {
+          _posts[index] = current;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Begeni guncellenemedi.')));
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -82,7 +112,7 @@ class _CommunityTabViewState extends State<CommunityTabView> {
         itemCount: _posts.length,
         itemBuilder: (context, index) {
           final post = _posts[index];
-          return CommunityPostCard(post: post);
+          return CommunityPostCard(post: post, onLike: () => _toggleLike(post));
         },
       ),
     );

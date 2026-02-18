@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart'; // Added
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
@@ -11,8 +12,35 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class SimpleNotifications {
   static const _topic = 'events_all';
+  static const String _defaultChannelId = 'akademiz_general';
+
+  static const AndroidNotificationChannel _generalChannel =
+      AndroidNotificationChannel(
+        _defaultChannelId,
+        'Genel Bildirimler',
+        description: 'Genel uygulama bildirimleri',
+        importance: Importance.defaultImportance,
+      );
+
+  static const AndroidNotificationChannel _eventsChannel =
+      AndroidNotificationChannel(
+        'akademiz_events',
+        'Etkinlik Bildirimleri',
+        description: 'Etkinlikler ile ilgili bildirimler',
+        importance: Importance.high,
+      );
+
+  static const AndroidNotificationChannel _announcementsChannel =
+      AndroidNotificationChannel(
+        'akademiz_announcements',
+        'Duyuru Bildirimleri',
+        description: 'Haber ve duyuru bildirimleri',
+        importance: Importance.high,
+      );
 
   final FirebaseMessaging _fcm;
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   SimpleNotifications({FirebaseMessaging? fcm})
     : _fcm = fcm ?? FirebaseMessaging.instance;
@@ -29,8 +57,18 @@ class SimpleNotifications {
       // FirebaseMessaging.onBackgroundMessage is usually set in main.dart
       // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler); // This should be called in main.dart
 
+      await _initLocalNotifications();
+      await _registerAndroidChannels();
+
       // Permissions
-      await requestPermission();
+      await ensurePermissionForDisplay();
+
+      // Ensure foreground notifications are shown
+      await _fcm.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       // Subscribe to topic
       await _fcm.subscribeToTopic(_topic);
@@ -38,6 +76,7 @@ class SimpleNotifications {
       // Foreground handler
       FirebaseMessaging.onMessage.listen((msg) async {
         await saveMessage(msg);
+        await _showForegroundNotification(msg);
       });
 
       // Background open handler
@@ -52,23 +91,93 @@ class SimpleNotifications {
       }
     } catch (e) {
       // General error during init
+      print("SimpleNotifications init error: $e");
     } finally {
       // _isInitializing stays true? Or resets?
     }
   }
 
-  Future<void> requestPermission() async {
+  Future<bool> ensurePermissionForDisplay() async {
+    final hasPermission = await checkPermission();
+    if (hasPermission) return true;
+    return requestPermission();
+  }
+
+  Future<bool> requestPermission() async {
     try {
       await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      final androidPlugin = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      if (androidPlugin != null) {
+        await androidPlugin.requestNotificationsPermission();
+      }
+      return await checkPermission();
     } catch (e) {
       // "A request for permissions is already running" or denied
+      return false;
     }
   }
 
   /// Returns true if permission is granted, false otherwise.
   Future<bool> checkPermission() async {
     final settings = await _fcm.getNotificationSettings();
-    return settings.authorizationStatus == AuthorizationStatus.authorized;
+    return settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
+  }
+
+  Future<void> _initLocalNotifications() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const initSettings = InitializationSettings(android: androidInit);
+    await _localNotifications.initialize(initSettings);
+  }
+
+  Future<void> _registerAndroidChannels() async {
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (androidPlugin == null) return;
+
+    await androidPlugin.createNotificationChannel(_generalChannel);
+    await androidPlugin.createNotificationChannel(_eventsChannel);
+    await androidPlugin.createNotificationChannel(_announcementsChannel);
+  }
+
+  Future<void> _showForegroundNotification(RemoteMessage msg) async {
+    final n = msg.notification;
+    if (n == null) return;
+
+    final channel = _resolveChannel(msg);
+
+    await _localNotifications.show(
+      msg.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      n.title ?? 'Bildirim',
+      n.body ?? '',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channel.id,
+          channel.name,
+          channelDescription: channel.description,
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@mipmap/launcher_icon',
+        ),
+      ),
+      payload: jsonEncode(msg.data),
+    );
+  }
+
+  AndroidNotificationChannel _resolveChannel(RemoteMessage msg) {
+    final rawType = (msg.data['type'] ?? msg.data['category'] ?? '')
+        .toString()
+        .toLowerCase();
+    if (rawType.contains('event')) return _eventsChannel;
+    if (rawType.contains('news') || rawType.contains('announcement')) {
+      return _announcementsChannel;
+    }
+    return _generalChannel;
   }
 
   /// Saves a message to notification history.

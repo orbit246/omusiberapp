@@ -48,6 +48,30 @@ class CommunityPost {
     'isLiked': isLiked,
     'poll': poll?.toJson(),
   };
+
+  CommunityPost copyWith({
+    String? id,
+    String? authorName,
+    String? authorImage,
+    String? content,
+    String? imageUrl,
+    DateTime? createdAt,
+    int? likes,
+    bool? isLiked,
+    PollModel? poll,
+  }) {
+    return CommunityPost(
+      id: id ?? this.id,
+      authorName: authorName ?? this.authorName,
+      authorImage: authorImage ?? this.authorImage,
+      content: content ?? this.content,
+      imageUrl: imageUrl ?? this.imageUrl,
+      createdAt: createdAt ?? this.createdAt,
+      likes: likes ?? this.likes,
+      isLiked: isLiked ?? this.isLiked,
+      poll: poll ?? this.poll,
+    );
+  }
 }
 
 class PollModel {
@@ -55,31 +79,41 @@ class PollModel {
   final String question;
   final List<PollOption> options;
   final String? userVotedOptionId;
-  final DateTime expiresAt;
+  final DateTime closesAt;
+  final bool isClosed;
 
   PollModel({
     required this.id,
     required this.question,
     required this.options,
     this.userVotedOptionId,
-    required this.expiresAt,
+    required this.closesAt,
+    this.isClosed = false,
   });
 
   int get totalVotes => options.fold(0, (sum, opt) => sum + opt.votes);
 
   factory PollModel.fromJson(Map<String, dynamic> json) {
+    final DateTime parsedClosesAt =
+        DateTime.tryParse(
+          (json['closesAt'] ?? json['expiresAt'])?.toString() ?? '',
+        ) ??
+        DateTime.now().add(const Duration(days: 7));
+
+    final bool parsedIsClosed =
+        (json['isClosed'] as bool?) ?? DateTime.now().isAfter(parsedClosesAt);
+
     return PollModel(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       question: json['question'] ?? '',
       options:
           (json['options'] as List<dynamic>?)
-              ?.map((e) => PollOption.fromJson(e))
+              ?.map((e) => PollOption.fromJson(Map<String, dynamic>.from(e)))
               .toList() ??
           [],
       userVotedOptionId: json['userVotedOptionId'],
-      expiresAt: json['expiresAt'] != null
-          ? DateTime.parse(json['expiresAt'])
-          : DateTime.now().add(const Duration(days: 7)),
+      closesAt: parsedClosesAt,
+      isClosed: parsedIsClosed,
     );
   }
 
@@ -88,7 +122,10 @@ class PollModel {
     'question': question,
     'options': options.map((e) => e.toJson()).toList(),
     'userVotedOptionId': userVotedOptionId,
-    'expiresAt': expiresAt.toIso8601String(),
+    'closesAt': closesAt.toIso8601String(),
+    'isClosed': isClosed,
+    // Backward compatibility for old cached shape
+    'expiresAt': closesAt.toIso8601String(),
   };
 }
 
@@ -101,9 +138,11 @@ class PollOption {
 
   factory PollOption.fromJson(Map<String, dynamic> json) {
     return PollOption(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       text: json['text'] ?? '',
-      votes: json['votes'] ?? 0,
+      votes: (json['votes'] is num)
+          ? (json['votes'] as num).toInt()
+          : int.tryParse(json['votes']?.toString() ?? '') ?? 0,
     );
   }
 

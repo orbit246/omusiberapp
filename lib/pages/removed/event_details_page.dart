@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EventDetailsPage extends StatefulWidget {
   const EventDetailsPage({super.key, required this.event});
@@ -21,19 +23,106 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   final EventRepository _repo = EventRepository();
   int _currentImageIndex = 0;
   bool _isFavorited = false;
+  bool _isJoining = false;
+  bool _hasJoined = false;
+  PostView? _event;
 
   @override
   void initState() {
     super.initState();
+    _event = widget.event;
+    _isFavorited = widget.event.isLiked;
+    _hasJoined = widget.event.isJoined;
     unawaited(_repo.trackEventView(widget.event.id));
+    unawaited(_refreshEventStatus());
+  }
+
+  Future<void> _handleJoinAction() async {
+    final event = _event ?? widget.event;
+    if (_hasJoined) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bu etkinlige zaten katildiniz.')),
+        );
+      }
+      return;
+    }
+
+    final serverJoined = await _repo.isEventJoined(event.id);
+    if (serverJoined) {
+      if (mounted) {
+        setState(() => _hasJoined = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bu etkinlige zaten katildiniz.')),
+        );
+      }
+      return;
+    }
+
+    if (event.allowAppSignups) {
+      setState(() => _isJoining = true);
+      try {
+        await _repo.joinEvent(event.id);
+        if (mounted) {
+          setState(() => _hasJoined = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Etkinliğe başarıyla katıldınız!')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+        }
+      } finally {
+        if (mounted) setState(() => _isJoining = false);
+      }
+    } else if (event.redirectTo != null && event.redirectTo!.isNotEmpty) {
+      await _openExternalLink();
+    }
+  }
+
+  Future<void> _openExternalLink() async {
+    final link = (_event ?? widget.event).redirectTo;
+    if (link == null || link.isEmpty) return;
+
+    final uri = Uri.tryParse(link);
+    if (uri != null) {
+      final openedExternal = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (openedExternal) return;
+
+      final openedDefault = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+      );
+      if (openedDefault) return;
+
+      final openedInApp = await launchUrl(
+        uri,
+        mode: LaunchMode.inAppBrowserView,
+      );
+      if (openedInApp) return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Baglanti acilamadi.')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final event = widget.event;
+    final event = _event ?? widget.event;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final hasExternalLink =
+        event.redirectTo != null && event.redirectTo!.isNotEmpty;
 
     // Logic to determine image source
     final List<String> images = event.imageLinks.isNotEmpty
@@ -41,14 +130,52 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         : (event.thubnailUrl.isNotEmpty ? [event.thubnailUrl] : <String>[]);
 
     // Extract metadata
-    final datetime =
-        event.metadata['datetimeText']?.toString() ?? 'Tarih Belirtilmemiş';
     final duration = event.metadata['durationText']?.toString();
-    final ticketText =
-        event.metadata['ticketText']?.toString() ??
-        (event.ticketPrice <= 0
-            ? 'Ücretsiz'
-            : '₺${event.ticketPrice.toStringAsFixed(0)}');
+    final ticketValueText = (event.ticketPrice <= 0)
+        ? 'Ücretsiz'
+        : '${event.ticketPrice.toStringAsFixed(0)} TRY';
+
+    // Human readable date (No year)
+    String datetime = 'Tarih Belirtilmemiş';
+    bool isPast = false;
+
+    if (event.eventDate != null) {
+      final date = event.eventDate!;
+      isPast = date.isBefore(DateTime.now());
+
+      final months = [
+        '',
+        'Ocak',
+        'Şubat',
+        'Mart',
+        'Nisan',
+        'Mayıs',
+        'Haziran',
+        'Temmuz',
+        'Ağustos',
+        'Eylül',
+        'Ekim',
+        'Kasım',
+        'Aralık',
+      ];
+      final days = [
+        '',
+        'Pazartesi',
+        'Salı',
+        'Çarşamba',
+        'Perşembe',
+        'Cuma',
+        'Cumartesi',
+        'Pazar',
+      ];
+
+      final dayName = days[date.weekday];
+      final monthName = months[date.month];
+      final timeStr =
+          '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+      datetime = '${date.day} $monthName $dayName, $timeStr';
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -185,42 +312,72 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                             ),
                           ),
 
-                        // Tags
-                        if (event.tags.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: event.tags.map((tag) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
+                        // Publisher & Tags
+                        Row(
+                          children: [
+                            if (event.publisher.isNotEmpty)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  event.publisher,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: colorScheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primary.withOpacity(
-                                      0.08,
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: colorScheme.primary.withOpacity(
-                                        0.1,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: theme.textTheme.labelMedium
-                                        ?.copyWith(
-                                          color: colorScheme.primary,
-                                          fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            if (event.tags.isNotEmpty)
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: event.tags.map((tag) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8.0,
                                         ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.primary
+                                                .withOpacity(0.08),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: colorScheme.primary
+                                                  .withOpacity(0.1),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color: colorScheme.primary,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
 
                         // Title
                         Text(
@@ -239,23 +396,26 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         _buildFeatureRow(
                           context,
                           Icons.calendar_today_rounded,
-                          datetime,
-                          subtitle: duration,
+                          "Tarih",
+                          subtitle: duration != null
+                              ? '$datetime ($duration)'
+                              : datetime,
                         ),
                         const SizedBox(height: 16),
                         _buildFeatureRow(
                           context,
                           Icons.location_on_rounded,
-                          event.location,
+                          "Lokasyon",
+                          subtitle: event.location,
                         ),
                         const SizedBox(height: 16),
                         _buildFeatureRow(
                           context,
                           Icons.confirmation_number_rounded,
-                          ticketText,
+                          "Bilet Ücreti:",
                           subtitle: event.maxContributors > 0
-                              ? '${event.remainingContributors}/${event.maxContributors} Kişilik Kontenjan'
-                              : null,
+                              ? '$ticketValueText • ${event.remainingContributors}/${event.maxContributors} Kontenjan'
+                              : ticketValueText,
                         ),
 
                         const SizedBox(height: 28),
@@ -359,26 +519,79 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         ),
                         color: _isFavorited ? colorScheme.primary : null,
                       ),
+                      if (hasExternalLink) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: _openExternalLink,
+                          icon: const Icon(Icons.open_in_new_rounded),
+                          tooltip: 'Dis Baglanti',
+                        ),
+                      ],
 
                       const Spacer(),
 
                       // Primary Action
-                      FilledButton.icon(
-                        onPressed: () {
-                          // Implement Join Logic
-                        },
-                        icon: const Icon(Icons.event_available, size: 18),
-                        label: const Text('Etkinliğe Katıl'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 14,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                      ),
+                      _isJoining
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 40),
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : FilledButton.icon(
+                              onPressed:
+                                  (isPast ||
+                                      event.isRegistrationClosed ||
+                                      _hasJoined)
+                                  ? null
+                                  : _handleJoinAction,
+                              icon: Icon(
+                                (isPast || event.isRegistrationClosed)
+                                    ? Icons.event_busy_rounded
+                                    : (_hasJoined
+                                          ? Icons.task_alt_rounded
+                                          : (event.allowAppSignups
+                                                ? Icons.event_available
+                                                : Icons.open_in_new)),
+                                size: 18,
+                              ),
+                              label: Text(
+                                isPast
+                                    ? 'Geçmiş Etkinlik'
+                                    : (event.isRegistrationClosed
+                                          ? 'Kayıt Kapandı'
+                                          : (_hasJoined
+                                                ? 'Katıldınız'
+                                                : (event.allowAppSignups
+                                                      ? 'Etkinliğe Katıl'
+                                                      : 'Dış Bağlantıya Git'))),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    (_hasJoined ||
+                                        isPast ||
+                                        event.isRegistrationClosed)
+                                    ? colorScheme.primaryContainer
+                                    : null,
+                                foregroundColor:
+                                    (_hasJoined ||
+                                        isPast ||
+                                        event.isRegistrationClosed)
+                                    ? colorScheme.onPrimaryContainer
+                                    : null,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
                     ],
                   ),
                 ),
@@ -388,6 +601,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _refreshEventStatus() async {
+    final fresh = await _repo.fetchEventById(widget.event.id);
+    if (!mounted || fresh == null) return;
+    setState(() {
+      _event = fresh;
+      _hasJoined = fresh.isJoined;
+      _isFavorited = fresh.isLiked;
+    });
   }
 
   Widget _buildFeatureRow(
@@ -439,22 +662,24 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   Widget _buildImage(String imagePath) {
     if (imagePath.startsWith('http')) {
-      return Image.network(
-        imagePath,
+      return CachedNetworkImage(
+        imageUrl: imagePath,
         fit: BoxFit.cover,
         width: double.infinity,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: Colors.grey.shade200,
-            child: const Center(
-              child: Icon(
-                Icons.image_not_supported,
-                size: 50,
-                color: Colors.grey,
-              ),
+        placeholder: (context, url) => Container(
+          color: Colors.grey.shade100,
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: Colors.grey.shade200,
+          child: const Center(
+            child: Icon(
+              Icons.image_not_supported,
+              size: 50,
+              color: Colors.grey,
             ),
-          );
-        },
+          ),
+        ),
       );
     } else {
       return Image.asset(imagePath, fit: BoxFit.cover, width: double.infinity);

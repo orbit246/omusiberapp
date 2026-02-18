@@ -14,11 +14,15 @@ final List<PostView> mockEvents = [
     thubnailUrl:
         "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
     imageLinks: [],
+    publisher: "OMÜ Siber",
     metadata: {
       'datetimeText': "12 Mart 2026",
       'durationText': "3 Gün",
       'ticketText': "Ücretsiz",
     },
+    eventDate: DateTime(2026, 3, 12, 10, 0),
+    isJoined: false,
+    isLiked: false,
   ),
   PostView(
     id: "mock_2",
@@ -33,11 +37,15 @@ final List<PostView> mockEvents = [
     thubnailUrl:
         "https://images.unsplash.com/photo-1557683316-973673baf926?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
     imageLinks: [],
+    publisher: "OMÜ Siber",
     metadata: {
       'datetimeText': "20 Mart 2026",
       'durationText': "4 Saat",
       'ticketText': "Kayıt Gerekli",
     },
+    eventDate: DateTime(2026, 3, 20, 14, 0),
+    isJoined: false,
+    isLiked: false,
   ),
   PostView(
     id: "mock_3",
@@ -52,10 +60,14 @@ final List<PostView> mockEvents = [
     thubnailUrl:
         "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
     imageLinks: [],
+    publisher: "OMÜ Siber",
     metadata: {
       'datetimeText': "25 Mart 2026",
       'durationText': "2 Saat",
       'ticketText': "Herkes Açık",
     },
+    eventDate: DateTime(2026, 3, 25, 18, 0),
+    isJoined: false,
+    isLiked: false,
   ),
 ];

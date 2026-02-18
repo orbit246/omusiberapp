@@ -24,6 +24,16 @@ class _PollWidgetState extends State<PollWidget> {
   }
 
   Future<void> _handleVote(String optionId) async {
+    final isClosed = _poll.isClosed || DateTime.now().isAfter(_poll.closesAt);
+    if (isClosed) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Bu oylama kapanmistir.")));
+      }
+      return;
+    }
+
     setState(() => _isVoting = true);
     try {
       // Simulate repo call
@@ -50,7 +60,7 @@ class _PollWidgetState extends State<PollWidget> {
   @override
   Widget build(BuildContext context) {
     final hasVoted = _poll.userVotedOptionId != null;
-    final isExpired = DateTime.now().isAfter(_poll.expiresAt);
+    final isExpired = _poll.isClosed || DateTime.now().isAfter(_poll.closesAt);
     final totalVotes = _poll.totalVotes;
     final showResults = hasVoted || isExpired;
 
@@ -109,7 +119,7 @@ class _PollWidgetState extends State<PollWidget> {
     if (isExpired) return "$totalVotes oy • Süre doldu";
     if (hasVoted) return "$totalVotes oy • Oylandı";
 
-    final diff = _poll.expiresAt.difference(DateTime.now());
+    final diff = _poll.closesAt.difference(DateTime.now());
     if (diff.inDays > 0) return "${diff.inDays} gün kaldı";
     if (diff.inHours > 0) return "${diff.inHours} saat kaldı";
     if (diff.inMinutes > 0) return "${diff.inMinutes} dakika kaldı";

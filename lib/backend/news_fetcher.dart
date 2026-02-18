@@ -178,8 +178,10 @@ class NewsFetcher {
           ? DateTime.tryParse(publishedAtStr)
           : null;
 
-      final viewCount = json['views'] as int? ?? 0;
-      final likeCount = json['likes'] as int? ?? 0;
+      final viewCount = json['views'] as int? ?? json['viewCount'] as int? ?? 0;
+      final likeCount = json['likes'] as int? ?? json['likeCount'] as int? ?? 0;
+      final isLiked =
+          json['isLiked'] as bool? ?? json['isFavorited'] as bool? ?? false;
 
       // JSON Strings Parsing
       List<String> tags = [];
@@ -223,6 +225,7 @@ class NewsFetcher {
         excelAttachments: excelAttachments,
         viewCount: viewCount,
         likeCount: likeCount,
+        isFavorited: isLiked,
       );
     } catch (e) {
       _logError('Failed to parse news item', e);

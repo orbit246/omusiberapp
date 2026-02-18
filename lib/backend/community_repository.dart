@@ -33,69 +33,32 @@ class CommunityRepository {
     return [];
   }
 
-  // Mock data for initial display if API fails
-  List<CommunityPost> get _mockPosts => [
-    CommunityPost(
-      id: 'mock-1',
-      authorName: 'AkademiZ Admin',
-      authorImage:
-          'https://ui-avatars.com/api/?name=OM&background=0D8ABC&color=fff',
-      content:
-          'Hoşgeldiniz! Topluluğumuzda fikirlerinizi paylaşabilir, sorular sorabilirsiniz.',
-      createdAt: DateTime(2025, 2, 11, 10, 0), // Fixed older date
-      likes: 12,
-      imageUrl:
-          'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
-    ),
-    CommunityPost(
-      id: 'mock-2',
-      authorName: 'Selim Y.',
-      authorImage: null,
-      content:
-          'Flutter ile mobil uygulama geliştirme etkinliği çok verimliydi, teşekkürler!',
-      createdAt: DateTime(2025, 2, 10, 10, 0),
-      likes: 5,
-    ),
-    CommunityPost(
-      id: 'mock-3',
-      authorName: 'AkademiZ Anket',
-      authorImage: null,
-      content: 'Hangi programlama dilini daha çok seviyorsunuz?',
-      createdAt: DateTime(2025, 2, 11, 14, 0),
-      likes: 42,
-      poll: PollModel(
-        id: 'poll-1',
-        question: 'Favori diliniz hangisi?',
-        options: [
-          PollOption(id: 'opt-1', text: 'Dart / Flutter', votes: 120),
-          PollOption(id: 'opt-2', text: 'Python', votes: 95),
-          PollOption(id: 'opt-3', text: 'JavaScript', votes: 60),
-          PollOption(id: 'opt-4', text: 'C# / .NET', votes: 45),
-        ],
-        expiresAt: DateTime.now().add(const Duration(days: 3)),
-      ),
-    ),
-    CommunityPost(
-      id: 'mock-4',
-      authorName: 'AkademiZ Etkinlik',
-      authorImage: null,
-      content: 'Gelecek haftaki buluşma için hangi gün size daha uygun?',
-      createdAt: DateTime(2025, 2, 11, 15, 0),
-      likes: 25,
-      poll: PollModel(
-        id: 'poll-2',
-        question: 'Etkinlik Günü',
-        options: [
-          PollOption(id: 'opt-day-1', text: 'Çarşamba 14:00', votes: 15),
-          PollOption(id: 'opt-day-2', text: 'Perşembe 15:00', votes: 20),
-          PollOption(id: 'opt-day-3', text: 'Cuma 16:00', votes: 10),
-        ],
-        expiresAt: DateTime.now().add(const Duration(days: 2)),
-      ),
-    ),
-  ];
+  // Mock data removed
 
   String get _baseUrl => '${Constants.baseUrl}/community';
+
+  Future<String> _getAuthToken() async {
+    var user = FirebaseAuth.instance.currentUser;
+    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
+    if (user == null) {
+      throw Exception('Authentication failed: no Firebase user available.');
+    }
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication failed: empty Firebase ID token.');
+    }
+    return token;
+  }
+
+  Future<Map<String, String>> _authorizedHeaders({
+    bool includeJsonContentType = false,
+  }) async {
+    final token = await _getAuthToken();
+    return {
+      if (includeJsonContentType) 'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
 
   Future<List<CommunityPost>> fetchPosts({bool forceRefresh = false}) async {
     if (!forceRefresh) {
@@ -105,21 +68,41 @@ class CommunityRepository {
 
     try {
       // Fetch real data
+      final headers = await _authorizedHeaders();
       final response = await http
-          .get(Uri.parse('$_baseUrl/posts'))
-          .timeout(
-            const Duration(seconds: 5),
-          ); // Increased timeout for real fetch
+          .get(Uri.parse('$_baseUrl/posts'), headers: headers)
+          .timeout(const Duration(seconds: 5));
 
       List<CommunityPost> apiPosts = [];
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        apiPosts = data.map((e) => CommunityPost.fromJson(e)).toList();
+        final decoded = json.decode(response.body);
+        final List<dynamic> data = decoded is List
+            ? decoded
+            : (decoded is Map<String, dynamic> && decoded['posts'] is List
+                  ? decoded['posts'] as List<dynamic>
+                  : <dynamic>[]);
+
+        for (final item in data) {
+          try {
+            if (item is Map<String, dynamic>) {
+              apiPosts.add(CommunityPost.fromJson(item));
+            } else if (item is Map) {
+              apiPosts.add(
+                CommunityPost.fromJson(Map<String, dynamic>.from(item)),
+              );
+            }
+          } catch (e) {
+            debugPrint('Skipping malformed community post: $e');
+          }
+        }
+      } else {
+        debugPrint(
+          'Community posts request failed: HTTP ${response.statusCode}',
+        );
       }
 
-      // Merge mock posts "as well"
-      _cachedPosts = [...apiPosts, ..._mockPosts];
+      _cachedPosts = apiPosts;
 
       // Sort by newest
       _cachedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -138,9 +121,7 @@ class CommunityRepository {
       final cached = await getCachedPosts();
       if (cached.isNotEmpty) return cached;
 
-      // Fallback to mock
-      _cachedPosts = [..._mockPosts];
-      return _cachedPosts;
+      return [];
     }
   }
 
@@ -168,6 +149,70 @@ class CommunityRepository {
     // If API call fails, remove from cache and throw error
   }
 
+  Future<void> setPostLike({
+    required String postId,
+    required bool isLiked,
+  }) async {
+    final headers = await _authorizedHeaders(includeJsonContentType: true);
+    final int? idAsInt = int.tryParse(postId);
+    final List<_LikeRequest> requests = [
+      _LikeRequest(uri: Uri.parse('$_baseUrl/posts/$postId/like'), body: null),
+      _LikeRequest(
+        uri: Uri.parse('$_baseUrl/posts/like'),
+        body: {'id': idAsInt ?? postId, 'isLiked': isLiked},
+      ),
+      _LikeRequest(
+        uri: Uri.parse('$_baseUrl/like'),
+        body: {'id': idAsInt ?? postId, 'isLiked': isLiked},
+      ),
+    ];
+
+    Object? lastError;
+    for (final req in requests) {
+      try {
+        final response = await http
+            .post(
+              req.uri,
+              headers: headers,
+              body: req.body == null ? null : jsonEncode(req.body),
+            )
+            .timeout(const Duration(seconds: 8));
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          _updateLikeInCache(postId: postId, isLiked: isLiked);
+          return;
+        }
+
+        lastError = Exception(
+          'HTTP ${response.statusCode} on ${req.uri.path}: ${response.body}',
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw Exception('Failed to update like for post $postId: $lastError');
+  }
+
+  void _updateLikeInCache({required String postId, required bool isLiked}) {
+    final idx = _cachedPosts.indexWhere((p) => p.id == postId);
+    if (idx == -1) return;
+
+    final current = _cachedPosts[idx];
+    final int nextLikes = isLiked
+        ? current.likes + (current.isLiked ? 0 : 1)
+        : (current.likes - (current.isLiked ? 1 : 0)).clamp(0, 1 << 30);
+
+    _cachedPosts[idx] = current.copyWith(isLiked: isLiked, likes: nextLikes);
+
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(
+        _storageKey,
+        json.encode(_cachedPosts.map((e) => e.toJson()).toList()),
+      );
+    });
+  }
+
   Future<PollModel> votePoll(String postId, String optionId) async {
     // Simulate API call
     await Future.delayed(const Duration(milliseconds: 500));
@@ -177,12 +222,14 @@ class CommunityRepository {
     if (postIndex != -1) {
       final post = _cachedPosts[postIndex];
       if (post.poll != null) {
-        if (DateTime.now().isAfter(post.poll!.expiresAt)) {
-          throw Exception("Bu oylama süresi dolmuştur.");
+        final poll = post.poll!;
+        final isClosed = poll.isClosed || DateTime.now().isAfter(poll.closesAt);
+        if (isClosed) {
+          throw Exception("Bu oylama suresi dolmustur.");
         }
 
         // Update counts
-        final newOptions = post.poll!.options.map((opt) {
+        final newOptions = poll.options.map((opt) {
           if (opt.id == optionId) {
             return PollOption(id: opt.id, text: opt.text, votes: opt.votes + 1);
           }
@@ -190,11 +237,12 @@ class CommunityRepository {
         }).toList();
 
         final newPoll = PollModel(
-          id: post.poll!.id,
-          question: post.poll!.question,
+          id: poll.id,
+          question: poll.question,
           options: newOptions,
-          userVotedOptionId: optionId, // Mark as voted
-          expiresAt: post.poll!.expiresAt,
+          userVotedOptionId: optionId,
+          closesAt: poll.closesAt,
+          isClosed: false,
         );
 
         // Update post in cache
@@ -214,4 +262,11 @@ class CommunityRepository {
     }
     throw Exception("Post or Poll not found");
   }
+}
+
+class _LikeRequest {
+  final Uri uri;
+  final Map<String, dynamic>? body;
+
+  const _LikeRequest({required this.uri, required this.body});
 }

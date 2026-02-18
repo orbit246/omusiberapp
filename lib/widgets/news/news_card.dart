@@ -31,19 +31,16 @@ class NewsCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Image Section
-              SizedBox(
-                height: 220,
-                width: double.infinity,
-                child: view.heroImage != null
-                    ? Image.network(
-                        view.heroImage!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: colorScheme.surfaceContainerHighest,
-                        ),
-                      )
-                    : Container(color: colorScheme.surfaceContainerHighest),
-              ),
+              if (view.heroImage != null)
+                AspectRatio(
+                  aspectRatio: 16 / 6.3,
+                  child: Image.network(
+                    view.heroImage!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: colorScheme.surfaceContainerHighest),
+                  ),
+                ),
 
               // Content Section
               Padding(
@@ -54,7 +51,7 @@ class NewsCard extends StatelessWidget {
                     // Title
                     Text(
                       view.title,
-                      style: theme.textTheme.titleLarge!.copyWith(
+                      style: theme.textTheme.titleMedium!.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1.2,
                         letterSpacing: -0.5,
@@ -66,13 +63,13 @@ class NewsCard extends StatelessWidget {
                     Row(
                       children: [
                         CircleAvatar(
-                          radius: 12,
+                          radius: 10,
                           backgroundImage: view.authorAvatar,
                           backgroundColor: colorScheme.primaryContainer,
                           child: view.authorAvatar == null
                               ? Icon(
                                   Icons.person,
-                                  size: 14,
+                                  size: 12,
                                   color: colorScheme.onPrimaryContainer,
                                 )
                               : null,
@@ -80,7 +77,7 @@ class NewsCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           view.authorName,
-                          style: theme.textTheme.labelMedium?.copyWith(
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
                           ),
@@ -89,23 +86,24 @@ class NewsCard extends StatelessWidget {
                         if (view.publishedAtText != null)
                           Text(
                             view.publishedAtText!,
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 10,
                               color: colorScheme.outline,
                             ),
                           ),
                       ],
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     const Divider(height: 1, thickness: 0.5),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     // Summary
                     Text(
                       view.summary,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurface.withOpacity(0.8),
-                        height: 1.6,
+                        height: 1.5,
                       ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
@@ -262,7 +260,7 @@ class _ActionButton extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 label!,
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: color,
                   fontWeight: FontWeight.bold,
                 ),

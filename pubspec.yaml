@@ -48,7 +48,7 @@ dependencies:
   flutter_map: ^6.1.0  # or latest
   latlong2: ^0.9.0
   firebase_messaging: ^16.0.4
-  # flutter_local_notifications: ^16.0.4
+  flutter_local_notifications: ^16.0.4
   shared_preferences: ^2.1.1
   html: ^0.15.6
   flutter_localizations:
@@ -61,6 +61,7 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^32.2.4
   device_info_plus: ^12.3.0
   in_app_update: ^4.2.5
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

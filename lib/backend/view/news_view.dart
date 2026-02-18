@@ -175,9 +175,10 @@ class NewsView {
       excelAttachments: List<Map<String, dynamic>>.from(
         json['excelAttachments'] ?? [],
       ),
-      viewCount: json['viewCount'] as int? ?? 0,
-      likeCount: json['likeCount'] as int? ?? 0,
-      isFavorited: json['isFavorited'] as bool? ?? false,
+      viewCount: json['views'] as int? ?? json['viewCount'] as int? ?? 0,
+      likeCount: json['likes'] as int? ?? json['likeCount'] as int? ?? 0,
+      isFavorited:
+          json['isLiked'] as bool? ?? json['isFavorited'] as bool? ?? false,
       readMoreLabel: json['readMoreLabel'] as String? ?? 'Devamını Oku',
     );
   }

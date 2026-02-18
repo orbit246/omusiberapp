@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class EventRepository {
   static const String _storageKey = 'cached_events_list';
+  static final Set<String> _locallyJoinedEventIds = <String>{};
   List<PostView>? _cachedEvents;
 
   EventRepository({
@@ -20,8 +21,10 @@ class EventRepository {
   });
 
   Future<List<PostView>> getCachedEvents() async {
-    if (_cachedEvents != null && _cachedEvents!.isNotEmpty)
+    if (_cachedEvents != null && _cachedEvents!.isNotEmpty) {
+      _sortEventsMostRecent(_cachedEvents!);
       return _cachedEvents!;
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -29,6 +32,7 @@ class EventRepository {
       if (jsonStr != null) {
         final List<dynamic> decoded = json.decode(jsonStr);
         _cachedEvents = decoded.map((item) => PostView.fromJson(item)).toList();
+        _sortEventsMostRecent(_cachedEvents!);
         return _cachedEvents!;
       }
     } catch (e) {
@@ -62,6 +66,17 @@ class EventRepository {
     };
   }
 
+  Future<Map<String, String>> _optionalAuthHeaders({
+    bool includeJsonContentType = false,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final token = user != null ? await user.getIdToken() : null;
+    return {
+      if (includeJsonContentType) 'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
   Future<List<PostView>> fetchEvents({bool forceRefresh = false}) async {
     // 1. Return cached events if available and not forcing refresh
     if (!forceRefresh) {
@@ -70,11 +85,8 @@ class EventRepository {
     }
 
     try {
-      final headers = await _authorizedHeaders();
-      final response = await http.get(
-        Uri.parse('$_baseUrl/events'),
-        headers: headers,
-      );
+      // User requested to call it directly as it doesn't require authentication
+      final response = await http.get(Uri.parse('$_baseUrl/events'));
 
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
@@ -86,6 +98,7 @@ class EventRepository {
       final List<PostView> events = data
           .map<PostView>((jsonItem) => PostView.fromJson(jsonItem))
           .toList();
+      _sortEventsMostRecent(events);
 
       // Persist to storage
       _cachedEvents = events;
@@ -212,6 +225,10 @@ class EventRepository {
   }
 
   Future<void> joinEvent(String eventId) async {
+    if (_locallyJoinedEventIds.contains(eventId)) {
+      return;
+    }
+
     // API expects int ID usually
     final int? idAsInt = int.tryParse(eventId);
     final bodyId = idAsInt ?? eventId;
@@ -219,17 +236,71 @@ class EventRepository {
     try {
       final headers = await _authorizedHeaders(includeJsonContentType: true);
       final response = await http.post(
-        Uri.parse('$_baseUrl/events/join'),
+        Uri.parse('$_baseUrl/events/$bodyId/join'),
         headers: headers,
-        body: jsonEncode({'id': bodyId}),
       );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Katılma başarısız: ${response.statusCode}');
+        throw Exception('Katilma basarisiz: ${response.statusCode}');
       }
+      _locallyJoinedEventIds.add(eventId);
     } catch (e) {
       debugPrint("Error joining event: $e");
       rethrow;
+    }
+  }
+
+  Future<bool> isEventJoined(String eventId) async {
+    final bodyId = _eventBodyId(eventId);
+    if (bodyId == null) return false;
+
+    try {
+      final headers = await _optionalAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/events/$bodyId/is-joined'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200) {
+        return _locallyJoinedEventIds.contains(eventId);
+      }
+
+      final data = jsonDecode(response.body);
+      final isJoined = data is Map<String, dynamic>
+          ? (data['isJoined'] as bool? ?? false)
+          : false;
+      if (isJoined) {
+        _locallyJoinedEventIds.add(eventId);
+      }
+      return isJoined;
+    } catch (_) {
+      return _locallyJoinedEventIds.contains(eventId);
+    }
+  }
+
+  Future<PostView?> fetchEventById(String eventId) async {
+    final bodyId = _eventBodyId(eventId);
+    if (bodyId == null) return null;
+
+    try {
+      final headers = await _optionalAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/events/$bodyId'),
+        headers: headers,
+      );
+      if (response.statusCode != 200) return null;
+
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic>) return null;
+
+      final fetched = PostView.fromJson(data);
+      if (fetched.isJoined) {
+        _locallyJoinedEventIds.add(fetched.id);
+      }
+      _upsertCachedEvent(fetched);
+      return fetched;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -255,6 +326,42 @@ class EventRepository {
     if (idAsInt != null) return idAsInt;
     if (eventId.trim().isEmpty) return null;
     return eventId;
+  }
+
+  void _sortEventsMostRecent(List<PostView> events) {
+    DateTime resolveSortDate(PostView e) {
+      if (e.eventDate != null) return e.eventDate!;
+
+      final createdRaw = e.metadata['createdAt'];
+      final createdAt = createdRaw != null
+          ? DateTime.tryParse(createdRaw.toString())
+          : null;
+      if (createdAt != null) return createdAt;
+
+      final eventRaw = e.metadata['eventDate'];
+      final eventMetaDate = eventRaw != null
+          ? DateTime.tryParse(eventRaw.toString())
+          : null;
+      if (eventMetaDate != null) return eventMetaDate;
+
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    events.sort((a, b) => resolveSortDate(b).compareTo(resolveSortDate(a)));
+  }
+
+  void _upsertCachedEvent(PostView event) {
+    if (_cachedEvents == null) {
+      _cachedEvents = [event];
+      return;
+    }
+    final idx = _cachedEvents!.indexWhere((e) => e.id == event.id);
+    if (idx == -1) {
+      _cachedEvents!.add(event);
+    } else {
+      _cachedEvents![idx] = event;
+    }
+    _sortEventsMostRecent(_cachedEvents!);
   }
 
   Future<void> _postEventInteraction({

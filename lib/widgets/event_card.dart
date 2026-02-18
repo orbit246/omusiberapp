@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,6 +17,11 @@ class EventCard extends StatefulWidget {
     this.capacityText,
     this.description,
     this.tags = const <EventTag>[],
+    this.publisher,
+    this.isLiked = false,
+    this.isJoined = false,
+    this.isPast = false,
+    this.isRegistrationClosed = false,
     // initialExpanded removed as concept is static now
     this.onJoin,
     this.onBookmark,
@@ -31,6 +37,11 @@ class EventCard extends StatefulWidget {
   final String? capacityText;
   final String? description;
   final List<EventTag> tags;
+  final String? publisher;
+  final bool isLiked;
+  final bool isJoined;
+  final bool isPast;
+  final bool isRegistrationClosed;
   final VoidCallback? onJoin;
   final ValueChanged<bool>? onBookmark;
   final VoidCallback? onShare;
@@ -41,7 +52,13 @@ class EventCard extends StatefulWidget {
 
 class _EventCardState extends State<EventCard> {
   // Static card, no expansion state
-  bool _isSaved = false;
+  late bool _isSaved;
+
+  @override
+  void initState() {
+    super.initState();
+    _isSaved = widget.isLiked;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +91,14 @@ class _EventCardState extends State<EventCard> {
                   // Image
                   AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: Image.network(
-                      widget.imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      fadeInDuration: const Duration(milliseconds: 220),
+                      fadeOutDuration: const Duration(milliseconds: 120),
+                      placeholder: (context, url) =>
+                          const _EventImageShimmerPlaceholder(),
+                      errorWidget: (context, url, error) => Container(
                         color: cs.surfaceContainerHighest,
                         child: const Center(
                           child: Icon(Icons.image_not_supported_outlined),
@@ -173,6 +194,19 @@ class _EventCardState extends State<EventCard> {
                       ),
                     ),
 
+                  // Publisher (if present)
+                  if (widget.publisher != null && widget.publisher!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4.0),
+                      child: Text(
+                        widget.publisher!,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
                   // Title
                   Text(
                     widget.title,
@@ -264,10 +298,43 @@ class _EventCardState extends State<EventCard> {
                     children: [
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: widget.onJoin,
-                          icon: const Icon(Icons.bookmark_add_outlined),
-                          label: const Text("Katıl / Kayıt Ol"),
+                          onPressed: widget.isPast
+                              ? widget.onJoin
+                              : ((widget.isRegistrationClosed ||
+                                        widget.isJoined)
+                                    ? null
+                                    : widget.onJoin),
+                          icon: Icon(
+                            widget.isPast
+                                ? Icons.info_outline_rounded
+                                : widget.isRegistrationClosed
+                                ? Icons.event_busy_rounded
+                                : (widget.isJoined
+                                      ? Icons.task_alt_rounded
+                                      : Icons.bookmark_add_outlined),
+                          ),
+                          label: Text(
+                            widget.isPast
+                                ? "Detaylar"
+                                : (widget.isRegistrationClosed
+                                      ? "Kayıt Kapandı"
+                                      : (widget.isJoined
+                                            ? "Katıldınız"
+                                            : "Katıl / Kayıt Ol")),
+                          ),
                           style: FilledButton.styleFrom(
+                            backgroundColor:
+                                (widget.isJoined ||
+                                    widget.isPast ||
+                                    widget.isRegistrationClosed)
+                                ? cs.primaryContainer
+                                : null,
+                            foregroundColor:
+                                (widget.isJoined ||
+                                    widget.isPast ||
+                                    widget.isRegistrationClosed)
+                                ? cs.onPrimaryContainer
+                                : null,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -275,36 +342,38 @@ class _EventCardState extends State<EventCard> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      IconButton.filledTonal(
-                        onPressed: () {
-                          setState(() => _isSaved = !_isSaved);
-                          widget.onBookmark?.call(_isSaved);
-                          _toast(
-                            context,
-                            "Etkinlik ${_isSaved ? 'kaydedildi' : 'silindi'}",
-                          );
-                        },
-                        icon: Icon(
-                          _isSaved ? Icons.favorite : Icons.favorite_border,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        onPressed: () {
-                          // Simple share
-                          if (widget.onShare != null) {
-                            widget.onShare!.call();
-                          } else {
-                            SharePlus.instance.share(
-                              ShareParams(
-                                text: '${widget.title}\n${widget.location}',
-                              ),
+                      if (!widget.isPast) ...[
+                        const SizedBox(width: 12),
+                        IconButton.filledTonal(
+                          onPressed: () {
+                            setState(() => _isSaved = !_isSaved);
+                            widget.onBookmark?.call(_isSaved);
+                            _toast(
+                              context,
+                              "Etkinlik ${_isSaved ? 'kaydedildi' : 'silindi'}",
                             );
-                          }
-                        },
-                        icon: const Icon(Icons.share_outlined),
-                      ),
+                          },
+                          icon: Icon(
+                            _isSaved ? Icons.favorite : Icons.favorite_border,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          onPressed: () {
+                            // Simple share
+                            if (widget.onShare != null) {
+                              widget.onShare!.call();
+                            } else {
+                              SharePlus.instance.share(
+                                ShareParams(
+                                  text: '${widget.title}\n${widget.location}',
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.share_outlined),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -371,6 +440,61 @@ class _InfoItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EventImageShimmerPlaceholder extends StatefulWidget {
+  const _EventImageShimmerPlaceholder();
+
+  @override
+  State<_EventImageShimmerPlaceholder> createState() =>
+      _EventImageShimmerPlaceholderState();
+}
+
+class _EventImageShimmerPlaceholderState
+    extends State<_EventImageShimmerPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final base = cs.surfaceContainerHighest;
+    final highlight = cs.surfaceContainerHigh;
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final x = -1.0 + (_controller.value * 2.0);
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment(x - 1.0, 0),
+              end: Alignment(x + 1.0, 0),
+              colors: [base, highlight, base],
+              stops: const [0.25, 0.5, 0.75],
+            ).createShader(bounds);
+          },
+          blendMode: BlendMode.srcATop,
+          child: Container(color: base),
+        );
+      },
     );
   }
 }

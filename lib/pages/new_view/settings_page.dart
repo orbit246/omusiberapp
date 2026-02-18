@@ -4,7 +4,6 @@ import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
-import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/models/user_badge.dart';
 import 'package:omusiber/widgets/badge_widget.dart';
 
@@ -13,7 +12,6 @@ import 'package:omusiber/pages/new_view/about_page.dart';
 import 'package:omusiber/pages/new_view/feedback_page.dart';
 import 'package:omusiber/backend/update_service.dart';
 import 'dart:math';
-import 'package:omusiber/pages/new_view/edit_profile_page.dart';
 
 // SettingsPage must be a StatefulWidget to hold the initial random state for the easter egg
 class SettingsPage extends StatefulWidget {
@@ -30,143 +28,31 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // State to hold the result of the 1/1000 random chance
   bool _isEasterEggMode = false;
-
-  // State to hold user badges
   List<UserBadge> _userBadges = [];
   bool _loadingBadges = false;
-  bool _isPrivate = false;
-  UserProfile? _userProfile;
-  bool _loadingProfile = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserBadges();
-    _loadUserProfile();
   }
 
-  /// Load user profile from Firestore or Backend
-  Future<void> _loadUserProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    setState(() => _loadingProfile = true);
-
-    try {
-      final profile = await _profileService.fetchUserProfile(user.uid);
-      if (mounted) {
-        setState(() {
-          if (profile != null) {
-            _userProfile = profile;
-            _isPrivate = profile.isPrivate;
-          } else {
-            // Default profile for Guest / First time
-            _userProfile = UserProfile(
-              uid: user.uid,
-              studentId: user.isAnonymous
-                  ? "misafir"
-                  : (user.email?.split('@')[0] ?? "unknown"),
-              name:
-                  user.displayName ??
-                  (user.isAnonymous ? "Misafir Kullanıcı" : "Öğrenci"),
-              role: user.isAnonymous ? "guest" : "student",
-              photoUrl: user.photoURL,
-              email: user.email,
-            );
-            _isPrivate = false;
-          }
-          _loadingProfile = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading profile: $e');
-      if (mounted) setState(() => _loadingProfile = false);
-    }
-  }
-
-  /// Load user badges from backend
   Future<void> _loadUserBadges() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    setState(() {
-      _loadingBadges = true;
-    });
-
+    setState(() => _loadingBadges = true);
     try {
       final badges = await _profileService.fetchUserBadges(user.uid);
-      if (mounted) {
-        setState(() {
-          _userBadges = badges;
-          _loadingBadges = false;
-        });
-      }
-    } catch (e) {
-      print('Error loading badges: $e');
-      if (mounted) {
-        setState(() {
-          _loadingBadges = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _togglePrivacy(bool val) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    setState(() {
-      _isPrivate = val;
-    });
-
-    try {
-      await _profileService.updatePrivacySetting(user.uid, val);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              val ? "Profiliniz gizlendi." : "Profiliniz artık görünür.",
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      // Revert on error
+      if (!mounted) return;
       setState(() {
-        _isPrivate = !val;
+        _userBadges = badges;
+        _loadingBadges = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Gizlilik ayarı güncellenemedi.")),
-        );
-      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingBadges = false);
     }
-  }
-
-  void _showPrivacyConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Profil Gizlensin mi?"),
-        content: const Text(
-          "Profilinizi gizlediğinizde, diğer kullanıcılar sizi öğrenci numarası ile arattığında bulamazlar. Devam etmek istiyor musunuz?",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("İptal"),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _togglePrivacy(true);
-            },
-            child: const Text("Gizle"),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -203,237 +89,44 @@ class _SettingsPageState extends State<SettingsPage> {
                       // --- Account Section ---
                       _buildSectionHeader(context, "Hesap"),
                       if (isLoggedIn) ...[
-                        // User Info Card
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest
-                                .withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(12),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.person),
                           ),
-                          child: _loadingProfile
-                              ? const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8.0),
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                )
-                              : Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          backgroundImage: user.photoURL != null
-                                              ? NetworkImage(user.photoURL!)
-                                              : null,
-                                          child: user.photoURL == null
-                                              ? const Icon(Icons.person)
-                                              : null,
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                user.isAnonymous
-                                                    ? "Misafir Kullanıcı"
-                                                    : (_userProfile?.name ??
-                                                          user.displayName ??
-                                                          "Kullanıcı"),
-                                                style:
-                                                    theme.textTheme.titleMedium,
-                                              ),
-                                              Text(
-                                                user.isAnonymous
-                                                    ? "Anonim Hesap"
-                                                    : (user.email ??
-                                                          "E-posta yok"),
-                                                style:
-                                                    theme.textTheme.bodyMedium,
-                                              ),
-                                              if (_userProfile != null) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  "${_userProfile?.department ?? 'Bölüm belirtilmedi'} • ${_userProfile?.campus ?? 'Kampüs belirtilmedi'}",
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelSmall
-                                                      ?.copyWith(
-                                                        color: colorScheme
-                                                            .onSurfaceVariant,
-                                                      ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                        if (_userProfile != null)
-                                          IconButton(
-                                            onPressed: () async {
-                                              final updated =
-                                                  await Navigator.of(
-                                                    context,
-                                                  ).push(
-                                                    MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          EditProfilePage(
-                                                            profile:
-                                                                _userProfile!,
-                                                          ),
-                                                    ),
-                                                  );
-                                              if (updated == true) {
-                                                _loadUserProfile();
-                                              }
-                                            },
-                                            icon: const Icon(
-                                              Icons.edit_outlined,
-                                            ),
-                                            style: IconButton.styleFrom(
-                                              backgroundColor:
-                                                  colorScheme.surface,
-                                              foregroundColor:
-                                                  colorScheme.primary,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-
-                                    // Display badges
-                                    const SizedBox(height: 16),
-                                    const Divider(height: 1),
-                                    const SizedBox(height: 12),
-
-                                    // Badges section
-                                    if (_loadingBadges)
-                                      const Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(8.0),
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    else if (_userBadges.isEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.info_outline,
-                                              size: 16,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'Henüz rozetiniz yok',
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    else
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.workspace_premium_rounded,
-                                                size: 16,
-                                                color: colorScheme.primary,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'Rozetler',
-                                                style: theme
-                                                    .textTheme
-                                                    .labelMedium
-                                                    ?.copyWith(
-                                                      color:
-                                                          colorScheme.primary,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          BadgeList(badges: _userBadges),
-                                        ],
-                                      ),
-
-                                    const SizedBox(height: 16),
-                                    const Divider(height: 1),
-                                    const SizedBox(height: 8),
-
-                                    // Privacy Toggle
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                "Gizli Profil",
-                                                style: theme
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                              ),
-                                              Text(
-                                                "Aratıldığında profiliniz görünmez",
-                                                style: theme
-                                                    .textTheme
-                                                    .labelSmall
-                                                    ?.copyWith(
-                                                      color: colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Switch(
-                                          value: _isPrivate,
-                                          onChanged: (val) {
-                                            if (val) {
-                                              _showPrivacyConfirmation();
-                                            } else {
-                                              _togglePrivacy(false);
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                          title: Text(
+                            user.isAnonymous
+                                ? "Misafir Kullanici"
+                                : (user.displayName ?? "Kullanici"),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          subtitle: Text(
+                            user.isAnonymous
+                                ? "Anonim Hesap"
+                                : (user.email ?? "E-posta yok"),
+                          ),
                         ),
-
-                        // If Anonymous, allow upgrading/switching to Google
+                        const SizedBox(height: 8),
+                        if (_loadingBadges)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        else if (_userBadges.isNotEmpty)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: BadgeList(badges: _userBadges),
+                          ),
                         if (user.isAnonymous)
                           _buildSettingsTile(
                             context,
                             icon: Icons.login,
-                            title: "Öğrenci Girişi Yap",
-                            subtitle: "Google ile giriş yapın",
+                            title: "Ogrenci Girisi Yap",
+                            subtitle: "Google ile giris yapin",
                             onTap: () async {
                               try {
                                 await _authService.signInWithGoogle();
@@ -447,13 +140,11 @@ class _SettingsPageState extends State<SettingsPage> {
                             },
                           ),
                       ] else ...[
-                        // Should technically not be reached if main.dart forces Anon Login
-                        // But keep it for safety.
                         _buildSettingsTile(
                           context,
                           icon: Icons.login,
-                          title: "Giriş Yap (Öğrenci)",
-                          subtitle: "Google ile giriş yapın",
+                          title: "Giris Yap (Ogrenci)",
+                          subtitle: "Google ile giris yapin",
                           onTap: () async {
                             try {
                               final user = await _authService
@@ -462,7 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
-                                      'Giriş işlemi iptal edildi veya yapılandırma hatası oluştu.',
+                                      'Giris islemi iptal edildi veya yapilandirma hatasi olustu.',
                                     ),
                                   ),
                                 );

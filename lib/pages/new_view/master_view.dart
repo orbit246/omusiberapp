@@ -208,6 +208,22 @@ class _MasterViewState extends State<MasterView>
     ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
   }
 
+  void _openAcademicCalendarSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        clipBehavior: Clip.antiAliasWithSaveLayer,
+        child: const AcademicCalendarPage(),
+      ),
+    );
+  }
+
   void _openNotificationsPage() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -261,6 +277,49 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
+  Widget _buildDrawerSectionTitle(BuildContext context, String title) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerTile({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 18, color: colorScheme.onPrimaryContainer),
+      ),
+      title: Text(
+        title,
+        style: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      onTap: onTap,
+    );
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -274,6 +333,63 @@ class _MasterViewState extends State<MasterView>
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      drawer: Drawer(
+        backgroundColor: colorScheme.surface,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+            children: [
+              _buildDrawerSectionTitle(context, "Araclar"),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainer.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    _buildDrawerTile(
+                      context: context,
+                      icon: Icons.restaurant_menu,
+                      title: "Yemek Menusu",
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const FoodMenuPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildDrawerTile(
+                      context: context,
+                      icon: Icons.calendar_month,
+                      title: "Ders Programi",
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SchedulePage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildDrawerTile(
+                      context: context,
+                      icon: Icons.description_outlined,
+                      title: "Akademik Takvim",
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _openAcademicCalendarSheet();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
 
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -285,128 +401,61 @@ class _MasterViewState extends State<MasterView>
               floating: true,
               snap: true,
               scrolledUnderElevation: 0,
-
+              leading: Builder(
+                builder: (context) => IconButton(
+                  icon: Icon(Icons.menu, color: colorScheme.onSurface),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
+              centerTitle: true,
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Text(
-                          _appBarTitle,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        if (_tabController.index == 2) ...[
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 18,
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ],
-                      ],
+                  Text(
+                    _appBarTitle,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
                     ),
                   ),
-                  // Quick Access Menu
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: colorScheme.onSurface),
-                    onSelected: (value) {
-                      if (value == 'food') {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const FoodMenuPage(),
-                          ),
-                        );
-                      } else if (value == 'schedule') {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SchedulePage(),
-                          ),
-                        );
-                      } else if (value == 'calendar') {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => Container(
-                            height: MediaQuery.of(context).size.height * 0.9,
-                            decoration: const BoxDecoration(
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(24),
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAliasWithSaveLayer,
-                            child: const AcademicCalendarPage(),
-                          ),
-                        );
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'food',
-                        child: Row(
-                          children: [
-                            Icon(Icons.restaurant_menu, size: 20),
-                            SizedBox(width: 12),
-                            Text("Yemek Menüsü"),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'schedule',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_month, size: 20),
-                            SizedBox(width: 12),
-                            Text("Ders Programı"),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'calendar',
-                        child: Row(
-                          children: [
-                            Icon(Icons.description_outlined, size: 20),
-                            SizedBox(width: 12),
-                            Text("Akademik Takvim"),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  // User Search Button (Only for Community Tab)
-                  if (_tabController.index == 3)
-                    IconButton(
-                      icon: Icon(Icons.search, color: colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const UserSearchPage(),
-                          ),
-                        );
-                      },
+                  if (_tabController.index == 2) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: colorScheme.onSurface.withOpacity(0.6),
                     ),
-                  // Notifications Button
-                  IconButton(
-                    icon: Badge(
-                      isLabelVisible: _unreadNotifications,
-                      smallSize: 8,
-                      child: Icon(
-                        Icons.notifications_outlined,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    onPressed: _openNotificationsPage,
-                  ),
-                  // Settings Button
-                  IconButton(
-                    icon: Icon(Icons.settings, color: colorScheme.onSurface),
-                    onPressed: _openSettingsPage,
-                  ),
+                  ],
                 ],
               ),
+              actions: [
+                if (_tabController.index == 3)
+                  IconButton(
+                    icon: Icon(Icons.search, color: colorScheme.onSurface),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const UserSearchPage(),
+                        ),
+                      );
+                    },
+                  ),
+                IconButton(
+                  icon: Badge(
+                    isLabelVisible: _unreadNotifications,
+                    smallSize: 8,
+                    child: Icon(
+                      Icons.notifications_outlined,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  onPressed: _openNotificationsPage,
+                ),
+                IconButton(
+                  icon: Icon(Icons.settings, color: colorScheme.onSurface),
+                  onPressed: _openSettingsPage,
+                ),
+              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(48),
                 child: Container(

@@ -10,7 +10,6 @@ import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
-import 'package:omusiber/backend/mock_events.dart';
 
 // --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
 class SlideInEntry extends StatefulWidget {
@@ -165,7 +164,7 @@ class _EventsTabViewState extends State<EventsTabView> {
   }
 
   List<PostView> freshWithMocks(List<PostView> fresh) {
-    return [...mockEvents, ...fresh];
+    return [...fresh];
   }
 
   Future<void> _checkPermissions() async {
@@ -193,7 +192,9 @@ class _EventsTabViewState extends State<EventsTabView> {
     }
   }
 
-  Widget _eventToCard(BuildContext context, PostView e) {
+  Widget _eventToCard(BuildContext context, PostView? e) {
+    if (e == null) return const SizedBox.shrink();
+
     final imageUrl = (e.thubnailUrl.trim().isNotEmpty)
         ? e.thubnailUrl.trim()
         : (e.imageLinks.isNotEmpty ? e.imageLinks.first.trim() : '');
@@ -201,7 +202,49 @@ class _EventsTabViewState extends State<EventsTabView> {
     final tags = e.tags.map((t) => EventTag(t, Icons.tag)).toList();
 
     final duration = _stringFromMeta(e, 'durationText');
-    final datetime = _stringFromMeta(e, 'datetimeText') ?? 'Tarih yok';
+
+    // Human readable date (No year)
+    String datetime = 'Tarih yok';
+    bool isPast = false;
+
+    if (e.eventDate != null) {
+      final date = e.eventDate!;
+      isPast = date.isBefore(DateTime.now());
+
+      final months = [
+        '',
+        'Ocak',
+        'Şubat',
+        'Mart',
+        'Nisan',
+        'Mayıs',
+        'Haziran',
+        'Temmuz',
+        'Ağustos',
+        'Eylül',
+        'Ekim',
+        'Kasım',
+        'Aralık',
+      ];
+      final days = [
+        '',
+        'Pazartesi',
+        'Salı',
+        'Çarşamba',
+        'Perşembe',
+        'Cuma',
+        'Cumartesi',
+        'Pazar',
+      ];
+
+      final dayName = days[date.weekday];
+      final monthName = months[date.month];
+      final timeStr =
+          '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+      datetime = '${date.day} $monthName $dayName, $timeStr';
+    }
+
     final ticket =
         _stringFromMeta(e, 'ticketText') ??
         (e.ticketPrice <= 0
@@ -210,6 +253,9 @@ class _EventsTabViewState extends State<EventsTabView> {
     final capacity = (e.maxContributors > 0)
         ? 'Katılımcı: ${e.remainingContributors}/${e.maxContributors}'
         : null;
+
+    final bool likedState = e.isLiked == true;
+    final bool joinedState = e.isJoined == true;
 
     return EventCard(
       title: e.title,
@@ -221,6 +267,11 @@ class _EventsTabViewState extends State<EventsTabView> {
       capacityText: capacity,
       description: e.description,
       tags: tags,
+      publisher: e.publisher,
+      isLiked: likedState,
+      isJoined: joinedState,
+      isPast: isPast,
+      isRegistrationClosed: e.isRegistrationClosed,
       onJoin: () {
         Navigator.push(
           context,
