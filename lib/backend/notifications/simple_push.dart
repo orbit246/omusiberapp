@@ -156,7 +156,7 @@ class SimpleNotifications {
 
     final notificationsEnabled = await _androidNotifications
         ?.areNotificationsEnabled();
-      return firebaseAllowed && (notificationsEnabled ?? false);
+    return firebaseAllowed && (notificationsEnabled ?? false);
   }
 
   Future<void> _configureRemoteRegistration() async {
