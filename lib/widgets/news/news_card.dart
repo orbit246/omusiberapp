@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/news_item_page.dart';
+import 'package:omusiber/widgets/shared/app_markdown.dart';
 
 /// Presentational card. All data comes from [NewsView].
 class NewsCard extends StatelessWidget {
@@ -99,14 +100,10 @@ class NewsCard extends StatelessWidget {
                     const SizedBox(height: 12),
 
                     // Summary
-                    Text(
-                      view.summary,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.8),
-                        height: 1.5,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                    AppMarkdownPreview(
+                      data: view.summary,
+                      maxHeight: 72,
+                      backgroundColor: colorScheme.surface,
                     ),
 
                     const SizedBox(height: 20),

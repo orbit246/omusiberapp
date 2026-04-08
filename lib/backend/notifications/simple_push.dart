@@ -64,9 +64,6 @@ class SimpleNotifications {
       await ensureInitialized();
       await _fcm.setAutoInitEnabled(true);
 
-      // Permissions
-      await ensurePermissionForDisplay();
-
       // Ensure foreground notifications are shown
       await _fcm.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -129,12 +126,15 @@ class SimpleNotifications {
     try {
       await ensureInitialized();
 
-      final androidPlugin = _androidNotifications;
       if (defaultTargetPlatform == TargetPlatform.android) {
-        await androidPlugin?.requestNotificationsPermission();
+        await _androidNotifications?.requestNotificationsPermission();
+        return (await _androidNotifications?.areNotificationsEnabled()) ?? false;
       }
 
-      await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      if (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      }
 
       return await checkPermission();
     } catch (e) {
@@ -145,18 +145,13 @@ class SimpleNotifications {
 
   /// Returns true if permission is granted, false otherwise.
   Future<bool> checkPermission() async {
-    final settings = await _fcm.getNotificationSettings();
-    final firebaseAllowed =
-        settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
-
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      return firebaseAllowed;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return (await _androidNotifications?.areNotificationsEnabled()) ?? false;
     }
 
-    final notificationsEnabled = await _androidNotifications
-        ?.areNotificationsEnabled();
-    return firebaseAllowed && (notificationsEnabled ?? false);
+    final settings = await _fcm.getNotificationSettings();
+    return settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
   Future<void> _configureRemoteRegistration() async {

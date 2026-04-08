@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/excel_viewer_page.dart';
+import 'package:omusiber/widgets/shared/app_markdown.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -68,7 +69,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                 leading: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                   ),
                   child: ClipOval(
@@ -123,7 +124,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withOpacity(0.4),
+                                Colors.black.withValues(alpha: 0.4),
                                 Colors.transparent,
                               ],
                             ),
@@ -148,7 +149,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 20,
                           offset: const Offset(0, -5),
                         ),
@@ -197,13 +198,13 @@ class _NewsItemPageState extends State<NewsItemPage> {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: colorScheme.primary.withOpacity(
-                                      0.08,
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.08,
                                     ),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: colorScheme.primary.withOpacity(
-                                        0.1,
+                                      color: colorScheme.primary.withValues(
+                                        alpha: 0.1,
                                       ),
                                     ),
                                   ),
@@ -277,7 +278,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest
-                                    .withOpacity(0.5),
+                                    .withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
@@ -304,13 +305,9 @@ class _NewsItemPageState extends State<NewsItemPage> {
                         const SizedBox(height: 28),
 
                         // Body Content
-                        Text(
-                          view.fullText ?? view.summary,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            height: 1.6,
-                            color: colorScheme.onSurface.withOpacity(0.85),
-                            fontWeight: FontWeight.w400,
-                          ),
+                        AppMarkdownBody(
+                          data: view.fullText ?? view.summary,
+                          selectable: true,
                         ),
 
                         if (view.excelAttachments.isNotEmpty) ...[
@@ -333,7 +330,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                               margin: const EdgeInsets.only(bottom: 8),
                               elevation: 0,
                               color: colorScheme.surfaceContainerHighest
-                                  .withOpacity(0.5),
+                                  .withValues(alpha: 0.5),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
@@ -401,14 +398,16 @@ class _NewsItemPageState extends State<NewsItemPage> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: (isDark ? Colors.black : Colors.white).withOpacity(
-                      0.8,
+                    color: (isDark ? Colors.black : Colors.white).withValues(
+                      alpha: 0.8,
                     ),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -442,9 +441,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                           }
                         },
                         icon: Icon(
-                          _isFavorited
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
+                          _isFavorited ? Icons.bookmark : Icons.bookmark_border,
                         ),
                         color: _isFavorited ? colorScheme.primary : null,
                       ),

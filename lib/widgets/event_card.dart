@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
+import 'package:omusiber/widgets/shared/app_markdown.dart';
 // Note: Removed test_widget import as it's no longer needed for expansion
 
 class EventCard extends StatefulWidget {
@@ -72,7 +73,7 @@ class _EventCardState extends State<EventCard> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -114,7 +115,7 @@ class _EventCardState extends State<EventCard> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withOpacity(0.3),
+                            Colors.black.withValues(alpha: 0.3),
                             Colors.transparent,
                           ],
                           stops: const [0.0, 0.4],
@@ -132,11 +133,11 @@ class _EventCardState extends State<EventCard> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: cs.surface.withOpacity(0.9),
+                        color: cs.surface.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -256,14 +257,10 @@ class _EventCardState extends State<EventCard> {
                   if (widget.description != null &&
                       widget.description!.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Text(
-                      widget.description!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurface.withOpacity(0.8),
-                        height: 1.5,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                    AppMarkdownPreview(
+                      data: widget.description!,
+                      maxHeight: 74,
+                      backgroundColor: cs.surface,
                     ),
                   ],
 

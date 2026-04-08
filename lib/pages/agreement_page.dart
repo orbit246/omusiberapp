@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:omusiber/backend/constants.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AgreementsPage extends StatefulWidget {
   const AgreementsPage({
@@ -405,12 +406,31 @@ Future<bool?> _openAgreementSheet(
                 const Divider(height: 1),
 
                 Expanded(
-                  child: SingleChildScrollView(
+                  child: Markdown(
+                    data: body,
+                    selectable: true,
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                    child: SelectableText(
-                      body,
-                      style: theme.textTheme.bodyMedium,
+                    styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                      p: theme.textTheme.bodyMedium,
+                      h1: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      h2: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      h3: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      listBullet: theme.textTheme.bodyMedium,
+                      a: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.primary,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
+                    onTapLink: (text, href, title) {
+                      if (href == null || href.isEmpty) return;
+                      _openAgreementLink(ctx, href);
+                    },
                   ),
                 ),
 
@@ -482,6 +502,32 @@ Future<bool?> _openAgreementSheet(
         },
       );
     },
+  );
+}
+
+Future<void> _openAgreementLink(BuildContext context, String href) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final uri = Uri.tryParse(href);
+
+  if (uri == null) {
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Baglanti acilamadi.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+  }
+
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (opened) return;
+
+  if (!context.mounted) return;
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text('Baglanti acilamadi: $href'),
+      behavior: SnackBarBehavior.floating,
+    ),
   );
 }
 

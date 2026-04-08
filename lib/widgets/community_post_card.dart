@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:intl/intl.dart';
 import 'package:omusiber/widgets/poll_widget.dart';
+import 'package:omusiber/widgets/shared/app_markdown.dart';
 
 class CommunityPostCard extends StatelessWidget {
   final CommunityPost post;
@@ -20,7 +21,7 @@ class CommunityPostCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       color: theme.cardColor,
       child: Padding(
@@ -76,10 +77,7 @@ class CommunityPostCard extends StatelessWidget {
             const SizedBox(height: 12),
 
             // Content
-            Text(
-              post.content,
-              style: GoogleFonts.inter(fontSize: 15, height: 1.5),
-            ),
+            AppMarkdownBody(data: post.content),
 
             if (post.poll != null)
               Padding(
