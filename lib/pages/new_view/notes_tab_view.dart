@@ -6,7 +6,9 @@ import 'package:omusiber/backend/view/note_model.dart';
 import 'package:omusiber/pages/new_view/note_editor_page.dart';
 
 class NotesTabView extends StatefulWidget {
-  const NotesTabView({super.key});
+  const NotesTabView({super.key, this.showAppBar = false});
+
+  final bool showAppBar;
 
   @override
   State<NotesTabView> createState() => _NotesTabViewState();
@@ -64,18 +66,9 @@ class _NotesTabViewState extends State<NotesTabView> {
 
     final notesToList = _filteredNotes;
 
-    // Manual Masonry: Split into two columns
-    List<Note> col1 = [];
-    List<Note> col2 = [];
-    for (int i = 0; i < notesToList.length; i++) {
-      if (i % 2 == 0)
-        col1.add(notesToList[i]);
-      else
-        col2.add(notesToList[i]);
-    }
-
     return Scaffold(
       backgroundColor: Colors.transparent,
+      appBar: widget.showAppBar ? AppBar(title: const Text("Notlar")) : null,
 
       // We will put the gradient in the body container if MasterView doesn't provide it.
       // Assuming MasterView has standard background. We want a special one.
@@ -139,7 +132,7 @@ class _NotesTabViewState extends State<NotesTabView> {
                           Icon(
                             Icons.notes,
                             size: 64,
-                            color: Colors.grey.withOpacity(0.3),
+                            color: Colors.grey.withValues(alpha: 0.3),
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -216,7 +209,7 @@ class _NotesTabViewState extends State<NotesTabView> {
             borderRadius: BorderRadius.circular(20), // Match mockup roundness
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -246,7 +239,7 @@ class _NotesTabViewState extends State<NotesTabView> {
                     Icon(
                       Icons.edit_outlined,
                       size: 18,
-                      color: textColor.withOpacity(0.5),
+                      color: textColor.withValues(alpha: 0.5),
                     ),
                   ],
                 ),
@@ -258,7 +251,7 @@ class _NotesTabViewState extends State<NotesTabView> {
                   fontSize: 15,
                   height: 1.4,
                   fontWeight: FontWeight.w500,
-                  color: textColor.withOpacity(0.9),
+                  color: textColor.withValues(alpha: 0.9),
                 ),
                 maxLines: 8,
                 overflow: TextOverflow.ellipsis,

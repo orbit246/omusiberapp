@@ -29,8 +29,8 @@ class _MasterViewState extends State<MasterView>
   late TabController _tabController;
   String _appBarTitle = "Haberler";
 
-  // News, Events, Notes, Community
-  final List<bool> _unreadStates = [true, false, false, false];
+  // News, Events, Community
+  final List<bool> _unreadStates = [true, false, false];
   bool _unreadNotifications = false;
 
   final TabBadgeService _badgeService = TabBadgeService();
@@ -38,7 +38,7 @@ class _MasterViewState extends State<MasterView>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -164,16 +164,16 @@ class _MasterViewState extends State<MasterView>
       }
     }
 
-    // 3: Community
+    // 2: Community
     final lastViewedCommunity = await _badgeService.getLastViewedCommunity();
     // CommunityRepository currently doesn't have persistent cache, but it has mock data
     final posts = await CommunityRepository().getCachedPosts();
     if (posts.isNotEmpty) {
       final latest = posts.first.createdAt;
       if (lastViewedCommunity == null || latest.isAfter(lastViewedCommunity)) {
-        if (mounted) setState(() => _unreadStates[3] = true);
+        if (mounted) setState(() => _unreadStates[2] = true);
       } else {
-        if (mounted) setState(() => _unreadStates[3] = false);
+        if (mounted) setState(() => _unreadStates[2] = false);
       }
     }
   }
@@ -190,9 +190,6 @@ class _MasterViewState extends State<MasterView>
           _badgeService.markEventsViewed();
           break;
         case 2:
-          _appBarTitle = "Notlar";
-          break;
-        case 3:
           _appBarTitle = "Topluluk";
           _badgeService.markCommunityViewed();
           break;
@@ -236,6 +233,14 @@ class _MasterViewState extends State<MasterView>
     );
     _badgeService.markNotifsViewed();
     setState(() => _unreadNotifications = false);
+  }
+
+  void _openNotesPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const NotesTabView(showAppBar: true),
+      ),
+    );
   }
 
   Widget _buildBadgedTab({required String text, required int index}) {
@@ -293,6 +298,25 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
+  Widget _buildDrawerPanel({
+    required BuildContext context,
+    required List<Widget> children,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer.withValues(alpha: 0.46),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(children: children),
+    );
+  }
+
   Widget _buildDrawerTile({
     required BuildContext context,
     required IconData icon,
@@ -301,13 +325,14 @@ class _MasterViewState extends State<MasterView>
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       leading: Container(
-        width: 34,
-        height: 34,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+          color: colorScheme.primaryContainer.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, size: 18, color: colorScheme.onPrimaryContainer),
       ),
@@ -316,6 +341,11 @@ class _MasterViewState extends State<MasterView>
         style: Theme.of(
           context,
         ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      trailing: Icon(
+        Icons.arrow_forward_ios_rounded,
+        size: 14,
+        color: colorScheme.onSurfaceVariant,
       ),
       onTap: onTap,
     );
@@ -374,6 +404,131 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
+  List<Color> _backgroundAccentColors(ColorScheme colorScheme, bool isDark) {
+    switch (_tabController.index) {
+      case 1:
+        return [
+          colorScheme.secondary.withValues(alpha: isDark ? 0.14 : 0.12),
+          colorScheme.primary.withValues(alpha: isDark ? 0.08 : 0.07),
+          colorScheme.tertiary.withValues(alpha: isDark ? 0.08 : 0.06),
+        ];
+      case 2:
+        return [
+          colorScheme.tertiary.withValues(alpha: isDark ? 0.12 : 0.10),
+          colorScheme.secondary.withValues(alpha: isDark ? 0.10 : 0.08),
+          colorScheme.primary.withValues(alpha: isDark ? 0.06 : 0.05),
+        ];
+      case 0:
+      default:
+        return [
+          colorScheme.primary.withValues(alpha: isDark ? 0.14 : 0.10),
+          colorScheme.secondary.withValues(alpha: isDark ? 0.08 : 0.07),
+          colorScheme.tertiary.withValues(alpha: isDark ? 0.06 : 0.05),
+        ];
+    }
+  }
+
+  Widget _buildAmbientBlob({
+    required double width,
+    required double height,
+    required List<Color> colors,
+    BorderRadius? borderRadius,
+  }) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: borderRadius == null ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: borderRadius,
+        gradient: RadialGradient(
+          center: const Alignment(-0.1, -0.1),
+          radius: 0.9,
+          colors: [colors.first, colors.last],
+        ),
+      ),
+      child: SizedBox(width: width, height: height),
+    );
+  }
+
+  Widget _buildBackdropLayer({
+    required List<Color> accentColors,
+    required bool isDark,
+    required Color baseColor,
+  }) {
+    return RepaintBoundary(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        child: LayoutBuilder(
+          key: ValueKey(_tabController.index),
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final height = constraints.maxHeight;
+            final rightBlobSize = width < 420 ? 208.0 : 236.0;
+            final bottomBlobWidth = width < 420 ? width * 0.56 : width * 0.48;
+
+            return Stack(
+              children: [
+                Positioned(
+                  top: 32,
+                  left: -76,
+                  child: _buildAmbientBlob(
+                    width: 240,
+                    height: 240,
+                    colors: [
+                      accentColors.first,
+                      accentColors.first.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: height * 0.31,
+                  left: width - (rightBlobSize - 34),
+                  child: _buildAmbientBlob(
+                    width: rightBlobSize,
+                    height: rightBlobSize,
+                    colors: [
+                      accentColors[1],
+                      accentColors[1].withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: height - 220,
+                  left: width * 0.16,
+                  child: _buildAmbientBlob(
+                    width: bottomBlobWidth,
+                    height: 164,
+                    borderRadius: BorderRadius.circular(160),
+                    colors: [
+                      accentColors[2].withValues(alpha: isDark ? 0.09 : 0.07),
+                      accentColors[2].withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: isDark ? 0.0 : 0.05),
+                          Colors.transparent,
+                          baseColor.withValues(alpha: isDark ? 0.0 : 0.03),
+                        ],
+                        stops: const [0.0, 0.28, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -385,6 +540,7 @@ class _MasterViewState extends State<MasterView>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final accentColors = _backgroundAccentColors(colorScheme, isDark);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -395,54 +551,63 @@ class _MasterViewState extends State<MasterView>
         backgroundColor: colorScheme.surface,
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
             children: [
+              _buildDrawerSectionTitle(context, "Kisisel"),
+              _buildDrawerPanel(
+                context: context,
+                children: [
+                  _buildDrawerTile(
+                    context: context,
+                    icon: Icons.edit_note_rounded,
+                    title: "Notlar",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _openNotesPage();
+                    },
+                  ),
+                ],
+              ),
               _buildDrawerSectionTitle(context, "Araclar"),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainer.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    _buildDrawerTile(
-                      context: context,
-                      icon: Icons.restaurant_menu,
-                      title: "Yemek Menusu",
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const FoodMenuPage(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildDrawerTile(
-                      context: context,
-                      icon: Icons.calendar_month,
-                      title: "Ders Programi",
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SchedulePage(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildDrawerTile(
-                      context: context,
-                      icon: Icons.description_outlined,
-                      title: "Akademik Takvim",
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        _openAcademicCalendarSheet();
-                      },
-                    ),
-                  ],
-                ),
+              _buildDrawerPanel(
+                context: context,
+                children: [
+                  _buildDrawerTile(
+                    context: context,
+                    icon: Icons.restaurant_menu,
+                    title: "Yemek Menusu",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const FoodMenuPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context: context,
+                    icon: Icons.calendar_month,
+                    title: "Ders Programi",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const SchedulePage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context: context,
+                    icon: Icons.description_outlined,
+                    title: "Akademik Takvim",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _openAcademicCalendarSheet();
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -451,50 +616,29 @@ class _MasterViewState extends State<MasterView>
       body: Stack(
         children: [
           Positioned.fill(
-            child: DecoratedBox(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    colorScheme.primary.withValues(alpha: isDark ? 0.12 : 0.08),
+                    accentColors.first.withValues(alpha: isDark ? 0.10 : 0.07),
                     theme.scaffoldBackgroundColor,
                     theme.scaffoldBackgroundColor,
                   ],
-                  stops: const [0.0, 0.22, 1.0],
+                  stops: const [0.0, 0.26, 1.0],
                 ),
               ),
             ),
           ),
-          Positioned(
-            top: -60,
-            left: -30,
+          Positioned.fill(
             child: IgnorePointer(
-              child: Container(
-                width: 170,
-                height: 170,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colorScheme.primary.withValues(
-                    alpha: isDark ? 0.12 : 0.10,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 86,
-            right: -48,
-            child: IgnorePointer(
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colorScheme.secondary.withValues(
-                    alpha: isDark ? 0.08 : 0.08,
-                  ),
-                ),
+              child: _buildBackdropLayer(
+                accentColors: accentColors,
+                isDark: isDark,
+                baseColor: theme.scaffoldBackgroundColor,
               ),
             ),
           ),
@@ -533,7 +677,7 @@ class _MasterViewState extends State<MasterView>
                               ),
                             ),
                             const Spacer(),
-                            if (_tabController.index == 3) ...[
+                            if (_tabController.index == 2) ...[
                               _buildShellButton(
                                 context: context,
                                 icon: Icons.search_rounded,
@@ -600,16 +744,6 @@ class _MasterViewState extends State<MasterView>
                                             color: colorScheme.onSurface,
                                           ),
                                     ),
-                                    if (_tabController.index == 2) ...[
-                                      const SizedBox(width: 8),
-                                      Icon(
-                                        Icons.edit_outlined,
-                                        size: 18,
-                                        color: colorScheme.onSurface.withValues(
-                                          alpha: 0.55,
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -629,8 +763,7 @@ class _MasterViewState extends State<MasterView>
                         decoration: _buildShellDecoration(context),
                         child: TabBar(
                           controller: _tabController,
-                          isScrollable: true,
-                          tabAlignment: TabAlignment.start,
+                          isScrollable: false,
                           dividerColor: Colors.transparent,
                           indicatorSize: TabBarIndicatorSize.tab,
                           indicator: BoxDecoration(
@@ -651,9 +784,7 @@ class _MasterViewState extends State<MasterView>
                           ),
                           unselectedLabelStyle: theme.textTheme.labelLarge
                               ?.copyWith(fontWeight: FontWeight.w600),
-                          labelPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                          ),
+                          labelPadding: EdgeInsets.zero,
                           splashBorderRadius: BorderRadius.circular(18),
                           overlayColor: WidgetStatePropertyAll(
                             colorScheme.primary.withValues(alpha: 0.06),
@@ -662,8 +793,7 @@ class _MasterViewState extends State<MasterView>
                           tabs: [
                             _buildBadgedTab(text: "Haberler", index: 0),
                             _buildBadgedTab(text: "Etkinlikler", index: 1),
-                            _buildBadgedTab(text: "Notlar", index: 2),
-                            _buildBadgedTab(text: "Topluluk", index: 3),
+                            _buildBadgedTab(text: "Topluluk", index: 2),
                           ],
                         ),
                       ),
@@ -677,7 +807,6 @@ class _MasterViewState extends State<MasterView>
               children: const [
                 NewsTabView(),
                 EventsTabView(),
-                NotesTabView(),
                 CommunityTabView(),
               ],
             ),
