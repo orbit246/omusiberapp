@@ -47,8 +47,8 @@ class AppMarkdownPreview extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           ClipRect(
-            child: Align(
-              alignment: Alignment.topLeft,
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
               child: MarkdownBody(
                 data: data,
                 styleSheet: _markdownStyleSheet(theme),

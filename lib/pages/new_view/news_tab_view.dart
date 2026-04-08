@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
+import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 
 // --- 1. ANIMATION WRAPPER ---
@@ -99,11 +99,16 @@ class _NewsTabViewState extends State<NewsTabView> {
   final List<NewsView> _articles = [];
   final Set<NewsView> _animateAllowedSet = {};
   final Set<NewsView> _hasAnimatedSet = {};
+  static const int _mockTodayNewsCount = 0;
+  static const int _mockTodayCommunityCount = 0;
+  static const int _mockWeekNewsCount = 6;
+  static const int _mockWeekCommunityCount = 9;
 
   bool _isInitialLoading = true;
   String? _errorMessage;
 
   bool _showBackToTopButton = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -113,18 +118,36 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _scrollToTop() {
-    final primaryController = PrimaryScrollController.of(context);
-    if (primaryController.hasClients) {
-      primaryController.animateTo(
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
         0,
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeOutQuart,
       );
     }
+  }
+
+  void _scrollToNewsSection() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        360,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _openMasterTab(int index) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => MasterView(initialTabIndex: index),
+      ),
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -279,10 +302,496 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  Widget _buildSectionLabel(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Center(
+        child: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayEventBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openMasterTab(1),
+          borderRadius: BorderRadius.circular(24),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.event_available_rounded,
+                    size: 18,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "En yakın etkinlik",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Yapay Zeka Atölyesi",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "17:30",
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ">",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayNewsBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _scrollToNewsSection,
+          borderRadius: BorderRadius.circular(22),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.72,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.newspaper_rounded,
+                    size: 17,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Bugün yayımlanan haber",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "$_mockTodayNewsCount haber",
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ">",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayCommunityBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openMasterTab(2),
+          borderRadius: BorderRadius.circular(22),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.72,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.forum_rounded,
+                    size: 17,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Bugün topluluk gönderileri",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "$_mockTodayCommunityCount gönderi",
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ">",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThisWeekBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openMasterTab(1),
+          borderRadius: BorderRadius.circular(24),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.secondary.withValues(alpha: 0.18),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.event_repeat_rounded,
+                    size: 18,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Bu hafta öne çıkan etkinlik",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Kariyer Günleri",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Per",
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colorScheme.secondary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ">",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThisWeekNewsBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _scrollToNewsSection,
+          borderRadius: BorderRadius.circular(22),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.date_range_rounded,
+                    size: 18,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Bu hafta yayımlanan haber",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "$_mockWeekNewsCount haber",
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ">",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThisWeekCommunityBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openMasterTab(2),
+          borderRadius: BorderRadius.circular(22),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.72,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.groups_rounded,
+                    size: 17,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Bu hafta topluluk gönderileri",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "$_mockWeekCommunityCount gönderi",
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ">",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final bool showThisWeekFirst =
+        _mockTodayNewsCount == 0 && _mockTodayCommunityCount == 0;
 
     // Loading State
     if (_isInitialLoading) {
@@ -301,8 +810,9 @@ class _NewsTabViewState extends State<NewsTabView> {
       );
     }
 
-    if (_errorMessage != null)
+    if (_errorMessage != null) {
       return Center(child: Text("Hata: $_errorMessage"));
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -334,10 +844,41 @@ class _NewsTabViewState extends State<NewsTabView> {
           displacement: 20,
           edgeOffset: 0,
           child: CustomScrollView(
+            controller: _scrollController,
             key: const PageStorageKey('news_tab'),
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              if (showThisWeekFirst) ...[
+                SliverToBoxAdapter(
+                  child: _buildSectionLabel(context, "Bu Hafta"),
+                ),
+                SliverToBoxAdapter(child: _buildThisWeekBlock(context)),
+                SliverToBoxAdapter(child: _buildThisWeekNewsBlock(context)),
+                SliverToBoxAdapter(
+                  child: _buildThisWeekCommunityBlock(context),
+                ),
+                SliverToBoxAdapter(child: _buildSectionLabel(context, "Bugün")),
+                SliverToBoxAdapter(child: _buildTodayEventBlock(context)),
+                SliverToBoxAdapter(child: _buildTodayNewsBlock(context)),
+                SliverToBoxAdapter(child: _buildTodayCommunityBlock(context)),
+              ] else ...[
+                SliverToBoxAdapter(child: _buildSectionLabel(context, "Bugün")),
+                SliverToBoxAdapter(child: _buildTodayEventBlock(context)),
+                SliverToBoxAdapter(child: _buildTodayNewsBlock(context)),
+                SliverToBoxAdapter(child: _buildTodayCommunityBlock(context)),
+                SliverToBoxAdapter(
+                  child: _buildSectionLabel(context, "Bu Hafta"),
+                ),
+                SliverToBoxAdapter(child: _buildThisWeekBlock(context)),
+                SliverToBoxAdapter(child: _buildThisWeekNewsBlock(context)),
+                SliverToBoxAdapter(
+                  child: _buildThisWeekCommunityBlock(context),
+                ),
+              ],
+              SliverToBoxAdapter(
+                child: _buildSectionLabel(context, "Haberler"),
+              ),
               // The List of News
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {

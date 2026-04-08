@@ -157,7 +157,7 @@ class NewsFetcher {
       final id = json['id'] as int? ?? 0;
       final title = json['title'] as String? ?? 'Başlıksız';
       final summary = json['summary'] as String? ?? '';
-      final authorName = json['authorName'] as String? ?? 'Bilinmeyen Yazar';
+      final authorName = json['authorName'] as String? ?? 'Sistem';
       String? heroImage = json['heroImage'] as String?;
 
       if (heroImage == null || heroImage.isEmpty) {

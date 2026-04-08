@@ -18,7 +18,9 @@ import 'package:omusiber/pages/new_view/academic_calendar_page.dart';
 import 'package:omusiber/pages/new_view/user_search_page.dart';
 
 class MasterView extends StatefulWidget {
-  const MasterView({super.key});
+  const MasterView({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   State<MasterView> createState() => _MasterViewState();
@@ -38,7 +40,12 @@ class _MasterViewState extends State<MasterView>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _appBarTitle = _titleForIndex(widget.initialTabIndex);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
 
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -178,19 +185,29 @@ class _MasterViewState extends State<MasterView>
     }
   }
 
+  String _titleForIndex(int index) {
+    switch (index) {
+      case 1:
+        return "Etkinlikler";
+      case 2:
+        return "Topluluk";
+      case 0:
+      default:
+        return "Haberler";
+    }
+  }
+
   void _handleTabSelection(int index) {
     setState(() {
+      _appBarTitle = _titleForIndex(index);
       switch (index) {
         case 0:
-          _appBarTitle = "Haberler";
           _badgeService.markNewsViewed();
           break;
         case 1:
-          _appBarTitle = "Etkinlikler";
           _badgeService.markEventsViewed();
           break;
         case 2:
-          _appBarTitle = "Topluluk";
           _badgeService.markCommunityViewed();
           break;
       }
