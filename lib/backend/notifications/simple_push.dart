@@ -1,13 +1,21 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:firebase_core/firebase_core.dart'; // Added
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:omusiber/firebase_options.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  await SimpleNotifications.saveMessage(message);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await SimpleNotifications.ensureInitialized();
+  await SimpleNotifications.handleRemoteMessage(
+    message,
+    showForegroundNotification: false,
+    showBackgroundDataNotification: true,
+  );
 }
 
 class SimpleNotifications {
@@ -38,27 +46,23 @@ class SimpleNotifications {
         importance: Importance.high,
       );
 
-  final FirebaseMessaging _fcm;
-  final FlutterLocalNotificationsPlugin _localNotifications =
+  static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
   SimpleNotifications({FirebaseMessaging? fcm})
     : _fcm = fcm ?? FirebaseMessaging.instance;
 
-  static bool _isInitializing = false;
+  final FirebaseMessaging _fcm;
+
+  static bool _isInitialized = false;
+  static bool _listenersRegistered = false;
+  static Future<void>? _initializationFuture;
   static const String _staticPrefsKey = 'saved_notifications_v1';
 
   Future<void> init() async {
-    if (_isInitializing) return;
-    _isInitializing = true;
-
     try {
-      // Background handler must be set before init or inside init but as top-level
-      // FirebaseMessaging.onBackgroundMessage is usually set in main.dart
-      // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler); // This should be called in main.dart
-
-      await _initLocalNotifications();
-      await _registerAndroidChannels();
+      await ensureInitialized();
+      await _fcm.setAutoInitEnabled(true);
 
       // Permissions
       await ensurePermissionForDisplay();
@@ -70,19 +74,23 @@ class SimpleNotifications {
         sound: true,
       );
 
-      // Subscribe to topic
-      await _fcm.subscribeToTopic(_topic);
+      if (!_listenersRegistered) {
+        _listenersRegistered = true;
 
-      // Foreground handler
-      FirebaseMessaging.onMessage.listen((msg) async {
-        await saveMessage(msg);
-        await _showForegroundNotification(msg);
-      });
+        FirebaseMessaging.onMessage.listen((msg) async {
+          await handleRemoteMessage(
+            msg,
+            showForegroundNotification: true,
+            showBackgroundDataNotification: false,
+          );
+        });
 
-      // Background open handler
-      FirebaseMessaging.onMessageOpenedApp.listen((msg) async {
-        await saveMessage(msg); // save anyway
-      });
+        FirebaseMessaging.onMessageOpenedApp.listen((msg) async {
+          await saveMessage(msg);
+        });
+      }
+
+      await _configureRemoteRegistration();
 
       // Cold start: opened from terminated
       final initial = await _fcm.getInitialMessage();
@@ -90,10 +98,24 @@ class SimpleNotifications {
         await saveMessage(initial);
       }
     } catch (e) {
-      // General error during init
-      print("SimpleNotifications init error: $e");
-    } finally {
-      // _isInitializing stays true? Or resets?
+      debugPrint('SimpleNotifications init error: $e');
+    }
+  }
+
+  static Future<void> ensureInitialized() async {
+    if (_isInitialized) return;
+    if (_initializationFuture != null) {
+      await _initializationFuture;
+      return;
+    }
+
+    _initializationFuture = _initializeCore();
+    try {
+      await _initializationFuture;
+      _isInitialized = true;
+    } catch (_) {
+      _initializationFuture = null;
+      rethrow;
     }
   }
 
@@ -105,17 +127,18 @@ class SimpleNotifications {
 
   Future<bool> requestPermission() async {
     try {
-      await _fcm.requestPermission(alert: true, badge: true, sound: true);
-      final androidPlugin = _localNotifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      if (androidPlugin != null) {
-        await androidPlugin.requestNotificationsPermission();
+      await ensureInitialized();
+
+      final androidPlugin = _androidNotifications;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        await androidPlugin?.requestNotificationsPermission();
       }
+
+      await _fcm.requestPermission(alert: true, badge: true, sound: true);
+
       return await checkPermission();
     } catch (e) {
-      // "A request for permissions is already running" or denied
+      debugPrint('Notification permission request failed: $e');
       return false;
     }
   }
@@ -123,21 +146,80 @@ class SimpleNotifications {
   /// Returns true if permission is granted, false otherwise.
   Future<bool> checkPermission() async {
     final settings = await _fcm.getNotificationSettings();
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
+    final firebaseAllowed =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional;
+
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return firebaseAllowed;
+    }
+
+    final notificationsEnabled = await _androidNotifications
+        ?.areNotificationsEnabled();
+      return firebaseAllowed && (notificationsEnabled ?? false);
   }
 
-  Future<void> _initLocalNotifications() async {
+  Future<void> _configureRemoteRegistration() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      final apnsToken = await _waitForApnsToken();
+      if (apnsToken == null) {
+        debugPrint(
+          'APNs token not available yet. Skipping FCM token/topic registration for now.',
+        );
+        return;
+      }
+      debugPrint('APNs token received.');
+    }
+
+    await _fcm.subscribeToTopic(_topic);
+
+    final token = await _fcm.getToken();
+    debugPrint('FCM token: $token');
+    _fcm.onTokenRefresh.listen((updatedToken) {
+      debugPrint('FCM token refreshed: $updatedToken');
+    });
+  }
+
+  Future<String?> _waitForApnsToken() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final token = await _fcm.getAPNSToken();
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    return null;
+  }
+
+  static Future<void> _initializeCore() async {
+    await _initLocalNotifications();
+    await _registerAndroidChannels();
+  }
+
+  static Future<void> _initLocalNotifications() async {
     const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
-    const initSettings = InitializationSettings(android: androidInit);
+    const darwinInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: darwinInit,
+      macOS: darwinInit,
+    );
     await _localNotifications.initialize(initSettings);
   }
 
-  Future<void> _registerAndroidChannels() async {
-    final androidPlugin = _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+  static AndroidFlutterLocalNotificationsPlugin? get _androidNotifications =>
+      _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+
+  static Future<void> _registerAndroidChannels() async {
+    final androidPlugin = _androidNotifications;
     if (androidPlugin == null) return;
 
     await androidPlugin.createNotificationChannel(_generalChannel);
@@ -145,16 +227,33 @@ class SimpleNotifications {
     await androidPlugin.createNotificationChannel(_announcementsChannel);
   }
 
-  Future<void> _showForegroundNotification(RemoteMessage msg) async {
-    final n = msg.notification;
-    if (n == null) return;
+  static Future<void> handleRemoteMessage(
+    RemoteMessage msg, {
+    required bool showForegroundNotification,
+    required bool showBackgroundDataNotification,
+  }) async {
+    await saveMessage(msg);
+
+    if (showForegroundNotification) {
+      await _showLocalNotification(msg);
+      return;
+    }
+
+    if (showBackgroundDataNotification && msg.notification == null) {
+      await _showLocalNotification(msg);
+    }
+  }
+
+  static Future<void> _showLocalNotification(RemoteMessage msg) async {
+    final content = _extractContent(msg);
+    if (content == null) return;
 
     final channel = _resolveChannel(msg);
 
     await _localNotifications.show(
       msg.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      n.title ?? 'Bildirim',
-      n.body ?? '',
+      content.title,
+      content.body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           channel.id,
@@ -164,12 +263,22 @@ class SimpleNotifications {
           priority: Priority.high,
           icon: '@mipmap/launcher_icon',
         ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+        macOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
       ),
       payload: jsonEncode(msg.data),
     );
   }
 
-  AndroidNotificationChannel _resolveChannel(RemoteMessage msg) {
+  static AndroidNotificationChannel _resolveChannel(RemoteMessage msg) {
     final rawType = (msg.data['type'] ?? msg.data['category'] ?? '')
         .toString()
         .toLowerCase();
@@ -183,12 +292,12 @@ class SimpleNotifications {
   /// Saves a message to notification history.
   /// Static so it can be called from background handlers.
   static Future<void> saveMessage(RemoteMessage msg) async {
-    final n = msg.notification;
-    if (n == null) return;
+    final content = _extractContent(msg);
+    if (content == null) return;
 
     final item = SavedNotification(
-      title: n.title ?? 'Bildirim',
-      body: n.body ?? '',
+      title: content.title,
+      body: content.body,
       receivedAt: DateTime.now(),
       data: msg.data,
     );
@@ -219,6 +328,30 @@ class SimpleNotifications {
     }
   }
 
+  static _NotificationContent? _extractContent(RemoteMessage msg) {
+    final notification = msg.notification;
+    final data = msg.data;
+
+    final title =
+        notification?.title ??
+        data['title']?.toString() ??
+        data['notification_title']?.toString() ??
+        'Bildirim';
+
+    final body =
+        notification?.body ??
+        data['body']?.toString() ??
+        data['message']?.toString() ??
+        data['notification_body']?.toString() ??
+        '';
+
+    if (title.trim().isEmpty && body.trim().isEmpty) {
+      return null;
+    }
+
+    return _NotificationContent(title: title, body: body);
+  }
+
   Future<List<SavedNotification>> loadSaved() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_staticPrefsKey) ?? <String>[];
@@ -232,6 +365,13 @@ class SimpleNotifications {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_staticPrefsKey);
   }
+}
+
+class _NotificationContent {
+  const _NotificationContent({required this.title, required this.body});
+
+  final String title;
+  final String body;
 }
 
 class SavedNotification {

@@ -4,19 +4,21 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:omusiber/colors/app_theme.dart';
 import 'package:omusiber/backend/theme_manager.dart';
-import 'package:omusiber/pages/agreement_page.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
+import 'package:omusiber/pages/agreement_page.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
+import 'package:omusiber/firebase_options.dart';
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await SimpleNotifications.ensureInitialized();
 
   // Register background handler
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -67,7 +69,6 @@ class MyApp extends StatelessWidget {
 
               // If we have a user (Anon or Google), go to MasterView
               if (snapshot.hasData) {
-                print("Has Data");
                 return const MasterView();
               }
 

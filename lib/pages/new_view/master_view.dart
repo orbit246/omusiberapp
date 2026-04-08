@@ -46,8 +46,9 @@ class _MasterViewState extends State<MasterView>
       }
     });
 
-    // Initialize Push Notifications
-    SimpleNotifications().init();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SimpleNotifications().init();
+    });
 
     // Check for badges
     _checkBadges();
@@ -423,7 +424,7 @@ class _MasterViewState extends State<MasterView>
                     Icon(
                       Icons.edit_outlined,
                       size: 18,
-                      color: colorScheme.onSurface.withOpacity(0.6),
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ],
                 ],
