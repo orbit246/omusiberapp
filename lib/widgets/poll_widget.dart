@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/backend/community_repository.dart';
+import 'package:omusiber/widgets/shared/app_markdown.dart';
 
 class PollWidget extends StatefulWidget {
   final String postId;
@@ -70,20 +71,19 @@ class _PollWidgetState extends State<PollWidget> {
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Question
-          Text(
-            _poll.question,
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
+          AppMarkdownBody(data: _poll.question),
           const SizedBox(height: 12),
 
           // Options
@@ -132,21 +132,16 @@ class _PollWidgetState extends State<PollWidget> {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        constraints: const BoxConstraints(minHeight: 44),
         decoration: BoxDecoration(
           border: Border.all(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                option.text,
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [Expanded(child: AppMarkdownBody(data: option.text))],
         ),
       ),
     );
@@ -160,66 +155,75 @@ class _PollWidgetState extends State<PollWidget> {
     final theme = Theme.of(context);
     final percentageInt = (percentage * 100).toInt();
 
-    return Stack(
-      children: [
-        // Background Bar (Progress)
-        LayoutBuilder(
-          builder: (context, constraints) {
-            return Container(
-              height: 40,
-              width: constraints.maxWidth * percentage,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? theme.colorScheme.primary.withOpacity(0.2)
-                    : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            );
-          },
-        ),
-        // Content
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: isSelected
-                ? Border.all(color: theme.colorScheme.primary, width: 1.5)
-                : null,
-          ),
-          child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
             children: [
-              if (isSelected)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              Expanded(
-                child: Text(
-                  "${option.text} (${option.votes})",
-                  style: GoogleFonts.inter(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface,
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: percentage.clamp(0, 1),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                            : theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              Text(
-                "$percentageInt%",
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+              Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: isSelected
+                      ? Border.all(color: theme.colorScheme.primary, width: 1.5)
+                      : null,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isSelected)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0, top: 2),
+                        child: Icon(
+                          Icons.check_circle,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    Expanded(
+                      child: AppMarkdownBody(
+                        data: "${option.text} (${option.votes})",
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        "$percentageInt%",
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
