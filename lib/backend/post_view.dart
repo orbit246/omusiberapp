@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 
 class PostView {
   final String id;
@@ -81,7 +82,8 @@ class PostView {
 
     // Check if joined - prioritize explicit field
     bool joined = json['isJoined'] as bool? ?? false;
-    if (json['isJoined'] == null) {
+    if (json['isJoined'] == null &&
+        AppStartupController.instance.isFirebaseReady) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         if (joinersList.contains(user.uid)) {

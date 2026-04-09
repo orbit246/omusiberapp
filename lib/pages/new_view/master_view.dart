@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
@@ -36,6 +39,9 @@ class _MasterViewState extends State<MasterView>
   bool _unreadNotifications = false;
 
   final TabBadgeService _badgeService = TabBadgeService();
+  final AppStartupController _startupController = AppStartupController.instance;
+  bool _notificationsInitialized = false;
+  bool _updateCheckScheduled = false;
 
   @override
   void initState() {
@@ -53,18 +59,33 @@ class _MasterViewState extends State<MasterView>
       }
     });
 
+    _startupController.addListener(_handleStartupChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      SimpleNotifications().init();
+      _handleStartupChanged();
+      if (_updateCheckScheduled) {
+        return;
+      }
+      _updateCheckScheduled = true;
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        UpdateService().checkForUpdate();
+      });
     });
 
     // Check for badges
     _checkBadges();
 
-    // Check for updates
-    UpdateService().checkForUpdate();
-
     // Notification permission reminder after 30s
     _startPermissionReminder();
+  }
+
+  void _handleStartupChanged() {
+    if (!_startupController.isFirebaseReady || _notificationsInitialized) {
+      return;
+    }
+
+    _notificationsInitialized = true;
+    unawaited(SimpleNotifications().init());
   }
 
   void _startPermissionReminder() {
@@ -548,6 +569,7 @@ class _MasterViewState extends State<MasterView>
 
   @override
   void dispose() {
+    _startupController.removeListener(_handleStartupChanged);
     _tabController.dispose();
     super.dispose();
   }

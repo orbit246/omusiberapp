@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/community_repository.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/widgets/community_post_card.dart';
+import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 class CommunityTabView extends StatefulWidget {
   const CommunityTabView({super.key});
@@ -12,14 +14,36 @@ class CommunityTabView extends StatefulWidget {
 }
 
 class _CommunityTabViewState extends State<CommunityTabView> {
+  final AppStartupController _startupController = AppStartupController.instance;
   final CommunityRepository _repo = CommunityRepository();
   List<CommunityPost> _posts = [];
   bool _isLoading = true;
+  bool _refreshQueued = false;
 
   @override
   void initState() {
     super.initState();
+    _startupController.addListener(_handleStartupChanged);
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    _startupController.removeListener(_handleStartupChanged);
+    super.dispose();
+  }
+
+  void _handleStartupChanged() {
+    if (!_startupController.canUseAuthenticatedApis || _refreshQueued) {
+      return;
+    }
+
+    _refreshQueued = true;
+    unawaited(
+      _refreshInBackground().whenComplete(() {
+        _refreshQueued = false;
+      }),
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -33,14 +57,17 @@ class _CommunityTabViewState extends State<CommunityTabView> {
         });
       }
 
-      // 2. Schedule refresh
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _refreshInBackground();
+        if (!mounted) return;
+        _handleStartupChanged();
       });
     } catch (e) {
       debugPrint("Failed to load initial community cache: $e");
       if (_posts.isEmpty) {
-        _refreshInBackground();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _handleStartupChanged();
+        });
       }
     }
   }
@@ -55,6 +82,9 @@ class _CommunityTabViewState extends State<CommunityTabView> {
         });
       }
     } catch (e) {
+      if (e is StateError) {
+        return;
+      }
       debugPrint("Background refresh failed: $e");
       if (mounted && _posts.isEmpty) {
         setState(() => _isLoading = false);
@@ -98,7 +128,7 @@ class _CommunityTabViewState extends State<CommunityTabView> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const _CommunityLoadingState();
     }
 
     if (_posts.isEmpty) {
@@ -115,6 +145,83 @@ class _CommunityTabViewState extends State<CommunityTabView> {
           return CommunityPostCard(post: post, onLike: () => _toggleLike(post));
         },
       ),
+    );
+  }
+}
+
+class _CommunityLoadingState extends StatelessWidget {
+  const _CommunityLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 16, bottom: 80),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AppSkeleton(
+                      height: 34,
+                      width: 34,
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                    ),
+                    SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppSkeleton(
+                          height: 10,
+                          width: 96,
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                        ),
+                        SizedBox(height: 7),
+                        AppSkeleton(
+                          height: 9,
+                          width: 64,
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                SizedBox(height: 14),
+                AppSkeleton(
+                  height: 10,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                ),
+                SizedBox(height: 7),
+                AppSkeleton(
+                  height: 10,
+                  width: 190,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                ),
+                SizedBox(height: 14),
+                AppSkeleton(
+                  height: 148,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

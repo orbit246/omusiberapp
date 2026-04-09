@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -38,8 +39,12 @@ class CommunityRepository {
   String get _baseUrl => '${Constants.baseUrl}/community';
 
   Future<String> _getAuthToken() async {
+    final ready = await AppStartupController.instance
+        .ensureAuthenticatedSession();
+    if (!ready) {
+      throw StateError('Authentication is not ready yet.');
+    }
     var user = FirebaseAuth.instance.currentUser;
-    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
     if (user == null) {
       throw Exception('Authentication failed: no Firebase user available.');
     }
@@ -116,6 +121,9 @@ class CommunityRepository {
 
       return _cachedPosts;
     } catch (e) {
+      if (e is StateError) {
+        rethrow;
+      }
       debugPrint("Error fetching posts: $e");
 
       final cached = await getCachedPosts();
@@ -126,6 +134,11 @@ class CommunityRepository {
   }
 
   Future<void> createPost(String content, {String? imageUrl}) async {
+    final ready = await AppStartupController.instance
+        .ensureAuthenticatedSession();
+    if (!ready) {
+      throw Exception('Giris hazir degil');
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Giriş yapmalısınız");
 

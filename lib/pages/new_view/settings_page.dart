@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
@@ -25,15 +26,32 @@ class _SettingsPageState extends State<SettingsPage> {
   final themeManager = ThemeManager();
   final AuthService _authService = AuthService();
   final UserProfileService _profileService = UserProfileService();
+  final AppStartupController _startupController = AppStartupController.instance;
 
   // State to hold the result of the 1/1000 random chance
   bool _isEasterEggMode = false;
   List<UserBadge> _userBadges = [];
   bool _loadingBadges = false;
+  bool _badgeLoadStarted = false;
 
   @override
   void initState() {
     super.initState();
+    _startupController.addListener(_handleStartupChanged);
+    _handleStartupChanged();
+  }
+
+  @override
+  void dispose() {
+    _startupController.removeListener(_handleStartupChanged);
+    super.dispose();
+  }
+
+  void _handleStartupChanged() {
+    if (_badgeLoadStarted || !_startupController.isFirebaseReady) {
+      return;
+    }
+    _badgeLoadStarted = true;
     _loadUserBadges();
   }
 
@@ -58,310 +76,338 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       // We use CustomScrollView to allow for a collapsible "Large" AppBar
-      body: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          final user = snapshot.data;
-          final isLoggedIn = user != null;
+      body: AnimatedBuilder(
+        animation: _startupController,
+        builder: (context, _) {
+          if (!_startupController.isFirebaseReady) {
+            return _buildSettingsBody(context, user: null, isAuthLoading: true);
+          }
 
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar.large(
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  // This handles the back button automatically
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                title: const Text("Ayarlar"),
-                backgroundColor: colorScheme.surface,
-                surfaceTintColor: colorScheme.surfaceTint,
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      // --- Account Section ---
-                      _buildSectionHeader(context, "Hesap"),
-                      if (isLoggedIn) ...[
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person),
-                          ),
-                          title: Text(
-                            user.isAnonymous
-                                ? "Misafir Kullanici"
-                                : (user.displayName ?? "Kullanici"),
-                            style: theme.textTheme.titleMedium,
-                          ),
-                          subtitle: Text(
-                            user.isAnonymous
-                                ? "Anonim Hesap"
-                                : (user.email ?? "E-posta yok"),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (_loadingBadges)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        else if (_userBadges.isNotEmpty)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: BadgeList(badges: _userBadges),
-                          ),
-                        if (user.isAnonymous)
-                          _buildSettingsTile(
-                            context,
-                            icon: Icons.login,
-                            title: "Ogrenci Girisi Yap",
-                            subtitle: "Google ile giris yapin",
-                            onTap: () async {
-                              try {
-                                await _authService.signInWithGoogle();
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(e.toString())),
-                                  );
-                                }
-                              }
-                            },
-                          ),
-                      ] else ...[
-                        _buildSettingsTile(
-                          context,
-                          icon: Icons.login,
-                          title: "Giris Yap (Ogrenci)",
-                          subtitle: "Google ile giris yapin",
-                          onTap: () async {
-                            try {
-                              final user = await _authService
-                                  .signInWithGoogle();
-                              if (user == null && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Giris islemi iptal edildi veya yapilandirma hatasi olustu.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(e.toString())),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ],
-
-                      const SizedBox(height: 24),
-
-                      // --- App Settings Section ---
-                      _buildSectionHeader(context, "Uygulama"),
-                      _buildSettingsTile(
-                        context,
-                        icon: Icons.notifications_outlined,
-                        title: "Bildirimler",
-                        onTap: () {
-                          TabBadgeService().markNotifsViewed();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => Scaffold(
-                                appBar: AppBar(
-                                  title: const Text("Bildirimler"),
-                                ),
-                                body: const NotificationsTabView(),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildSettingsTile(
-                        context,
-                        icon: Icons.language,
-                        title: "Dil / Language",
-                        subtitle: "Türkçe",
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                "Farklı Dil desteği yakında geliyor!",
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildSettingsTile(
-                        context,
-                        icon: Icons.system_update_outlined,
-                        title: "Güncellemeleri Denetle",
-                        onTap: () async {
-                          final started = await UpdateService()
-                              .checkForUpdate();
-                          if (!started && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Sürümünüz güncel."),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-
-                      // Dark Mode Switch (Toggle)
-                      GestureDetector(
-                        onLongPress: () {
-                          // 100% chance easter egg on long press
-                          setState(() {
-                            _isEasterEggMode = true; // Force easter egg mode ON
-                          });
-
-                          // Toggle the theme state as if the switch was pressed
-                          final isCurrentlyDark =
-                              themeManager.themeMode == ThemeMode.dark;
-                          themeManager.toggleTheme(!isCurrentlyDark);
-                        },
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: ListenableBuilder(
-                            listenable: themeManager,
-                            builder: (context, _) {
-                              final isDarkMode =
-                                  themeManager.themeMode == ThemeMode.dark;
-                              Widget iconWidget;
-                              final iconColor =
-                                  colorScheme.onSecondaryContainer;
-                              const iconSize = 24.0;
-
-                              if (_isEasterEggMode) {
-                                iconWidget = isDarkMode
-                                    ? Image.asset(
-                                        'assets/cookie.png',
-                                        height: iconSize,
-                                        width: iconSize,
-                                      )
-                                    : Image.asset(
-                                        'assets/quarter_moon.png',
-                                        height: iconSize,
-                                        width: iconSize,
-                                      );
-                              } else {
-                                iconWidget = Icon(
-                                  Icons.dark_mode_outlined,
-                                  color: iconColor,
-                                  size: iconSize,
-                                );
-                              }
-
-                              return Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Transform.rotate(
-                                  angle: _isEasterEggMode ? 100 : 0,
-                                  child: iconWidget,
-                                ),
-                              );
-                            },
-                          ),
-                          title: Text(
-                            "Karanlık Mod",
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          trailing: ListenableBuilder(
-                            listenable: themeManager,
-                            builder: (context, _) {
-                              return Switch(
-                                value: themeManager.themeMode == ThemeMode.dark,
-                                onChanged: (val) {
-                                  final random = Random();
-                                  final newEasterEggMode =
-                                      random.nextInt(1000) == 0;
-                                  setState(() {
-                                    _isEasterEggMode = newEasterEggMode;
-                                  });
-                                  themeManager.toggleTheme(val);
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // --- Other Section ---
-                      _buildSectionHeader(context, "Diğer"),
-                      _buildSettingsTile(
-                        context,
-                        icon: Icons.info_outline,
-                        title: "Hakkında",
-                        onTap: () {
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.transparent,
-                            isScrollControlled: true,
-                            builder: (context) => const AboutBottomSheet(),
-                          );
-                        },
-                      ),
-
-                      _buildSettingsTile(
-                        context,
-                        icon: Icons.feedback_outlined,
-                        title: "Geri Dönüş",
-                        subtitle: "Hata bildirimi ve öneriler",
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const FeedbackPage(),
-                            ),
-                          );
-                        },
-                      ),
-
-                      // Sign Out Button (Only if logged in)
-                      if (isLoggedIn)
-                        _buildSettingsTile(
-                          context,
-                          icon: Icons.logout,
-                          title: "Çıkış Yap",
-                          textColor: colorScheme.error,
-                          iconColor: colorScheme.error,
-                          onTap: () async {
-                            await _authService.signOut();
-                          },
-                        ),
-
-                      // Bottom padding for scrolling
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          return StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              return _buildSettingsBody(
+                context,
+                user: snapshot.data,
+                isAuthLoading:
+                    snapshot.connectionState == ConnectionState.waiting,
+              );
+            },
           );
         },
       ),
+    );
+  }
+
+  Widget _buildSettingsBody(
+    BuildContext context, {
+    required User? user,
+    required bool isAuthLoading,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isLoggedIn = user != null;
+
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar.large(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            // This handles the back button automatically
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text("Ayarlar"),
+          backgroundColor: colorScheme.surface,
+          surfaceTintColor: colorScheme.surfaceTint,
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // --- Account Section ---
+                _buildSectionHeader(context, "Hesap"),
+                if (isAuthLoading) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    title: Text(
+                      "Hesap hazirlaniyor",
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    subtitle: const Text(
+                      "Baglanti kurulurken ayarlar yukleniyor.",
+                    ),
+                  ),
+                ] else if (isLoggedIn) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(
+                      user.isAnonymous
+                          ? "Misafir Kullanici"
+                          : (user.displayName ?? "Kullanici"),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    subtitle: Text(
+                      user.isAnonymous
+                          ? "Anonim Hesap"
+                          : (user.email ?? "E-posta yok"),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_loadingBadges)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else if (_userBadges.isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: BadgeList(badges: _userBadges),
+                    ),
+                  if (user.isAnonymous)
+                    _buildSettingsTile(
+                      context,
+                      icon: Icons.login,
+                      title: "Ogrenci Girisi Yap",
+                      subtitle: "Google ile giris yapin",
+                      onTap: () async {
+                        try {
+                          await _authService.signInWithGoogle();
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                ] else ...[
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.login,
+                    title: "Giris Yap (Ogrenci)",
+                    subtitle: "Google ile giris yapin",
+                    onTap: () async {
+                      try {
+                        final user = await _authService.signInWithGoogle();
+                        if (user == null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Giris islemi iptal edildi veya yapilandirma hatasi olustu.',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(e.toString())));
+                        }
+                      }
+                    },
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+
+                // --- App Settings Section ---
+                _buildSectionHeader(context, "Uygulama"),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.notifications_outlined,
+                  title: "Bildirimler",
+                  onTap: () {
+                    TabBadgeService().markNotifsViewed();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => Scaffold(
+                          appBar: AppBar(title: const Text("Bildirimler")),
+                          body: const NotificationsTabView(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.language,
+                  title: "Dil / Language",
+                  subtitle: "Türkçe",
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Farklı Dil desteği yakında geliyor!"),
+                      ),
+                    );
+                  },
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.system_update_outlined,
+                  title: "Güncellemeleri Denetle",
+                  onTap: () async {
+                    final started = await UpdateService().checkForUpdate();
+                    if (!started && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Sürümünüz güncel.")),
+                      );
+                    }
+                  },
+                ),
+
+                // Dark Mode Switch (Toggle)
+                GestureDetector(
+                  onLongPress: () {
+                    // 100% chance easter egg on long press
+                    setState(() {
+                      _isEasterEggMode = true; // Force easter egg mode ON
+                    });
+
+                    // Toggle the theme state as if the switch was pressed
+                    final isCurrentlyDark =
+                        themeManager.themeMode == ThemeMode.dark;
+                    themeManager.toggleTheme(!isCurrentlyDark);
+                  },
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: ListenableBuilder(
+                      listenable: themeManager,
+                      builder: (context, _) {
+                        final isDarkMode =
+                            themeManager.themeMode == ThemeMode.dark;
+                        Widget iconWidget;
+                        final iconColor = colorScheme.onSecondaryContainer;
+                        const iconSize = 24.0;
+
+                        if (_isEasterEggMode) {
+                          iconWidget = isDarkMode
+                              ? Image.asset(
+                                  'assets/cookie.png',
+                                  height: iconSize,
+                                  width: iconSize,
+                                )
+                              : Image.asset(
+                                  'assets/quarter_moon.png',
+                                  height: iconSize,
+                                  width: iconSize,
+                                );
+                        } else {
+                          iconWidget = Icon(
+                            Icons.dark_mode_outlined,
+                            color: iconColor,
+                            size: iconSize,
+                          );
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Transform.rotate(
+                            angle: _isEasterEggMode ? 100 : 0,
+                            child: iconWidget,
+                          ),
+                        );
+                      },
+                    ),
+                    title: Text(
+                      "Karanlık Mod",
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: ListenableBuilder(
+                      listenable: themeManager,
+                      builder: (context, _) {
+                        return Switch(
+                          value: themeManager.themeMode == ThemeMode.dark,
+                          onChanged: (val) {
+                            final random = Random();
+                            final newEasterEggMode = random.nextInt(1000) == 0;
+                            setState(() {
+                              _isEasterEggMode = newEasterEggMode;
+                            });
+                            themeManager.toggleTheme(val);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // --- Other Section ---
+                _buildSectionHeader(context, "Diğer"),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.info_outline,
+                  title: "Hakkında",
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      isScrollControlled: true,
+                      builder: (context) => const AboutBottomSheet(),
+                    );
+                  },
+                ),
+
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.feedback_outlined,
+                  title: "Geri Dönüş",
+                  subtitle: "Hata bildirimi ve öneriler",
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const FeedbackPage(),
+                      ),
+                    );
+                  },
+                ),
+
+                // Sign Out Button (Only if logged in)
+                if (isLoggedIn)
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.logout,
+                    title: "Çıkış Yap",
+                    textColor: colorScheme.error,
+                    iconColor: colorScheme.error,
+                    onTap: () async {
+                      await _authService.signOut();
+                    },
+                  ),
+
+                // Bottom padding for scrolling
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -403,7 +449,7 @@ class _SettingsPageState extends State<SettingsPage> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (iconColor ?? colorScheme.primary).withOpacity(0.1),
+            color: (iconColor ?? colorScheme.primary).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: iconColor ?? colorScheme.primary),

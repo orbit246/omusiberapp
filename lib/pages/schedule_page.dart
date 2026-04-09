@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/schedule_service.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
@@ -24,6 +26,7 @@ class _SchedulePageState extends State<SchedulePage> {
   ];
 
   final ScrollController _horizontalController = ScrollController();
+  Timer? _clockTimer;
   late Future<List<ProgramSchedule>> _schedulesFuture;
 
   ProgramSchedule? _selectedProgram;
@@ -33,10 +36,15 @@ class _SchedulePageState extends State<SchedulePage> {
   void initState() {
     super.initState();
     _schedulesFuture = _loadSchedules();
+    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _clockTimer?.cancel();
     _horizontalController.dispose();
     super.dispose();
   }
@@ -126,8 +134,8 @@ class _SchedulePageState extends State<SchedulePage> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              _buildIntroCard(context, selectedProgram, gridData),
-              const SizedBox(height: 18),
+              _buildTodayLessonCard(context, gridData),
+              const SizedBox(height: 12),
               _buildProgramSelector(context, schedules),
               const SizedBox(height: 12),
               _buildGradeSwitcher(context),
@@ -229,99 +237,179 @@ class _SchedulePageState extends State<SchedulePage> {
     return resolved;
   }
 
-  Widget _buildIntroCard(
+  Widget _buildTodayLessonCard(
     BuildContext context,
-    ProgramSchedule program,
     _GridScheduleData gridData,
   ) {
-    final todayColumn = _dayColumns
-        .where((day) => day.key == _todayDayKey())
-        .firstOrNull;
-    final todayCount = todayColumn == null
-        ? 0
-        : gridData.lessonsByDay[todayColumn.key]?.length ?? 0;
+    final theme = Theme.of(context);
+    final status = _resolveTodayLessonStatus(gridData);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.14)),
+      ),
+      child: status.phase == _TodayLessonPhase.noLessons
+          ? Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.free_breakfast_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bugun ders yok',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${status.dayLabel} sakin. Takvim bos, minik bir mola fena fikir degil.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppColors.coolGray,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${status.dayLabel} icin anlik durum',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: theme.textTheme.bodyLarge?.color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Cihaz saatine gore guncellenir.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.coolGray,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildLessonMomentTile(
+                  context,
+                  label: 'Simdi',
+                  scheduledLesson: status.current,
+                  emptyTitle: status.phase == _TodayLessonPhase.beforeFirst
+                      ? 'Henuz baslamadi'
+                      : 'Gun tamam',
+                  emptySubtitle: status.phase == _TodayLessonPhase.beforeFirst
+                      ? 'Su an bosluktasin.'
+                      : 'Bugunku dersler bitti.',
+                ),
+                const SizedBox(height: 10),
+                _buildLessonMomentTile(
+                  context,
+                  label: 'Siradaki',
+                  scheduledLesson: status.next,
+                  emptyTitle: status.phase == _TodayLessonPhase.afterLast
+                      ? 'Yeni ders yok'
+                      : 'Bekleyen ders yok',
+                  emptySubtitle: status.phase == _TodayLessonPhase.afterLast
+                      ? 'Takvim bugunluk kapandi.'
+                      : 'Sirada yeni bir ders gorunmuyor.',
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildLessonMomentTile(
+    BuildContext context, {
+    required String label,
+    required _ScheduledLesson? scheduledLesson,
+    required String emptyTitle,
+    required String emptySubtitle,
+  }) {
+    final theme = Theme.of(context);
+    final accent = scheduledLesson?.lesson.accent ?? AppColors.coolGray;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: accent.withValues(
+          alpha: scheduledLesson == null
+              ? 0.06
+              : theme.brightness == Brightness.dark
+                  ? 0.22
+                  : 0.10,
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: accent.withValues(
+            alpha: scheduledLesson == null
+                ? 0.16
+                : theme.brightness == Brightness.dark
+                    ? 0.34
+                    : 0.20,
           ),
-        ],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildInfoPill(
-                icon: Icons.cloud_done_outlined,
-                label: 'Merkezi API',
-              ),
-              _buildInfoPill(
-                icon: Icons.bookmark_outline_rounded,
-                label: 'Son secim hatirlanir',
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
           Text(
-            program.programName,
+            label,
             style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: 24,
+              color: scheduledLesson?.lesson.accent ?? AppColors.coolGray,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
-              height: 1.1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            '${_gradeLabel()} • ${program.academicYear} • ${program.semester}',
+            scheduledLesson?.lesson.title ?? emptyTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.78),
+              color: theme.textTheme.bodyLarge?.color,
               fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _buildInfoPill(
-                icon: Icons.grid_view_rounded,
-                label: '${gridData.lessonCount} ders',
-              ),
-              _buildInfoPill(
-                icon: Icons.today_outlined,
-                label: todayColumn == null
-                    ? 'Bugun ders yok'
-                    : '${todayColumn.label}: $todayCount ders',
-              ),
-              _buildInfoPill(
-                icon: Icons.update_rounded,
-                label: 'Guncelleme: ${_formatUpdatedAt(program.updatedAt)}',
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 4),
           Text(
-            'Saatler solda, gunler ustte. Dolu kutu ders, bos kutu uygun saat demek. Ekran tekrar acildiginda secilen program ve sinif burada ayni sekilde geri gelir.',
+            scheduledLesson == null
+                ? emptySubtitle
+                : '${scheduledLesson.startLabel} - ${scheduledLesson.endLabel} • ${scheduledLesson.lesson.subtitle}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.84),
-              fontSize: 13,
-              height: 1.45,
+              color: AppColors.coolGray,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
             ),
           ),
         ],
@@ -329,31 +417,6 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  Widget _buildInfoPill({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildProgramSelector(
     BuildContext context,
@@ -373,20 +436,11 @@ class _SchedulePageState extends State<SchedulePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Sinif / Program',
+            'Sınıfını Seç',
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: theme.textTheme.bodyLarge?.color,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Hangi programa bakiyorsan burada degistir. Son secimin otomatik kaydedilir.',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppColors.coolGray,
-              height: 1.4,
             ),
           ),
           const SizedBox(height: 10),
@@ -911,6 +965,7 @@ class _SchedulePageState extends State<SchedulePage> {
     final timeSlots = orderedTimes.map((minutes) {
       return _GridTimeSlot(
         startMinutes: minutes,
+        endMinutes: minutes + 50,
         startLabel: _formatMinutes(minutes),
         endLabel: _formatMinutes(minutes + 50),
       );
@@ -965,7 +1020,7 @@ class _SchedulePageState extends State<SchedulePage> {
       return 'Detay yok';
     }
 
-    return parts.join(' • ');
+    return parts.join(' â€¢ ');
   }
 
   Color _lessonAccent(ScheduleLesson lesson) {
@@ -990,6 +1045,91 @@ class _SchedulePageState extends State<SchedulePage> {
 
   String _gradeLabel() {
     return _selectedGradeIndex == 0 ? '1. Sinif' : '2. Sinif';
+  }
+
+  _TodayLessonStatus _resolveTodayLessonStatus(_GridScheduleData gridData) {
+    final todayKey = _todayDayKey();
+    final dayLabel = _dayLabel(todayKey) ?? 'Bugun';
+    final todayLessons = _scheduledLessonsForDay(gridData, todayKey);
+
+    if (todayLessons.isEmpty) {
+      return _TodayLessonStatus(
+        phase: _TodayLessonPhase.noLessons,
+        dayLabel: dayLabel,
+      );
+    }
+
+    final now = DateTime.now();
+    final currentMinutes = (now.hour * 60) + now.minute;
+
+    for (var index = 0; index < todayLessons.length; index++) {
+      final lesson = todayLessons[index];
+      if (currentMinutes >= lesson.startMinutes &&
+          currentMinutes < lesson.endMinutes) {
+        return _TodayLessonStatus(
+          phase: _TodayLessonPhase.inLesson,
+          dayLabel: dayLabel,
+          current: lesson,
+          next: index + 1 < todayLessons.length
+              ? todayLessons[index + 1]
+              : null,
+        );
+      }
+
+      if (currentMinutes < lesson.startMinutes) {
+        return _TodayLessonStatus(
+          phase: _TodayLessonPhase.beforeFirst,
+          dayLabel: dayLabel,
+          next: lesson,
+        );
+      }
+    }
+
+    return _TodayLessonStatus(
+      phase: _TodayLessonPhase.afterLast,
+      dayLabel: dayLabel,
+    );
+  }
+
+  List<_ScheduledLesson> _scheduledLessonsForDay(
+    _GridScheduleData gridData,
+    String? dayKey,
+  ) {
+    if (dayKey == null) return const [];
+
+    final lessonsByStart = gridData.lessonsByDay[dayKey];
+    if (lessonsByStart == null || lessonsByStart.isEmpty) {
+      return const [];
+    }
+
+    final endByStart = {
+      for (final slot in gridData.timeSlots) slot.startMinutes: slot.endMinutes,
+    };
+
+    final lessons = lessonsByStart.entries.map((entry) {
+      final startMinutes = entry.key;
+      final endMinutes = endByStart[startMinutes] ?? (startMinutes + 50);
+      return _ScheduledLesson(
+        lesson: entry.value,
+        startMinutes: startMinutes,
+        endMinutes: endMinutes,
+      );
+    }).toList();
+
+    lessons.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    return lessons;
+  }
+
+  String? _dayLabel(String? dayKey) {
+    if (dayKey == null) return null;
+
+    for (final day in _dayColumns) {
+      if (day.key == dayKey) {
+        return day.label;
+      }
+    }
+
+    return null;
   }
 
   String? _todayDayKey() {
@@ -1017,13 +1157,13 @@ class _SchedulePageState extends State<SchedulePage> {
   String? _normalizeDay(String value) {
     final normalized = value
         .toUpperCase()
-        .replaceAll('İ', 'I')
+        .replaceAll('Ä°', 'I')
         .replaceAll('I', 'I')
-        .replaceAll('Ş', 'S')
-        .replaceAll('Ç', 'C')
-        .replaceAll('Ü', 'U')
-        .replaceAll('Ö', 'O')
-        .replaceAll('Ğ', 'G')
+        .replaceAll('Å', 'S')
+        .replaceAll('Ã‡', 'C')
+        .replaceAll('Ãœ', 'U')
+        .replaceAll('Ã–', 'O')
+        .replaceAll('Ä', 'G')
         .trim();
 
     for (final day in _dayColumns) {
@@ -1054,20 +1194,6 @@ class _SchedulePageState extends State<SchedulePage> {
     return '$hour:$minute';
   }
 
-  String _formatUpdatedAt(String raw) {
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) {
-      return raw.isEmpty ? '-' : raw;
-    }
-
-    final local = parsed.toLocal();
-    final day = local.day.toString().padLeft(2, '0');
-    final month = local.month.toString().padLeft(2, '0');
-    final year = local.year.toString();
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    return '$day.$month.$year $hour:$minute';
-  }
 }
 
 class _GridScheduleData {
@@ -1101,25 +1227,58 @@ class _GridLesson {
 class _GridTimeSlot {
   const _GridTimeSlot({
     required this.startMinutes,
+    required this.endMinutes,
     required this.startLabel,
     required this.endLabel,
   });
 
   final int startMinutes;
+  final int endMinutes;
   final String startLabel;
   final String endLabel;
 }
+
+class _ScheduledLesson {
+  const _ScheduledLesson({
+    required this.lesson,
+    required this.startMinutes,
+    required this.endMinutes,
+  });
+
+  final _GridLesson lesson;
+  final int startMinutes;
+  final int endMinutes;
+
+  String get startLabel => _formatClock(startMinutes);
+  String get endLabel => _formatClock(endMinutes);
+
+  static String _formatClock(int totalMinutes) {
+    final normalized = totalMinutes < 0 ? 0 : totalMinutes;
+    final hour = (normalized ~/ 60).toString().padLeft(2, '0');
+    final minute = (normalized % 60).toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+}
+
+class _TodayLessonStatus {
+  const _TodayLessonStatus({
+    required this.phase,
+    required this.dayLabel,
+    this.current,
+    this.next,
+  });
+
+  final _TodayLessonPhase phase;
+  final String dayLabel;
+  final _ScheduledLesson? current;
+  final _ScheduledLesson? next;
+}
+
+enum _TodayLessonPhase { noLessons, beforeFirst, inLesson, afterLast }
 
 class _DayColumn {
   const _DayColumn({required this.key, required this.label});
 
   final String key;
   final String label;
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    if (isEmpty) return null;
-    return first;
-  }
 }

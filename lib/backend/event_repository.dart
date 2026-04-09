@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,8 +45,12 @@ class EventRepository {
   String get _baseUrl => Constants.baseUrl;
 
   Future<String> _getAuthToken() async {
+    final ready = await AppStartupController.instance
+        .ensureAuthenticatedSession();
+    if (!ready) {
+      throw StateError('Authentication is not ready yet.');
+    }
     var user = FirebaseAuth.instance.currentUser;
-    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
     if (user == null) {
       throw Exception('Authentication failed: no Firebase user available.');
     }
@@ -69,6 +74,9 @@ class EventRepository {
   Future<Map<String, String>> _optionalAuthHeaders({
     bool includeJsonContentType = false,
   }) async {
+    if (!AppStartupController.instance.isFirebaseReady) {
+      return {if (includeJsonContentType) 'Content-Type': 'application/json'};
+    }
     final user = FirebaseAuth.instance.currentUser;
     final token = user != null ? await user.getIdToken() : null;
     return {
@@ -145,6 +153,7 @@ class EventRepository {
   }
 
   Future<void> addEvent(PostView event) async {
+    await AppStartupController.instance.ensureAuthenticatedSession();
     final dynamic rawEventDate = event.metadata['eventDate'];
     final String eventDate = rawEventDate is DateTime
         ? rawEventDate.toIso8601String()
@@ -202,6 +211,7 @@ class EventRepository {
 
   Future<void> deleteEvent(String eventId) async {
     try {
+      await AppStartupController.instance.ensureAuthenticatedSession();
       final headers = await _authorizedHeaders(includeJsonContentType: true);
       // API expects integer ID if possible, but our ID is String.
       // We try to parse it. If it's not a number (like 'example-event'), it will fail on server side or we skip.
@@ -234,6 +244,7 @@ class EventRepository {
     final bodyId = idAsInt ?? eventId;
 
     try {
+      await AppStartupController.instance.ensureAuthenticatedSession();
       final headers = await _authorizedHeaders(includeJsonContentType: true);
       final response = await http.post(
         Uri.parse('$_baseUrl/events/$bodyId/join'),
@@ -369,6 +380,7 @@ class EventRepository {
     required dynamic bodyId,
   }) async {
     try {
+      await AppStartupController.instance.ensureAuthenticatedSession();
       final headers = await _authorizedHeaders(includeJsonContentType: true);
       final response = await http.post(
         Uri.parse('$_baseUrl/events/$endpoint'),

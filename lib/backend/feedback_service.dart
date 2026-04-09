@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,7 +51,9 @@ class FeedbackService {
     String? email,
   }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = AppStartupController.instance.isFirebaseReady
+          ? FirebaseAuth.instance.currentUser
+          : null;
       final now = DateTime.now();
 
       print("📝 [FeedbackService] Sending feedback to: $_baseUrl/feedback");

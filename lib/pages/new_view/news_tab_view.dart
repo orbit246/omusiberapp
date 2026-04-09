@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
+import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 // --- 1. ANIMATION WRAPPER ---
 class SlideInEntry extends StatefulWidget {
@@ -96,6 +98,7 @@ class NewsTabView extends StatefulWidget {
 }
 
 class _NewsTabViewState extends State<NewsTabView> {
+  final AppStartupController _startupController = AppStartupController.instance;
   final List<NewsView> _articles = [];
   final Set<NewsView> _animateAllowedSet = {};
   final Set<NewsView> _hasAnimatedSet = {};
@@ -112,17 +115,33 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
+  bool _refreshQueued = false;
 
   @override
   void initState() {
     super.initState();
+    _startupController.addListener(_handleStartupChanged);
     _loadInitialData();
   }
 
   @override
   void dispose() {
+    _startupController.removeListener(_handleStartupChanged);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleStartupChanged() {
+    if (!_startupController.canUseAuthenticatedApis || _refreshQueued) {
+      return;
+    }
+
+    _refreshQueued = true;
+    unawaited(
+      _refreshInBackground().whenComplete(() {
+        _refreshQueued = false;
+      }),
+    );
   }
 
   void _scrollToTop() {
@@ -169,14 +188,17 @@ class _NewsTabViewState extends State<NewsTabView> {
         });
       }
 
-      // 2. Schedule a refresh AFTER the app has fully rendered
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _refreshInBackground();
+        if (!mounted) return;
+        _handleStartupChanged();
       });
     } catch (e) {
       debugPrint("Failed to load initial news cache: $e");
       if (_articles.isEmpty) {
-        _refreshInBackground();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _handleStartupChanged();
+        });
       }
     }
   }
@@ -194,6 +216,9 @@ class _NewsTabViewState extends State<NewsTabView> {
         });
       }
     } catch (e) {
+      if (e is StateError) {
+        return;
+      }
       if (mounted && _articles.isEmpty) {
         setState(() {
           _isInitialLoading = false;
@@ -1236,6 +1261,55 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  Widget _buildLoadingState(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: CustomScrollView(
+        key: const PageStorageKey('news_tab_loading'),
+        physics: const NeverScrollableScrollPhysics(),
+        slivers: [
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          SliverToBoxAdapter(child: _buildLoadingSection('Bugun')),
+          const SliverToBoxAdapter(child: _LoadingSummaryCard()),
+          const SliverToBoxAdapter(child: _LoadingSummaryCard()),
+          SliverToBoxAdapter(child: _buildLoadingSection('Haberler')),
+          const SliverToBoxAdapter(child: _LoadingFilterRow()),
+          SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              return const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: _LoadingNewsCard(),
+              );
+            }, childCount: 3),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingSection(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
+        children: [
+          AppSkeleton(
+            width: label.length * 11.0,
+            height: 18,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: AppSkeleton(
+              height: 1,
+              borderRadius: BorderRadius.all(Radius.circular(999)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1244,8 +1318,12 @@ class _NewsTabViewState extends State<NewsTabView> {
         _mockTodayNewsCount == 0 && _mockTodayCommunityCount == 0;
     final visibleArticles = _filteredArticles;
 
-    // Loading State
     if (_isInitialLoading) {
+      return _buildLoadingState(context);
+    }
+
+    // Loading State
+    /* if (false && _isInitialLoading) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1259,7 +1337,7 @@ class _NewsTabViewState extends State<NewsTabView> {
           ],
         ),
       );
-    }
+    } */
 
     if (_errorMessage != null) {
       return Center(child: Text("Hata: $_errorMessage"));
@@ -1446,6 +1524,115 @@ class _NewsTabViewState extends State<NewsTabView> {
               child: const Icon(Icons.arrow_upward),
             )
           : null,
+    );
+  }
+}
+
+class _LoadingSummaryCard extends StatelessWidget {
+  const _LoadingSummaryCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: AppSkeleton(
+        height: 74,
+        borderRadius: BorderRadius.all(Radius.circular(22)),
+      ),
+    );
+  }
+}
+
+class _LoadingFilterRow extends StatelessWidget {
+  const _LoadingFilterRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+      child: Row(
+        children: [
+          Expanded(child: AppSkeleton(height: 38)),
+          SizedBox(width: 8),
+          Expanded(child: AppSkeleton(height: 38)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingNewsCard extends StatelessWidget {
+  const _LoadingNewsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSkeleton(
+            height: 136,
+            borderRadius: BorderRadius.all(Radius.circular(14)),
+          ),
+          SizedBox(height: 14),
+          AppSkeleton(
+            height: 16,
+            width: 190,
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              AppSkeleton(
+                height: 18,
+                width: 18,
+                borderRadius: BorderRadius.all(Radius.circular(999)),
+              ),
+              SizedBox(width: 8),
+              AppSkeleton(
+                height: 10,
+                width: 84,
+                borderRadius: BorderRadius.all(Radius.circular(6)),
+              ),
+            ],
+          ),
+          SizedBox(height: 14),
+          AppSkeleton(
+            height: 10,
+            borderRadius: BorderRadius.all(Radius.circular(6)),
+          ),
+          SizedBox(height: 7),
+          AppSkeleton(
+            height: 10,
+            width: 210,
+            borderRadius: BorderRadius.all(Radius.circular(6)),
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              AppSkeleton(
+                height: 12,
+                width: 60,
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              Spacer(),
+              AppSkeleton(
+                height: 12,
+                width: 76,
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

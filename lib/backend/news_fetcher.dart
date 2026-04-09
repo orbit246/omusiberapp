@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,8 +51,12 @@ class NewsFetcher {
   }
 
   Future<String> _getAuthToken() async {
+    final ready = await AppStartupController.instance
+        .ensureAuthenticatedSession();
+    if (!ready) {
+      throw StateError('Authentication is not ready yet.');
+    }
     var user = FirebaseAuth.instance.currentUser;
-    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
     if (user == null) {
       throw Exception('Authentication failed: no Firebase user available.');
     }
@@ -130,6 +135,9 @@ class NewsFetcher {
         json.encode(result.map((e) => e.toJson()).toList()),
       );
     } catch (e) {
+      if (e is StateError) {
+        rethrow;
+      }
       _logError('CRITICAL FAILURE in fetchLatestNews', e);
       if (_cachedNews != null && _cachedNews!.isNotEmpty) {
         return _cachedNews!;

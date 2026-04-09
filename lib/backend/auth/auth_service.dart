@@ -3,13 +3,14 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 
 class AuthService {
   // --- DEPENDENCIES ---
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: <String>['email']);
   final UserProfileService _profileService = UserProfileService();
 
@@ -25,6 +26,7 @@ class AuthService {
   /// Google Sign-In + Firebase Auth.
   Future<User?> signInWithGoogle() async {
     try {
+      await AppStartupController.instance.ensureFirebaseReady();
       print('Starting Google Sign In...');
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -95,6 +97,7 @@ class AuthService {
       }
 
       print('Google Sign In successful for: ${user.email}');
+      AppStartupController.instance.markReady();
       return user;
     } catch (e) {
       print('Google Sign In failed: $e');
@@ -115,24 +118,23 @@ class AuthService {
     }
 
     try {
+      await AppStartupController.instance.ensureFirebaseReady();
       final UserCredential userCred = await _auth.signInAnonymously();
+      AppStartupController.instance.markReady();
       return userCred.user;
     } catch (e) {
       throw _handleAuthError(e);
     }
   }
 
-  /// Extract student ID from email
-  String _extractStudentId(String email) {
-    final parts = email.split('@');
-    if (parts.length != 2) {
-      throw Exception('Invalid email format');
-    }
-    return parts[0].trim().toLowerCase();
-  }
-
   /// Check if the current user is in the whitelist via Backend API.
   Future<bool> isWhitelisted() async {
+    final ready = await AppStartupController.instance
+        .ensureAuthenticatedSession();
+    if (!ready) {
+      return false;
+    }
+
     final user = _auth.currentUser;
     if (user == null || user.isAnonymous) {
       return false;
@@ -162,6 +164,7 @@ class AuthService {
     } catch (_) {}
 
     try {
+      await AppStartupController.instance.ensureFirebaseReady();
       await _auth.signOut();
       print('Signed out from Firebase. Creating fallback anonymous session...');
       await signInAnonymously(acceptedTos: true, acceptedPrivacy: true);

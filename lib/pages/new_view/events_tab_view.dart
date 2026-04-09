@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
@@ -9,6 +10,7 @@ import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
+import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 // --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
 class SlideInEntry extends StatefulWidget {
@@ -98,6 +100,7 @@ class EventsTabView extends StatefulWidget {
 }
 
 class _EventsTabViewState extends State<EventsTabView> {
+  final AppStartupController _startupController = AppStartupController.instance;
   final EventRepository _repo = EventRepository();
   final Set<String> _hasAnimatedIds = {};
 
@@ -107,12 +110,17 @@ class _EventsTabViewState extends State<EventsTabView> {
   final List<PostView> _events = [];
   bool _isInitialLoading = true;
   String? _errorMessage;
+  bool _permissionCheckQueued = false;
 
   @override
   void initState() {
     super.initState();
+    _startupController.addListener(_handleStartupChanged);
     _loadInitialData();
-    _checkPermissions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _handleStartupChanged();
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -167,6 +175,9 @@ class _EventsTabViewState extends State<EventsTabView> {
   }
 
   Future<void> _checkPermissions() async {
+    if (!_startupController.canUseAuthenticatedApis) {
+      return;
+    }
     final allowed = await AuthService().isWhitelisted();
     if (mounted) {
       setState(() {
@@ -177,7 +188,21 @@ class _EventsTabViewState extends State<EventsTabView> {
 
   @override
   void dispose() {
+    _startupController.removeListener(_handleStartupChanged);
     super.dispose();
+  }
+
+  void _handleStartupChanged() {
+    if (!_startupController.canUseAuthenticatedApis || _permissionCheckQueued) {
+      return;
+    }
+
+    _permissionCheckQueued = true;
+    unawaited(
+      _checkPermissions().whenComplete(() {
+        _permissionCheckQueued = false;
+      }),
+    );
   }
 
   void _scrollToTop() {
@@ -299,6 +324,10 @@ class _EventsTabViewState extends State<EventsTabView> {
   @override
   Widget build(BuildContext context) {
     if (_isInitialLoading && _events.isEmpty) {
+      return const _EventsLoadingState();
+    }
+
+    /* if (false && _isInitialLoading && _events.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -312,7 +341,7 @@ class _EventsTabViewState extends State<EventsTabView> {
           ],
         ),
       );
-    }
+    } */
 
     if (_errorMessage != null && _events.isEmpty) {
       return Center(child: Text('Bir hata oluştu: $_errorMessage'));
@@ -461,6 +490,69 @@ class _EventsTabViewState extends State<EventsTabView> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EventsLoadingState extends StatelessWidget {
+  const _EventsLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      key: const PageStorageKey('events_tab_loading'),
+      physics: const NeverScrollableScrollPhysics(),
+      slivers: [
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppSkeleton(
+                        height: 172,
+                        borderRadius: BorderRadius.all(Radius.circular(16)),
+                      ),
+                      SizedBox(height: 14),
+                      AppSkeleton(
+                        height: 16,
+                        width: 180,
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      SizedBox(height: 10),
+                      AppSkeleton(
+                        height: 10,
+                        width: 132,
+                        borderRadius: BorderRadius.all(Radius.circular(6)),
+                      ),
+                      SizedBox(height: 10),
+                      AppSkeleton(
+                        height: 10,
+                        borderRadius: BorderRadius.all(Radius.circular(6)),
+                      ),
+                      SizedBox(height: 18),
+                      AppSkeleton(
+                        height: 38,
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }, childCount: 3),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 80)),
+      ],
     );
   }
 }

@@ -1,15 +1,17 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/models/user_badge.dart';
 
 class UserProfileService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
 
   /// Helper to get headers with Firebase ID token
   Future<Map<String, String>> _getHeaders() async {
+    await AppStartupController.instance.ensureAuthenticatedSession();
     final token = await _auth.currentUser?.getIdToken();
     return {
       'Content-Type': 'application/json',

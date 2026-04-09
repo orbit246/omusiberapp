@@ -49,10 +49,11 @@ class SimpleNotifications {
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
-  SimpleNotifications({FirebaseMessaging? fcm})
-    : _fcm = fcm ?? FirebaseMessaging.instance;
+  SimpleNotifications({FirebaseMessaging? fcm}) : _fcm = fcm;
 
-  final FirebaseMessaging _fcm;
+  final FirebaseMessaging? _fcm;
+
+  FirebaseMessaging get _messaging => _fcm ?? FirebaseMessaging.instance;
 
   static bool _isInitialized = false;
   static bool _listenersRegistered = false;
@@ -62,10 +63,10 @@ class SimpleNotifications {
   Future<void> init() async {
     try {
       await ensureInitialized();
-      await _fcm.setAutoInitEnabled(true);
+      await _messaging.setAutoInitEnabled(true);
 
       // Ensure foreground notifications are shown
-      await _fcm.setForegroundNotificationPresentationOptions(
+      await _messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
@@ -90,7 +91,7 @@ class SimpleNotifications {
       await _configureRemoteRegistration();
 
       // Cold start: opened from terminated
-      final initial = await _fcm.getInitialMessage();
+      final initial = await _messaging.getInitialMessage();
       if (initial != null) {
         await saveMessage(initial);
       }
@@ -128,12 +129,17 @@ class SimpleNotifications {
 
       if (defaultTargetPlatform == TargetPlatform.android) {
         await _androidNotifications?.requestNotificationsPermission();
-        return (await _androidNotifications?.areNotificationsEnabled()) ?? false;
+        return (await _androidNotifications?.areNotificationsEnabled()) ??
+            false;
       }
 
       if (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) {
-        await _fcm.requestPermission(alert: true, badge: true, sound: true);
+        await _messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
       }
 
       return await checkPermission();
@@ -149,7 +155,7 @@ class SimpleNotifications {
       return (await _androidNotifications?.areNotificationsEnabled()) ?? false;
     }
 
-    final settings = await _fcm.getNotificationSettings();
+    final settings = await _messaging.getNotificationSettings();
     return settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional;
   }
@@ -167,18 +173,18 @@ class SimpleNotifications {
       debugPrint('APNs token received.');
     }
 
-    await _fcm.subscribeToTopic(_topic);
+    await _messaging.subscribeToTopic(_topic);
 
-    final token = await _fcm.getToken();
+    final token = await _messaging.getToken();
     debugPrint('FCM token: $token');
-    _fcm.onTokenRefresh.listen((updatedToken) {
+    _messaging.onTokenRefresh.listen((updatedToken) {
       debugPrint('FCM token refreshed: $updatedToken');
     });
   }
 
   Future<String?> _waitForApnsToken() async {
     for (var attempt = 0; attempt < 10; attempt++) {
-      final token = await _fcm.getAPNSToken();
+      final token = await _messaging.getAPNSToken();
       if (token != null && token.isNotEmpty) {
         return token;
       }
