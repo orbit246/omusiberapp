@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
@@ -403,13 +402,14 @@ class _EventsTabViewState extends State<EventsTabView> {
               padding: const EdgeInsets.only(bottom: 12.0),
               child: FloatingActionButton(
                 heroTag: 'createEvent',
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => const CreateEventSheet(),
+                onPressed: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateEventPage()),
                   );
+                  if (created == true) {
+                    await _refreshInBackground();
+                  }
                 },
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 child: const Icon(Icons.add, color: Colors.white),

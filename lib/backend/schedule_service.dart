@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
@@ -30,8 +31,8 @@ class ScheduleService {
         throw Exception('Failed to load schedules: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching schedules: $e');
-      throw e;
+      debugPrint('Error fetching schedules: $e');
+      rethrow;
     }
   }
 }

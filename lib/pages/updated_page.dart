@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/create_event_sheet.dart';
-import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_toggle.dart';
 import 'package:omusiber/widgets/home/home_page_appbar.dart';
 import 'package:omusiber/widgets/home/search_bar.dart';
@@ -13,7 +11,8 @@ class SimplifiedHomePageState extends StatefulWidget {
   static final selectedIndexNotifier = ValueNotifier<int>(0);
 
   @override
-  State<SimplifiedHomePageState> createState() => SimplifiedHomePageStateState();
+  State<SimplifiedHomePageState> createState() =>
+      SimplifiedHomePageStateState();
 }
 
 class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
@@ -23,30 +22,30 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
       // optional: explicitly set background if you want
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            useSafeArea: true,
-            showDragHandle: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            builder: (context) {
-              return CreateEventSheet(
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => CreateEventPage(
                 onCreate: (data) {
                   // TODO: handle "Create"
-                  // data.title, data.description, data.tags, data.imageBytes (nullable)
                 },
                 onFinishLater: (data) {
                   // TODO: handle "Finish later" (save draft)
                 },
-              );
-            },
+              ),
+            ),
           );
         },
-        child: Icon(Icons.add, color: Theme.of(context).colorScheme.surfaceBright),
+        child: Icon(
+          Icons.add,
+          color: Theme.of(context).colorScheme.surfaceBright,
+        ),
       ),
 
       bottomNavigationBar: AppNavigationBar(),
-      appBar: PreferredSize(preferredSize: const Size.fromHeight(60), child: HomePageAppbar()),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: HomePageAppbar(),
+      ),
 
       body: SafeArea(
         child: SingleChildScrollView(
@@ -67,7 +66,6 @@ class SimplifiedHomePageStateState extends State<SimplifiedHomePageState> {
                               // If your ExpandableSearchBar constructor is NOT const, do this:
                               SizedBox(height: 8),
                               ExpandableSearchBar(hintText: 'Etkinlik ara...'),
-
                             ],
                           );
                   },

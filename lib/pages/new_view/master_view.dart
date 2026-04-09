@@ -498,21 +498,13 @@ class _MasterViewState extends State<MasterView>
               ),
             ),
           ),
-          NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverAppBar(
-                  backgroundColor: Colors.transparent,
-                  surfaceTintColor: Colors.transparent,
-                  pinned: true,
-                  floating: true,
-                  snap: true,
-                  elevation: 0,
-                  scrolledUnderElevation: 0,
-                  automaticallyImplyLeading: false,
-                  toolbarHeight: 84,
-                  titleSpacing: 12,
-                  title: Container(
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: Container(
                     height: 62,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -619,66 +611,61 @@ class _MasterViewState extends State<MasterView>
                       ],
                     ),
                   ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(72),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                      child: Container(
-                        height: 54,
-                        padding: const EdgeInsets.all(6),
-                        decoration: _buildShellDecoration(context),
-                        child: TabBar(
-                          controller: _tabController,
-                          isScrollable: true,
-                          tabAlignment: TabAlignment.start,
-                          dividerColor: Colors.transparent,
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          indicator: BoxDecoration(
-                            color: colorScheme.primary.withValues(
-                              alpha: isDark ? 0.24 : 0.12,
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: colorScheme.primary.withValues(
-                                alpha: 0.18,
-                              ),
-                            ),
-                          ),
-                          labelColor: colorScheme.primary,
-                          unselectedLabelColor: colorScheme.onSurfaceVariant,
-                          labelStyle: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                          unselectedLabelStyle: theme.textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                          labelPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                          ),
-                          splashBorderRadius: BorderRadius.circular(18),
-                          overlayColor: WidgetStatePropertyAll(
-                            colorScheme.primary.withValues(alpha: 0.06),
-                          ),
-                          onTap: (index) => _handleTabSelection(index),
-                          tabs: [
-                            _buildBadgedTab(text: "Haberler", index: 0),
-                            _buildBadgedTab(text: "Etkinlikler", index: 1),
-                            _buildBadgedTab(text: "Notlar", index: 2),
-                            _buildBadgedTab(text: "Topluluk", index: 3),
-                          ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  child: Container(
+                    height: 54,
+                    padding: const EdgeInsets.all(6),
+                    decoration: _buildShellDecoration(context),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      dividerColor: Colors.transparent,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: colorScheme.primary.withValues(
+                          alpha: isDark ? 0.24 : 0.12,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.18),
                         ),
                       ),
+                      labelColor: colorScheme.primary,
+                      unselectedLabelColor: colorScheme.onSurfaceVariant,
+                      labelStyle: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      unselectedLabelStyle: theme.textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                      splashBorderRadius: BorderRadius.circular(18),
+                      overlayColor: WidgetStatePropertyAll(
+                        colorScheme.primary.withValues(alpha: 0.06),
+                      ),
+                      onTap: (index) => _handleTabSelection(index),
+                      tabs: [
+                        _buildBadgedTab(text: "Haberler", index: 0),
+                        _buildBadgedTab(text: "Etkinlikler", index: 1),
+                        _buildBadgedTab(text: "Notlar", index: 2),
+                        _buildBadgedTab(text: "Topluluk", index: 3),
+                      ],
                     ),
                   ),
                 ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: const [
-                NewsTabView(),
-                EventsTabView(),
-                NotesTabView(),
-                CommunityTabView(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: const [
+                      NewsTabView(),
+                      EventsTabView(),
+                      NotesTabView(),
+                      CommunityTabView(),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
