@@ -103,6 +103,9 @@ class _NewsTabViewState extends State<NewsTabView> {
   static const int _mockTodayCommunityCount = 0;
   static const int _mockWeekNewsCount = 6;
   static const int _mockWeekCommunityCount = 9;
+  String _selectedSortKey = 'newest';
+  String _selectedDatePreset = 'all';
+  final Set<String> _selectedTags = <String>{};
 
   bool _isInitialLoading = true;
   String? _errorMessage;
@@ -299,6 +302,453 @@ class _NewsTabViewState extends State<NewsTabView> {
         ),
         duration: const Duration(seconds: 2),
       ),
+    );
+  }
+
+  List<String> get _availableTags {
+    final tags =
+        _articles
+            .expand((item) => item.tags)
+            .where((tag) => tag.trim().isNotEmpty)
+            .map((tag) => tag.trim())
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return tags;
+  }
+
+  String get _sortLabel {
+    switch (_selectedSortKey) {
+      case 'oldest':
+        return 'En Eski';
+      case 'popular':
+        return 'En Çok Okunan';
+      case 'today':
+        return 'Bugün';
+      case 'newest':
+      default:
+        return 'En Yeni';
+    }
+  }
+
+  String get _filterSummary {
+    final parts = <String>[];
+
+    switch (_selectedDatePreset) {
+      case 'today':
+        parts.add('Bugün');
+        break;
+      case 'week':
+        parts.add('Bu Hafta');
+        break;
+    }
+
+    if (_selectedTags.isNotEmpty) {
+      if (_selectedTags.length == 1) {
+        parts.add(_selectedTags.first);
+      } else {
+        parts.add('${_selectedTags.length} etiket');
+      }
+    }
+
+    if (parts.isEmpty) {
+      return 'Tümü';
+    }
+
+    return parts.join(' • ');
+  }
+
+  bool _isToday(DateTime? date) {
+    if (date == null) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  bool _isThisWeek(DateTime? date) {
+    if (date == null) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
+    return !date.isBefore(startOfWeek) && date.isBefore(endOfWeek);
+  }
+
+  List<NewsView> get _filteredArticles {
+    final items = _articles.where((item) {
+      final matchesDate = switch (_selectedDatePreset) {
+        'today' => _isToday(item.publishedAt),
+        'week' => _isThisWeek(item.publishedAt),
+        _ => true,
+      };
+
+      if (!matchesDate) {
+        return false;
+      }
+
+      if (_selectedTags.isEmpty) {
+        return true;
+      }
+
+      return item.tags.any(_selectedTags.contains);
+    }).toList();
+
+    items.sort((a, b) {
+      switch (_selectedSortKey) {
+        case 'oldest':
+          final aDate = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return aDate.compareTo(bDate);
+        case 'popular':
+          return b.viewCount.compareTo(a.viewCount);
+        case 'today':
+          final aToday = _isToday(a.publishedAt) ? 1 : 0;
+          final bToday = _isToday(b.publishedAt) ? 1 : 0;
+          if (aToday != bToday) {
+            return bToday.compareTo(aToday);
+          }
+          final aDate = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bDate.compareTo(aDate);
+        case 'newest':
+        default:
+          final aDate = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bDate.compareTo(aDate);
+      }
+    });
+
+    return items;
+  }
+
+  Widget _buildFilterPill(
+    BuildContext context, {
+    required String label,
+    required VoidCallback onTap,
+    bool active = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: active
+                ? colorScheme.primaryContainer.withValues(alpha: 0.92)
+                : colorScheme.surface.withValues(alpha: 0.86),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: active
+                  ? colorScheme.primary.withValues(alpha: 0.2)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.38),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: active ? colorScheme.primary : colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: active
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final hasActiveFilters =
+        _selectedDatePreset != 'all' || _selectedTags.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.84),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.36),
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(
+              'Filtrele',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const Spacer(),
+            _buildFilterPill(
+              context,
+              label: _sortLabel,
+              onTap: _openFilterSheet,
+              active: true,
+            ),
+            const SizedBox(width: 8),
+            _buildFilterPill(
+              context,
+              label: _filterSummary,
+              onTap: _openFilterSheet,
+              active: hasActiveFilters,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFilterSheet() async {
+    String tempSortKey = _selectedSortKey;
+    String tempDatePreset = _selectedDatePreset;
+    final Set<String> tempTags = {..._selectedTags};
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final theme = Theme.of(context);
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Widget buildChoice({
+              required String label,
+              required bool selected,
+              required VoidCallback onTap,
+            }) {
+              return ChoiceChip(
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) => onTap(),
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  color: selected ? colorScheme.primary : colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+                selectedColor: colorScheme.primaryContainer.withValues(
+                  alpha: 0.9,
+                ),
+                backgroundColor: colorScheme.surfaceContainerLow,
+                side: BorderSide(
+                  color: selected
+                      ? colorScheme.primary.withValues(alpha: 0.24)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Haber filtreleri',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Sıralama',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        buildChoice(
+                          label: 'En Yeni',
+                          selected: tempSortKey == 'newest',
+                          onTap: () =>
+                              setModalState(() => tempSortKey = 'newest'),
+                        ),
+                        buildChoice(
+                          label: 'En Eski',
+                          selected: tempSortKey == 'oldest',
+                          onTap: () =>
+                              setModalState(() => tempSortKey = 'oldest'),
+                        ),
+                        buildChoice(
+                          label: 'En Çok Okunan',
+                          selected: tempSortKey == 'popular',
+                          onTap: () =>
+                              setModalState(() => tempSortKey = 'popular'),
+                        ),
+                        buildChoice(
+                          label: 'Bugün',
+                          selected: tempSortKey == 'today',
+                          onTap: () =>
+                              setModalState(() => tempSortKey = 'today'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Zaman aralığı',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        buildChoice(
+                          label: 'Tümü',
+                          selected: tempDatePreset == 'all',
+                          onTap: () =>
+                              setModalState(() => tempDatePreset = 'all'),
+                        ),
+                        buildChoice(
+                          label: 'Bugün',
+                          selected: tempDatePreset == 'today',
+                          onTap: () =>
+                              setModalState(() => tempDatePreset = 'today'),
+                        ),
+                        buildChoice(
+                          label: 'Bu Hafta',
+                          selected: tempDatePreset == 'week',
+                          onTap: () =>
+                              setModalState(() => tempDatePreset = 'week'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Etiketler',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_availableTags.isEmpty)
+                      Text(
+                        'Henüz filtrelenebilir etiket yok.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _availableTags.map((tag) {
+                          return FilterChip(
+                            label: Text(tag),
+                            selected: tempTags.contains(tag),
+                            onSelected: (selected) {
+                              setModalState(() {
+                                if (selected) {
+                                  tempTags.add(tag);
+                                } else {
+                                  tempTags.remove(tag);
+                                }
+                              });
+                            },
+                            labelStyle: theme.textTheme.labelLarge?.copyWith(
+                              color: tempTags.contains(tag)
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            selectedColor: colorScheme.primaryContainer
+                                .withValues(alpha: 0.9),
+                            backgroundColor: colorScheme.surfaceContainerLow,
+                            side: BorderSide(
+                              color: tempTags.contains(tag)
+                                  ? colorScheme.primary.withValues(alpha: 0.24)
+                                  : colorScheme.outlineVariant.withValues(
+                                      alpha: 0.3,
+                                    ),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                tempSortKey = 'newest';
+                                tempDatePreset = 'all';
+                                tempTags.clear();
+                              });
+                            },
+                            child: const Text('Sıfırla'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectedSortKey = tempSortKey;
+                                _selectedDatePreset = tempDatePreset;
+                                _selectedTags
+                                  ..clear()
+                                  ..addAll(tempTags);
+                              });
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Uygula'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -792,6 +1242,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     final colorScheme = theme.colorScheme;
     final bool showThisWeekFirst =
         _mockTodayNewsCount == 0 && _mockTodayCommunityCount == 0;
+    final visibleArticles = _filteredArticles;
 
     // Loading State
     if (_isInitialLoading) {
@@ -879,26 +1330,74 @@ class _NewsTabViewState extends State<NewsTabView> {
               SliverToBoxAdapter(
                 child: _buildSectionLabel(context, "Haberler"),
               ),
+              SliverToBoxAdapter(child: _buildFilterBar(context)),
               // The List of News
-              SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final newsItem = _articles[index];
-                  final bool isAllowed = _animateAllowedSet.contains(newsItem);
-                  final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
-                  final bool shouldAnimate = isAllowed && !hasAnimated;
-                  if (shouldAnimate) {
-                    _hasAnimatedSet.add(newsItem);
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: SlideInEntry(
-                      key: ValueKey(newsItem),
-                      animate: shouldAnimate,
-                      child: NewsCard(view: newsItem),
+              if (visibleArticles.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface.withValues(alpha: 0.84),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.34,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.filter_alt_off_rounded,
+                            size: 32,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Bu filtrelerle eşleşen haber yok.',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Filtreleri değiştirip tekrar deneyebilirsin.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                }, childCount: _articles.length),
-              ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final newsItem = visibleArticles[index];
+                    final bool isAllowed = _animateAllowedSet.contains(
+                      newsItem,
+                    );
+                    final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
+                    final bool shouldAnimate = isAllowed && !hasAnimated;
+                    if (shouldAnimate) {
+                      _hasAnimatedSet.add(newsItem);
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: SlideInEntry(
+                        key: ValueKey(newsItem),
+                        animate: shouldAnimate,
+                        child: NewsCard(view: newsItem),
+                      ),
+                    );
+                  }, childCount: visibleArticles.length),
+                ),
               // --- FOOTER SECTION ---
               SliverToBoxAdapter(
                 child: Padding(
