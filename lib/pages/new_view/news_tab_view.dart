@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/master_news_widgets_repository.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
@@ -103,10 +105,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   final List<NewsView> _articles = [];
   final Set<NewsView> _animateAllowedSet = {};
   final Set<NewsView> _hasAnimatedSet = {};
-  static const int _mockTodayNewsCount = 0;
-  static const int _mockTodayCommunityCount = 0;
-  static const int _mockWeekNewsCount = 6;
-  static const int _mockWeekCommunityCount = 9;
+  MasterNewsWidgetsView? _summaryWidgets;
   String _selectedSortKey = 'newest';
   String _selectedDatePreset = 'all';
   final Set<String> _selectedTags = <String>{};
@@ -202,10 +201,13 @@ class _NewsTabViewState extends State<NewsTabView> {
     try {
       // 1. Load from cache first (no network)
       final cachedData = await NewsFetcher().getCachedNews();
+      final cachedSummaryWidgets =
+          await MasterNewsWidgetsRepository().getCachedWidgets();
       final hydratedCached = _bindNewsActions(cachedData);
 
       if (mounted) {
         setState(() {
+          _summaryWidgets = cachedSummaryWidgets ?? _summaryWidgets;
           if (hydratedCached.isNotEmpty) {
             _isInitialLoading = false;
             _errorMessage = null;
@@ -234,11 +236,15 @@ class _NewsTabViewState extends State<NewsTabView> {
   Future<void> _refreshInBackground() async {
     try {
       final newData = await NewsFetcher().fetchLatestNews(forceRefresh: true);
+      final widgets = await MasterNewsWidgetsRepository().fetchWidgets(
+        forceRefresh: true,
+      );
       final hydratedData = _bindNewsActions(newData);
       if (mounted) {
         setState(() {
           _isInitialLoading = false;
           _errorMessage = null;
+          _summaryWidgets = widgets ?? _summaryWidgets;
           _articles.clear();
           _articles.addAll(hydratedData);
           _animateAllowedSet.addAll(hydratedData);
@@ -259,6 +265,9 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _handleRefresh() async {
     try {
+      final widgets = await MasterNewsWidgetsRepository().fetchWidgets(
+        forceRefresh: true,
+      );
       final fetchedData = _bindNewsActions(
         await NewsFetcher().fetchLatestNews(forceRefresh: true),
       );
@@ -267,6 +276,10 @@ class _NewsTabViewState extends State<NewsTabView> {
       final List<NewsView> newItems = fetchedData.where((newItem) {
         return !_articles.contains(newItem);
       }).toList();
+
+      setState(() {
+        _summaryWidgets = widgets ?? _summaryWidgets;
+      });
 
       if (newItems.isNotEmpty) {
         setState(() {
@@ -824,6 +837,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  /*
   Widget _buildTodayEventBlock(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1290,6 +1304,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  */
   Widget _buildLoadingState(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1339,12 +1354,290 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  List<Widget> _buildSummarySlivers(BuildContext context) {
+    final summaryWidgets = _summaryWidgets;
+    if (summaryWidgets == null) {
+      return const [
+        SliverToBoxAdapter(child: _LoadingSummaryCard()),
+        SliverToBoxAdapter(child: _LoadingSummaryCard()),
+      ];
+    }
+
+    if (summaryWidgets.sections.isEmpty) {
+      return [
+        SliverToBoxAdapter(
+          child: _buildSummaryUnavailableCard(
+            context,
+            'Ozet widget verisi API tarafindan henuz donmedi.',
+          ),
+        ),
+      ];
+    }
+
+    final slivers = <Widget>[];
+    for (final section in summaryWidgets.sections) {
+      if (section.title.trim().isNotEmpty) {
+        slivers.add(
+          SliverToBoxAdapter(
+            child: _buildSectionLabel(context, section.title),
+          ),
+        );
+      }
+
+      if (section.cards.isEmpty) {
+        slivers.add(
+          SliverToBoxAdapter(
+            child: _buildSummaryUnavailableCard(
+              context,
+              'Bu bolum icin API kart verisi donmedi.',
+            ),
+          ),
+        );
+        continue;
+      }
+
+      for (var index = 0; index < section.cards.length; index++) {
+        slivers.add(
+          SliverToBoxAdapter(
+            child: _buildApiSummaryCard(
+              context,
+              section: section,
+              card: section.cards[index],
+              isLastInSection: index == section.cards.length - 1,
+            ),
+          ),
+        );
+      }
+    }
+
+    return slivers;
+  }
+
+  Widget _buildSummaryUnavailableCard(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApiSummaryCard(
+    BuildContext context, {
+    required MasterNewsWidgetSection section,
+    required MasterNewsWidgetCard card,
+    required bool isLastInSection,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final style = _summaryCardStyle(context, section: section, card: card);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, isLastInSection ? 16 : 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: card.isInteractive ? () => _handleSummaryCardTap(card) : null,
+          borderRadius: BorderRadius.circular(style.borderRadius),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: style.backgroundColor,
+              borderRadius: BorderRadius.circular(style.borderRadius),
+              border: Border.all(color: style.borderColor),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: style.iconBoxSize,
+                  height: style.iconBoxSize,
+                  decoration: BoxDecoration(
+                    color: style.iconBackgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    style.icon,
+                    size: style.iconSize,
+                    color: style.iconColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        card.subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        card.value,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (card.trailingText != null &&
+                    card.trailingText!.trim().isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    card.trailingText!,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: style.trailingColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+                if (card.isInteractive) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '>',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleSummaryCardTap(MasterNewsWidgetCard card) {
+    switch (card.actionType) {
+      case MasterNewsWidgetActionType.openTab:
+        final tabIndex = card.targetTabIndex;
+        if (tabIndex == null) return;
+        _openMasterTab(tabIndex);
+        break;
+      case MasterNewsWidgetActionType.scrollNewsList:
+        _scrollToNewsSection();
+        break;
+      case MasterNewsWidgetActionType.none:
+        break;
+    }
+  }
+
+  _SummaryCardStyle _summaryCardStyle(
+    BuildContext context, {
+    required MasterNewsWidgetSection section,
+    required MasterNewsWidgetCard card,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isToday = section.id == 'today';
+
+    switch (card.kind) {
+      case MasterNewsWidgetCardKind.event:
+        return isToday
+            ? _SummaryCardStyle(
+                borderRadius: 24,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.95),
+                borderColor: colorScheme.primary.withValues(alpha: 0.16),
+                iconBackgroundColor: colorScheme.primaryContainer,
+                iconColor: colorScheme.onPrimaryContainer,
+                icon: Icons.event_available_rounded,
+                iconBoxSize: 38,
+                iconSize: 18,
+                trailingColor: colorScheme.primary,
+              )
+            : _SummaryCardStyle(
+                borderRadius: 24,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.95),
+                borderColor: colorScheme.secondary.withValues(alpha: 0.18),
+                iconBackgroundColor: colorScheme.secondaryContainer,
+                iconColor: colorScheme.onSecondaryContainer,
+                icon: Icons.event_repeat_rounded,
+                iconBoxSize: 38,
+                iconSize: 18,
+                trailingColor: colorScheme.secondary,
+              );
+      case MasterNewsWidgetCardKind.news:
+        return isToday
+            ? _SummaryCardStyle(
+                borderRadius: 22,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.82),
+                borderColor: colorScheme.outlineVariant.withValues(alpha: 0.34),
+                iconBackgroundColor: colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.72),
+                iconColor: colorScheme.primary,
+                icon: Icons.newspaper_rounded,
+                iconBoxSize: 34,
+                iconSize: 17,
+                trailingColor: colorScheme.primary,
+              )
+            : _SummaryCardStyle(
+                borderRadius: 22,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.88),
+                borderColor: colorScheme.outlineVariant.withValues(alpha: 0.34),
+                iconBackgroundColor: colorScheme.secondaryContainer,
+                iconColor: colorScheme.onSecondaryContainer,
+                icon: Icons.date_range_rounded,
+                iconBoxSize: 38,
+                iconSize: 18,
+                trailingColor: colorScheme.secondary,
+              );
+      case MasterNewsWidgetCardKind.community:
+      case MasterNewsWidgetCardKind.unknown:
+        return _SummaryCardStyle(
+          borderRadius: 22,
+          backgroundColor: colorScheme.surface.withValues(
+            alpha: isToday ? 0.82 : 0.88,
+          ),
+          borderColor: colorScheme.outlineVariant.withValues(alpha: 0.34),
+          iconBackgroundColor: colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.72,
+          ),
+          iconColor: colorScheme.primary,
+          icon: isToday ? Icons.forum_rounded : Icons.groups_rounded,
+          iconBoxSize: 34,
+          iconSize: 17,
+          trailingColor: colorScheme.primary,
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bool showThisWeekFirst =
-        _mockTodayNewsCount == 0 && _mockTodayCommunityCount == 0;
     final visibleArticles = _filteredArticles;
 
     if (_isInitialLoading) {
@@ -1407,6 +1700,8 @@ class _NewsTabViewState extends State<NewsTabView> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              ..._buildSummarySlivers(context),
+              /*
               if (showThisWeekFirst) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionLabel(context, "Bu Hafta"),
@@ -1434,6 +1729,8 @@ class _NewsTabViewState extends State<NewsTabView> {
                   child: _buildThisWeekCommunityBlock(context),
                 ),
               ],
+              ],
+              */
               SliverToBoxAdapter(
                 child: _buildSectionLabel(context, "Haberler"),
               ),
@@ -1664,4 +1961,28 @@ class _LoadingNewsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SummaryCardStyle {
+  final double borderRadius;
+  final Color backgroundColor;
+  final Color borderColor;
+  final Color iconBackgroundColor;
+  final Color iconColor;
+  final Color trailingColor;
+  final IconData icon;
+  final double iconBoxSize;
+  final double iconSize;
+
+  const _SummaryCardStyle({
+    required this.borderRadius,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.iconBackgroundColor,
+    required this.iconColor,
+    required this.trailingColor,
+    required this.icon,
+    required this.iconBoxSize,
+    required this.iconSize,
+  });
 }

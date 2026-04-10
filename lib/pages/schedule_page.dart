@@ -1,10 +1,13 @@
 ﻿import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/schedule_service.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
 import 'package:omusiber/colors/app_colors.dart';
+import 'package:omusiber/pages/new_view/user_profile_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SchedulePage extends StatefulWidget {
@@ -28,6 +31,7 @@ class _SchedulePageState extends State<SchedulePage> {
   final ScrollController _horizontalController = ScrollController();
   Timer? _clockTimer;
   late Future<List<ProgramSchedule>> _schedulesFuture;
+  final UserProfileService _profileService = UserProfileService();
 
   ProgramSchedule? _selectedProgram;
   int _selectedGradeIndex = 0;
@@ -95,6 +99,48 @@ class _SchedulePageState extends State<SchedulePage> {
     setState(() {
       _schedulesFuture = _loadSchedules();
     });
+  }
+
+  Future<void> _openProfilePage() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profilini gormek icin once giris yapmalisin.'),
+        ),
+      );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      const SnackBar(
+        duration: Duration(seconds: 10),
+        content: Text('Profil yukleniyor...'),
+      ),
+    );
+
+    final profile = await _profileService.fetchUserProfile(user.uid);
+
+    if (!mounted) return;
+    messenger.clearSnackBars();
+
+    if (profile == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Profil bilgisi su anda yuklenemedi.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserProfilePage(profile: profile),
+      ),
+    );
   }
 
   @override
@@ -496,45 +542,87 @@ class _SchedulePageState extends State<SchedulePage> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.14)),
       ),
-      child: Row(
-        children: List.generate(2, (index) {
-          final isSelected = index == _selectedGradeIndex;
-          final title = index == 0 ? '1. Sinif' : '2. Sinif';
+      child: Column(
+        children: [
+          Row(
+            children: List.generate(2, (index) {
+              final isSelected = index == _selectedGradeIndex;
+              final title = index == 0 ? '1. Sinif' : '2. Sinif';
 
-          return Expanded(
-            child: GestureDetector(
-              onTap: () async {
-                setState(() {
-                  _selectedGradeIndex = index;
-                });
-                await _savePreferences();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    color: isSelected
-                        ? Colors.white
-                        : theme.textTheme.bodyLarge?.color,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    setState(() {
+                      _selectedGradeIndex = index;
+                    });
+                    await _savePreferences();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: isSelected
+                            ? Colors.white
+                            : theme.textTheme.bodyLarge?.color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 6),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _openProfilePage,
+              borderRadius: BorderRadius.circular(16),
+              child: Ink(
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.coolGray.withValues(alpha: 0.10),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Sinif ve sube bilgisini profilinden degistirebilirsin.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.coolGray,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
               ),
             ),
-          );
-        }),
+          ),
+        ],
       ),
     );
   }
