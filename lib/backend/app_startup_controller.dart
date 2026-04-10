@@ -18,6 +18,8 @@ class AppStartupController extends ChangeNotifier {
   static final AppStartupController instance = AppStartupController._();
 
   static const String _agreementPrefsKey = 'startup_agreement_acceptance_v1';
+  static const Duration _startupWarmupWindow = Duration(seconds: 10);
+  static final Stopwatch _startupStopwatch = Stopwatch()..start();
 
   AppStartupStage _stage = AppStartupStage.idle;
   Object? _lastError;
@@ -30,6 +32,16 @@ class AppStartupController extends ChangeNotifier {
   bool get isBooting => _stage == AppStartupStage.booting;
   bool get needsAgreement => _stage == AppStartupStage.waitingForAgreement;
   bool get canUseAuthenticatedApis => _stage == AppStartupStage.ready;
+  bool get isInStartupWarmup =>
+      _startupStopwatch.elapsed < _startupWarmupWindow;
+
+  Duration startupDeferral(Duration requestedDelay) {
+    final remaining = _startupWarmupWindow - _startupStopwatch.elapsed;
+    if (remaining <= Duration.zero || requestedDelay <= Duration.zero) {
+      return Duration.zero;
+    }
+    return remaining < requestedDelay ? remaining : requestedDelay;
+  }
 
   Future<void> start() {
     return _startFuture ??= _performStartup();
@@ -83,14 +95,6 @@ class AppStartupController extends ChangeNotifier {
     );
 
     _lastError = null;
-    _stage = AppStartupStage.booting;
-    notifyListeners();
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      await FirebaseAuth.instance.signInAnonymously();
-    }
-
     _stage = AppStartupStage.ready;
     notifyListeners();
   }
@@ -116,7 +120,7 @@ class AppStartupController extends ChangeNotifier {
       _firebaseReady = true;
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-      await SimpleNotifications.ensureInitialized();
+      unawaited(SimpleNotifications.ensureInitialized());
 
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
@@ -132,7 +136,6 @@ class AppStartupController extends ChangeNotifier {
         return;
       }
 
-      await FirebaseAuth.instance.signInAnonymously();
       _stage = AppStartupStage.ready;
       notifyListeners();
     } catch (error) {

@@ -40,18 +40,26 @@ class _MasterViewState extends State<MasterView>
 
   final TabBadgeService _badgeService = TabBadgeService();
   final AppStartupController _startupController = AppStartupController.instance;
+  static const Duration _notificationsInitDelay = Duration(seconds: 4);
+  static const Duration _updateCheckDelay = Duration(seconds: 12);
   bool _notificationsInitialized = false;
+  bool _notificationsInitScheduled = false;
   bool _updateCheckScheduled = false;
+  final Set<int> _activatedTabs = <int>{};
+  Timer? _notificationsInitTimer;
+  Timer? _updateCheckTimer;
 
   @override
   void initState() {
     super.initState();
     _appBarTitle = _titleForIndex(widget.initialTabIndex);
+    _activatedTabs.add(widget.initialTabIndex);
     _tabController = TabController(
       length: 3,
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
+    _tabController.animation?.addListener(_handleTabAnimationChanged);
 
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -61,31 +69,71 @@ class _MasterViewState extends State<MasterView>
 
     _startupController.addListener(_handleStartupChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _checkBadges();
+      _startPermissionReminder();
       _handleStartupChanged();
       if (_updateCheckScheduled) {
         return;
       }
       _updateCheckScheduled = true;
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        UpdateService().checkForUpdate();
-      });
+      _scheduleUpdateCheck();
     });
-
-    // Check for badges
-    _checkBadges();
-
-    // Notification permission reminder after 30s
-    _startPermissionReminder();
   }
 
   void _handleStartupChanged() {
-    if (!_startupController.isFirebaseReady || _notificationsInitialized) {
+    if (!_startupController.isFirebaseReady ||
+        _notificationsInitialized ||
+        _notificationsInitScheduled) {
       return;
     }
 
-    _notificationsInitialized = true;
-    unawaited(SimpleNotifications().init());
+    _notificationsInitScheduled = true;
+    final delay = _startupController.startupDeferral(_notificationsInitDelay);
+    _notificationsInitTimer?.cancel();
+    if (delay == Duration.zero) {
+      _notificationsInitialized = true;
+      unawaited(SimpleNotifications().init());
+      return;
+    }
+    _notificationsInitTimer = Timer(delay, () {
+      if (!mounted || _notificationsInitialized) {
+        return;
+      }
+      _notificationsInitialized = true;
+      unawaited(SimpleNotifications().init());
+    });
+  }
+
+  void _scheduleUpdateCheck() {
+    final delay = _startupController.startupDeferral(_updateCheckDelay);
+    _updateCheckTimer?.cancel();
+    if (delay == Duration.zero) {
+      if (!mounted) return;
+      UpdateService().checkForUpdate();
+      return;
+    }
+    _updateCheckTimer = Timer(delay, () {
+      if (!mounted) return;
+      UpdateService().checkForUpdate();
+    });
+  }
+
+  void _handleTabAnimationChanged() {
+    final animation = _tabController.animation;
+    if (animation == null) {
+      return;
+    }
+
+    final lowerIndex = animation.value.floor();
+    final upperIndex = animation.value.ceil();
+    final didChange =
+        _activatedTabs.add(lowerIndex) | _activatedTabs.add(upperIndex);
+    if (didChange && mounted) {
+      setState(() {});
+    }
   }
 
   void _startPermissionReminder() {
@@ -220,6 +268,7 @@ class _MasterViewState extends State<MasterView>
 
   void _handleTabSelection(int index) {
     setState(() {
+      _activatedTabs.add(index);
       _appBarTitle = _titleForIndex(index);
       switch (index) {
         case 0:
@@ -570,6 +619,9 @@ class _MasterViewState extends State<MasterView>
   @override
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
+    _tabController.animation?.removeListener(_handleTabAnimationChanged);
+    _notificationsInitTimer?.cancel();
+    _updateCheckTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -843,15 +895,61 @@ class _MasterViewState extends State<MasterView>
             },
             body: TabBarView(
               controller: _tabController,
-              children: const [
-                NewsTabView(),
-                EventsTabView(),
-                CommunityTabView(),
+              children: [
+                _LazyTabHost(
+                  isActive: _activatedTabs.contains(0),
+                  child: const NewsTabView(),
+                ),
+                _LazyTabHost(
+                  isActive: _activatedTabs.contains(1),
+                  child: const EventsTabView(),
+                ),
+                _LazyTabHost(
+                  isActive: _activatedTabs.contains(2),
+                  child: const CommunityTabView(),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+class _LazyTabHost extends StatefulWidget {
+  const _LazyTabHost({required this.isActive, required this.child});
+
+  final bool isActive;
+  final Widget child;
+
+  @override
+  State<_LazyTabHost> createState() => _LazyTabHostState();
+}
+
+class _LazyTabHostState extends State<_LazyTabHost>
+    with AutomaticKeepAliveClientMixin {
+  late bool _hasBuiltChild = widget.isActive;
+
+  @override
+  void didUpdateWidget(covariant _LazyTabHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !_hasBuiltChild) {
+      setState(() {
+        _hasBuiltChild = true;
+      });
+    }
+  }
+
+  @override
+  bool get wantKeepAlive => _hasBuiltChild;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (!_hasBuiltChild) {
+      return const SizedBox.expand();
+    }
+    return widget.child;
   }
 }

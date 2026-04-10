@@ -101,6 +101,8 @@ class EventsTabView extends StatefulWidget {
 
 class _EventsTabViewState extends State<EventsTabView> {
   final AppStartupController _startupController = AppStartupController.instance;
+  static const Duration _backgroundRefreshDelay = Duration(seconds: 4);
+  static const Duration _permissionCheckDelay = Duration(seconds: 5);
   final EventRepository _repo = EventRepository();
   final Set<String> _hasAnimatedIds = {};
 
@@ -111,14 +113,17 @@ class _EventsTabViewState extends State<EventsTabView> {
   bool _isInitialLoading = true;
   String? _errorMessage;
   bool _permissionCheckQueued = false;
+  bool _refreshQueued = false;
+  Timer? _backgroundRefreshTimer;
+  Timer? _permissionCheckTimer;
 
   @override
   void initState() {
     super.initState();
     _startupController.addListener(_handleStartupChanged);
-    _loadInitialData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _loadInitialData();
       _handleStartupChanged();
     });
   }
@@ -131,6 +136,7 @@ class _EventsTabViewState extends State<EventsTabView> {
         setState(() {
           if (cached.isNotEmpty) {
             _isInitialLoading = false;
+            _errorMessage = null;
             _events.clear();
             _events.addAll(freshWithMocks(cached));
           }
@@ -139,12 +145,12 @@ class _EventsTabViewState extends State<EventsTabView> {
 
       // 2. Schedule refresh AFTER render
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _refreshInBackground();
+        _scheduleBackgroundRefresh();
       });
     } catch (e) {
       debugPrint("Failed to load initial events cache: $e");
       if (_events.isEmpty) {
-        _refreshInBackground();
+        _scheduleBackgroundRefresh();
       }
     }
   }
@@ -155,6 +161,7 @@ class _EventsTabViewState extends State<EventsTabView> {
       if (mounted) {
         setState(() {
           _isInitialLoading = false;
+          _errorMessage = null;
           _events.clear();
           _events.addAll(freshWithMocks(fresh));
         });
@@ -189,20 +196,70 @@ class _EventsTabViewState extends State<EventsTabView> {
   @override
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
+    _backgroundRefreshTimer?.cancel();
+    _permissionCheckTimer?.cancel();
     super.dispose();
   }
 
   void _handleStartupChanged() {
-    if (!_startupController.canUseAuthenticatedApis || _permissionCheckQueued) {
+    if (!_startupController.canUseAuthenticatedApis) {
       return;
     }
 
+    _scheduleBackgroundRefresh();
+    if (_permissionCheckQueued) {
+      return;
+    }
     _permissionCheckQueued = true;
-    unawaited(
-      _checkPermissions().whenComplete(() {
+    final delay = _startupController.startupDeferral(_permissionCheckDelay);
+    _permissionCheckTimer?.cancel();
+    if (delay == Duration.zero) {
+      unawaited(
+        _checkPermissions().whenComplete(() {
+          _permissionCheckQueued = false;
+        }),
+      );
+      return;
+    }
+    _permissionCheckTimer = Timer(delay, () {
+      if (!mounted) {
         _permissionCheckQueued = false;
-      }),
-    );
+        return;
+      }
+      unawaited(
+        _checkPermissions().whenComplete(() {
+          _permissionCheckQueued = false;
+        }),
+      );
+    });
+  }
+
+  void _scheduleBackgroundRefresh() {
+    final delay = _startupController.startupDeferral(_backgroundRefreshDelay);
+    _backgroundRefreshTimer?.cancel();
+    if (delay == Duration.zero) {
+      if (_refreshQueued) {
+        return;
+      }
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+      return;
+    }
+    _backgroundRefreshTimer = Timer(delay, () {
+      if (!mounted || _refreshQueued) {
+        return;
+      }
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+    });
   }
 
   void _scrollToTop() {

@@ -124,26 +124,7 @@ class EventRepository {
       final cached = await getCachedEvents();
       if (cached.isNotEmpty) return cached;
 
-      // Return just the example event on error, so the user can see it
-      return [
-        PostView(
-          id: 'example-event-error',
-          title: 'Siber Güvenlik Konferansı (Offline)',
-          description: 'Ağ hatası oluştu veya sunucuya erişilemiyor.',
-          tags: ['Siber Güvenlik', 'Örnek'],
-          maxContributors: 100,
-          remainingContributors: 50,
-          ticketPrice: 0.0,
-          location: 'Mühendislik Fakültesi',
-          thubnailUrl:
-              'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80',
-          imageLinks: [],
-          metadata: {
-            'datetimeText': '20 Ekim 2025',
-            'eventDate': DateTime.now().toIso8601String(),
-          },
-        ),
-      ];
+      return [];
     }
   }
 

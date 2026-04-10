@@ -15,21 +15,27 @@ class CommunityTabView extends StatefulWidget {
 
 class _CommunityTabViewState extends State<CommunityTabView> {
   final AppStartupController _startupController = AppStartupController.instance;
+  static const Duration _backgroundRefreshDelay = Duration(seconds: 4);
   final CommunityRepository _repo = CommunityRepository();
   List<CommunityPost> _posts = [];
   bool _isLoading = true;
   bool _refreshQueued = false;
+  Timer? _backgroundRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _startupController.addListener(_handleStartupChanged);
-    _loadInitialData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadInitialData();
+    });
   }
 
   @override
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
+    _backgroundRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -38,12 +44,7 @@ class _CommunityTabViewState extends State<CommunityTabView> {
       return;
     }
 
-    _refreshQueued = true;
-    unawaited(
-      _refreshInBackground().whenComplete(() {
-        _refreshQueued = false;
-      }),
-    );
+    _scheduleBackgroundRefresh();
   }
 
   Future<void> _loadInitialData() async {
@@ -70,6 +71,31 @@ class _CommunityTabViewState extends State<CommunityTabView> {
         });
       }
     }
+  }
+
+  void _scheduleBackgroundRefresh() {
+    final delay = _startupController.startupDeferral(_backgroundRefreshDelay);
+    _backgroundRefreshTimer?.cancel();
+    if (delay == Duration.zero) {
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+      return;
+    }
+    _backgroundRefreshTimer = Timer(delay, () {
+      if (!mounted || _refreshQueued) {
+        return;
+      }
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+    });
   }
 
   Future<void> _refreshInBackground() async {

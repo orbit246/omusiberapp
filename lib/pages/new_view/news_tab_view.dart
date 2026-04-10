@@ -99,6 +99,7 @@ class NewsTabView extends StatefulWidget {
 
 class _NewsTabViewState extends State<NewsTabView> {
   final AppStartupController _startupController = AppStartupController.instance;
+  static const Duration _backgroundRefreshDelay = Duration(seconds: 3);
   final List<NewsView> _articles = [];
   final Set<NewsView> _animateAllowedSet = {};
   final Set<NewsView> _hasAnimatedSet = {};
@@ -116,17 +117,22 @@ class _NewsTabViewState extends State<NewsTabView> {
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
   bool _refreshQueued = false;
+  Timer? _backgroundRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _startupController.addListener(_handleStartupChanged);
-    _loadInitialData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadInitialData();
+    });
   }
 
   @override
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
+    _backgroundRefreshTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -136,12 +142,7 @@ class _NewsTabViewState extends State<NewsTabView> {
       return;
     }
 
-    _refreshQueued = true;
-    unawaited(
-      _refreshInBackground().whenComplete(() {
-        _refreshQueued = false;
-      }),
-    );
+    _scheduleBackgroundRefresh();
   }
 
   void _scrollToTop() {
@@ -152,6 +153,31 @@ class _NewsTabViewState extends State<NewsTabView> {
         curve: Curves.easeOutQuart,
       );
     }
+  }
+
+  void _scheduleBackgroundRefresh() {
+    final delay = _startupController.startupDeferral(_backgroundRefreshDelay);
+    _backgroundRefreshTimer?.cancel();
+    if (delay == Duration.zero) {
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+      return;
+    }
+    _backgroundRefreshTimer = Timer(delay, () {
+      if (!mounted || _refreshQueued) {
+        return;
+      }
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+    });
   }
 
   void _scrollToNewsSection() {
@@ -182,7 +208,9 @@ class _NewsTabViewState extends State<NewsTabView> {
         setState(() {
           if (hydratedCached.isNotEmpty) {
             _isInitialLoading = false;
+            _errorMessage = null;
             _animateAllowedSet.addAll(hydratedCached);
+            _articles.clear();
             _articles.addAll(hydratedCached);
           }
         });
@@ -210,6 +238,7 @@ class _NewsTabViewState extends State<NewsTabView> {
       if (mounted) {
         setState(() {
           _isInitialLoading = false;
+          _errorMessage = null;
           _articles.clear();
           _articles.addAll(hydratedData);
           _animateAllowedSet.addAll(hydratedData);

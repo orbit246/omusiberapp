@@ -142,7 +142,7 @@ class NewsFetcher {
       if (_cachedNews != null && _cachedNews!.isNotEmpty) {
         return _cachedNews!;
       }
-      return [_getExampleNews()];
+      return [];
     }
 
     // 3. Save to Memory Cache
@@ -156,8 +156,8 @@ class NewsFetcher {
       return _cachedNews!;
     }
 
-    _log('returning fallback data because result list is empty.');
-    return [_getExampleNews()];
+    _log('returning empty list because result list is empty.');
+    return [];
   }
 
   NewsView? _parseNewsItem(Map<String, dynamic> json) {
@@ -244,20 +244,6 @@ class NewsFetcher {
   String? _formatDate(DateTime? date) {
     if (date == null) return null;
     return '${date.day}.${date.month}.${date.year}';
-  }
-
-  NewsView _getExampleNews() {
-    return NewsView(
-      id: -1,
-      title: "Bağlantı Sorunu",
-      summary: "Haberler yüklenemedi. İnternet bağlantınızı kontrol edin.",
-      heroImage: _fallbackImage,
-      authorName: "Sistem",
-      authorAvatar: null,
-      detailUrl: null,
-      publishedAt: DateTime(2025, 2, 10), // Fixed older date
-      publishedAtText: _formatDate(DateTime(2025, 2, 10)),
-    );
   }
 
   Future<void> trackNewsView(int newsId) async {

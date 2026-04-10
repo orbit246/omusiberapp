@@ -16,7 +16,10 @@ class CommunityRepository {
   List<CommunityPost> _cachedPosts = [];
 
   Future<List<CommunityPost>> getCachedPosts() async {
-    if (_cachedPosts.isNotEmpty) return _cachedPosts;
+    if (_cachedPosts.isNotEmpty) {
+      _cachedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return _cachedPosts;
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -26,6 +29,7 @@ class CommunityRepository {
         _cachedPosts = decoded
             .map((item) => CommunityPost.fromJson(item))
             .toList();
+        _cachedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return _cachedPosts;
       }
     } catch (e) {
