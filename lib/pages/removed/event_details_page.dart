@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
+import 'package:omusiber/widgets/shared/app_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EventDetailsPage extends StatefulWidget {
@@ -432,14 +433,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         const SizedBox(height: 12),
 
                         // Body Content
-                        Text(
-                          event.description,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            height: 1.6,
-                            color: colorScheme.onSurface.withOpacity(0.85),
-                            fontWeight: FontWeight.w400,
-                            fontSize: 16,
-                          ),
+                        AppMarkdownBody(
+                          data: event.description,
+                          selectable: true,
                         ),
 
                         // Extra space for FAB
