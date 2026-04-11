@@ -11,6 +11,9 @@ class UserProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final studentId = profile.studentId?.trim();
+    final hasStudentId = studentId != null && studentId.isNotEmpty;
+    final identityLabel = hasStudentId ? '@$studentId' : profile.email;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -30,12 +33,14 @@ class UserProfilePage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withOpacity(
-                        0.5,
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.5,
                       ),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: colorScheme.outlineVariant.withOpacity(0.5),
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
                     ),
                     child: Column(
@@ -67,14 +72,17 @@ class UserProfilePage extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          "@${profile.studentId}",
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w500,
+                        if (identityLabel != null && identityLabel.isNotEmpty)
+                          Text(
+                            identityLabel,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        if (profile.role != 'student') ...[
+                        if (profile.role.isNotEmpty &&
+                            profile.role != 'student' &&
+                            profile.role != 'member') ...[
                           const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -110,12 +118,13 @@ class UserProfilePage extends StatelessWidget {
                   // Info Section
                   _buildSectionHeader(context, "Hakkında"),
                   const SizedBox(height: 12),
-                  _buildInfoTile(
-                    context,
-                    icon: Icons.school_outlined,
-                    label: "Öğrenci Numarası",
-                    value: profile.studentId,
-                  ),
+                  if (hasStudentId)
+                    _buildInfoTile(
+                      context,
+                      icon: Icons.school_outlined,
+                      label: "Öğrenci Numarası",
+                      value: studentId,
+                    ),
                   if (profile.email != null)
                     _buildInfoTile(
                       context,
@@ -190,7 +199,9 @@ class UserProfilePage extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.3)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [

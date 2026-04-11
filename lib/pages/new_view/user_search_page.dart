@@ -78,7 +78,9 @@ class _UserSearchPageState extends State<UserSearchPage> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 filled: true,
-                fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                fillColor: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
               ),
               onSubmitted: (_) => _performSearch(),
               textInputAction: TextInputAction.search,
@@ -110,7 +112,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
           Icon(
             Icons.person_search_outlined,
             size: 80,
-            color: theme.colorScheme.primary.withOpacity(0.2),
+            color: theme.colorScheme.primary.withValues(alpha: 0.2),
           ),
           const SizedBox(height: 16),
           Text(
@@ -132,7 +134,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
           Icon(
             Icons.error_outline,
             size: 60,
-            color: theme.colorScheme.error.withOpacity(0.5),
+            color: theme.colorScheme.error.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -148,6 +150,9 @@ class _UserSearchPageState extends State<UserSearchPage> {
 
   Widget _buildResultCard(BuildContext context, ThemeData theme) {
     final user = _result!;
+    final secondaryText = user.studentId?.trim().isNotEmpty ?? false
+        ? user.studentId!
+        : (user.email ?? "Kimlik bilgisi yok");
     return Column(
       children: [
         Card(
@@ -155,7 +160,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
             side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
           ),
           child: InkWell(
@@ -193,7 +198,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
                           ),
                         ),
                         Text(
-                          user.studentId,
+                          secondaryText,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

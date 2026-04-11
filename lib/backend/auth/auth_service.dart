@@ -1,21 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
+import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
   // --- DEPENDENCIES ---
   FirebaseAuth get _auth => FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: <String>['email']);
   final UserProfileService _profileService = UserProfileService();
-
-  // --- SETTINGS ---
-  final String allowedDomain = 'stu.omu.edu.tr';
 
   /// Helper to get headers with Firebase ID token
   Future<Map<String, String>> _getHeaders() async {
@@ -42,65 +43,79 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      User? user;
-      final currentUser = _auth.currentUser;
-
-      // Capture anonymous profile for migration if needed
-      UserProfile? anonProfile;
-      if (currentUser != null && currentUser.isAnonymous) {
-        anonProfile = await _profileService.fetchUserProfile(currentUser.uid);
-      }
-
-      if (currentUser != null && currentUser.isAnonymous) {
-        try {
-          print('Linking Google account to anonymous session...');
-          final userCred = await currentUser.linkWithCredential(credential);
-          user = userCred.user;
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'credential-already-in-use') {
-            print(
-              'Google account already exists. Signing in explicitly (dropping anon session)...',
-            );
-            final userCred = await _auth.signInWithCredential(credential);
-            user = userCred.user;
-
-            // Migrate profile to the new UID since it changed
-            if (user != null && anonProfile != null) {
-              print('Migrating anonymous profile to new OAuth account...');
-              await _profileService.migrateProfile(
-                currentUser.uid,
-                user.uid,
-                anonProfile,
-              );
-            }
-          } else {
-            rethrow;
-          }
-        }
-      } else {
-        print('Signing in to Firebase...');
-        final userCred = await _auth.signInWithCredential(credential);
-        user = userCred.user;
-      }
-
+      final user = await _authenticateWithCredential(
+        credential,
+        providerLabel: 'Google',
+      );
       if (user == null) {
         throw Exception('Firebase sign-in returned no user.');
       }
 
-      final String? email = user.email;
-      if (email == null || !email.endsWith('@$allowedDomain')) {
-        print('Email domain check failed for: $email');
-        await signOut();
-        throw AuthException(
-          'Erişim reddedildi: Sadece @$allowedDomain uzantılı öğrenci mailleri kabul edilmektedir.',
-        );
-      }
-
       print('Google Sign In successful for: ${user.email}');
+      await _syncProfileFromAuthUser(user);
       AppStartupController.instance.markReady();
       return user;
     } catch (e) {
       print('Google Sign In failed: $e');
+      await signOut();
+      throw _handleAuthError(e);
+    }
+  }
+
+  Future<User?> signInWithApple() async {
+    try {
+      await AppStartupController.instance.ensureFirebaseReady();
+      final available = await SignInWithApple.isAvailable();
+      if (!available) {
+        throw AuthException('Apple ile giriş bu cihazda kullanılamıyor.');
+      }
+
+      final rawNonce = _generateNonce();
+      final hashedNonce = _sha256OfString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final identityToken = appleCredential.identityToken;
+      if (identityToken == null || identityToken.isEmpty) {
+        throw AuthException('Apple kimlik doğrulaması tamamlanamadı.');
+      }
+
+      final credential = OAuthProvider(
+        'apple.com',
+      ).credential(idToken: identityToken, rawNonce: rawNonce);
+
+      final fallbackName =
+          [appleCredential.givenName, appleCredential.familyName]
+              .whereType<String>()
+              .map((part) => part.trim())
+              .where((part) => part.isNotEmpty)
+              .join(' ')
+              .trim();
+
+      final user = await _authenticateWithCredential(
+        credential,
+        providerLabel: 'Apple',
+      );
+      if (user == null) {
+        throw AuthException(
+          'Apple ile giriş tamamlandı fakat kullanıcı alınamadı.',
+        );
+      }
+
+      await _syncProfileFromAuthUser(
+        user,
+        fallbackDisplayName: fallbackName.isEmpty ? null : fallbackName,
+      );
+      AppStartupController.instance.markReady();
+      return user;
+    } catch (e) {
+      print('Apple Sign In failed: $e');
       await signOut();
       throw _handleAuthError(e);
     }
@@ -177,6 +192,95 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) return null;
     return await user.getIdToken();
+  }
+
+  Future<User?> _authenticateWithCredential(
+    AuthCredential credential, {
+    required String providerLabel,
+  }) async {
+    User? user;
+    final currentUser = _auth.currentUser;
+
+    UserProfile? anonProfile;
+    if (currentUser != null && currentUser.isAnonymous) {
+      anonProfile = await _profileService.fetchUserProfile(currentUser.uid);
+    }
+
+    if (currentUser != null && currentUser.isAnonymous) {
+      try {
+        print('Linking $providerLabel account to anonymous session...');
+        final userCred = await currentUser.linkWithCredential(credential);
+        user = userCred.user;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'credential-already-in-use') {
+          print(
+            '$providerLabel account already exists. Signing in explicitly (dropping anon session)...',
+          );
+          final userCred = await _auth.signInWithCredential(credential);
+          user = userCred.user;
+
+          if (user != null && anonProfile != null) {
+            print('Migrating anonymous profile to new OAuth account...');
+            await _profileService.migrateProfile(
+              currentUser.uid,
+              user.uid,
+              anonProfile,
+            );
+          }
+        } else {
+          rethrow;
+        }
+      }
+    } else {
+      print('Signing in to Firebase with $providerLabel...');
+      final userCred = await _auth.signInWithCredential(credential);
+      user = userCred.user;
+    }
+
+    return user;
+  }
+
+  Future<void> _syncProfileFromAuthUser(
+    User user, {
+    String? fallbackDisplayName,
+  }) async {
+    try {
+      final resolvedName = (user.displayName?.trim().isNotEmpty ?? false)
+          ? user.displayName!.trim()
+          : fallbackDisplayName?.trim();
+
+      final updates = <String, dynamic>{
+        'email': user.email,
+        'photoUrl': user.photoURL,
+      };
+
+      if (resolvedName != null && resolvedName.isNotEmpty) {
+        updates['name'] = resolvedName;
+      }
+
+      final derivedStudentId = extractStudentIdFromEmail(user.email);
+      if (derivedStudentId != null) {
+        updates['studentId'] = derivedStudentId;
+      }
+
+      await _profileService.updateUserProfile(user.uid, updates);
+    } catch (e) {
+      print('Profile sync after auth failed: $e');
+    }
+  }
+
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  String _sha256OfString(String input) {
+    return sha256.convert(utf8.encode(input)).toString();
   }
 }
 

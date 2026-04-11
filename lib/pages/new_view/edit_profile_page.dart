@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 
@@ -16,6 +17,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _profileService = UserProfileService();
 
   late TextEditingController _nameController;
+  late TextEditingController _studentIdController;
   late TextEditingController _ageController;
   late TextEditingController _departmentController;
 
@@ -40,7 +42,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
+    final derivedStudentId = extractStudentIdFromEmail(widget.profile.email);
     _nameController = TextEditingController(text: widget.profile.name);
+    _studentIdController = TextEditingController(
+      text: widget.profile.studentId ?? derivedStudentId ?? "",
+    );
     _ageController = TextEditingController(
       text: widget.profile.age?.toString() ?? "",
     );
@@ -54,6 +60,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _studentIdController.dispose();
     _ageController.dispose();
     _departmentController.dispose();
     super.dispose();
@@ -67,6 +74,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final updates = {
         'name': _nameController.text.trim(),
+        'studentId': _studentIdController.text.trim(),
         'age': int.tryParse(_ageController.text.trim()),
         'department': _departmentController.text.trim(),
         'gender': _selectedGender,
@@ -131,7 +139,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.3),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -179,6 +187,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
               const SizedBox(height: 16),
 
+              TextFormField(
+                controller: _studentIdController,
+                decoration: InputDecoration(
+                  labelText: "Öğrenci Numarası",
+                  helperText:
+                      widget.profile.email != null &&
+                          extractStudentIdFromEmail(widget.profile.email) !=
+                              null
+                      ? "E-postanızdan otomatik dolduruldu. İsterseniz değiştirebilir veya boş bırakabilirsiniz."
+                      : "İsteğe bağlı. Öğrenci değilseniz boş bırakabilirsiniz.",
+                  prefixIcon: const Icon(Icons.badge_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surface,
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return null;
+                  if (!RegExp(r'^\d{6,}$').hasMatch(val.trim())) {
+                    return "En az 6 haneli sayı olmalı";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
               Row(
                 children: [
                   // Age field
@@ -212,7 +249,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     flex: 2,
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
-                      value: _selectedGender,
+                      initialValue: _selectedGender,
                       decoration: InputDecoration(
                         labelText: "Cinsiyet",
                         prefixIcon: const Icon(Icons.wc_outlined),
@@ -260,8 +297,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
                 maxLength: 32,
                 validator: (val) {
-                  if (val != null && val.length > 32)
+                  if (val != null && val.length > 32) {
                     return "En fazla 32 karakter";
+                  }
                   return null;
                 },
               ),
@@ -270,7 +308,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               // Campus
               DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: _selectedCampus,
+                initialValue: _selectedCampus,
                 decoration: InputDecoration(
                   labelText: "Yerleşke / Kampüs",
                   prefixIcon: const Icon(Icons.map_outlined),

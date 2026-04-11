@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/theme_manager.dart';
@@ -77,6 +78,47 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() => _loadingBadges = false);
     }
   }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      final user = await _authService.signInWithGoogle();
+      if (user == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Giriş işlemi iptal edildi veya yapılandırma hatası oluştu.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _handleAppleSignIn() async {
+    try {
+      final user = await _authService.signInWithApple();
+      if (user == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Apple ile giriş tamamlanamadı.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  bool get _canUseAppleSignIn =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
 
   @override
   Widget build(BuildContext context) {
@@ -186,50 +228,41 @@ class _SettingsPageState extends State<SettingsPage> {
                       child: BadgeList(badges: _userBadges),
                     ),
                   if (user.isAnonymous)
-                    _buildSettingsTile(
-                      context,
-                      icon: Icons.login,
-                      title: "Ogrenci Girisi Yap",
-                      subtitle: "Google ile giris yapin",
-                      onTap: () async {
-                        try {
-                          await _authService.signInWithGoogle();
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
-                            );
-                          }
-                        }
-                      },
+                    Column(
+                      children: [
+                        _buildSettingsTile(
+                          context,
+                          icon: Icons.login,
+                          title: "Giriş Yap",
+                          subtitle: "Google ile giriş yapın",
+                          onTap: _handleGoogleSignIn,
+                        ),
+                        if (_canUseAppleSignIn)
+                          _buildSettingsTile(
+                            context,
+                            icon: Icons.apple,
+                            title: "Apple ile Giriş Yap",
+                            subtitle: "Apple hesabınızla devam edin",
+                            onTap: _handleAppleSignIn,
+                          ),
+                      ],
                     ),
                 ] else ...[
                   _buildSettingsTile(
                     context,
                     icon: Icons.login,
-                    title: "Giris Yap (Ogrenci)",
-                    subtitle: "Google ile giris yapin",
-                    onTap: () async {
-                      try {
-                        final user = await _authService.signInWithGoogle();
-                        if (user == null && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Giris islemi iptal edildi veya yapilandirma hatasi olustu.',
-                              ),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(e.toString())));
-                        }
-                      }
-                    },
+                    title: "Giriş Yap",
+                    subtitle: "Google ile giriş yapın",
+                    onTap: _handleGoogleSignIn,
                   ),
+                  if (_canUseAppleSignIn)
+                    _buildSettingsTile(
+                      context,
+                      icon: Icons.apple,
+                      title: "Apple ile Giriş Yap",
+                      subtitle: "Apple hesabınızla devam edin",
+                      onTap: _handleAppleSignIn,
+                    ),
                 ],
 
                 const SizedBox(height: 24),

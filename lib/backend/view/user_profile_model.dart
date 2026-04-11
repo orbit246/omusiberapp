@@ -2,7 +2,7 @@ import 'package:omusiber/models/user_badge.dart';
 
 class UserProfile {
   final String uid;
-  final String studentId;
+  final String? studentId;
   final String? email;
   final String name;
   final String? photoUrl;
@@ -17,7 +17,7 @@ class UserProfile {
 
   UserProfile({
     required this.uid,
-    required this.studentId,
+    this.studentId,
     this.email,
     required this.name,
     this.photoUrl,
@@ -37,11 +37,13 @@ class UserProfile {
   }) {
     return UserProfile(
       uid: uid,
-      studentId: data['studentId'] ?? '',
+      studentId: (data['studentId'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (data['studentId'] as String).trim(),
       email: data['email'],
       name: data['name'] ?? 'Kullanıcı',
       photoUrl: data['photoUrl'],
-      role: data['role'] ?? 'student',
+      role: data['role'] ?? 'member',
       badges: badges,
       isPrivate: data['isPrivate'] ?? false,
       gender: data['gender'],
