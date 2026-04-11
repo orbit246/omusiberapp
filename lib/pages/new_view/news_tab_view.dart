@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/master_news_widgets_repository.dart';
@@ -102,15 +103,19 @@ class NewsTabView extends StatefulWidget {
 class _NewsTabViewState extends State<NewsTabView> {
   final AppStartupController _startupController = AppStartupController.instance;
   static const Duration _backgroundRefreshDelay = Duration(seconds: 3);
+  static const int _imagePrefetchLimit = 5;
   final List<NewsView> _articles = [];
   final Set<NewsView> _animateAllowedSet = {};
   final Set<NewsView> _hasAnimatedSet = {};
   MasterNewsWidgetsView? _summaryWidgets;
   String _selectedSortKey = 'newest';
   String _selectedDatePreset = 'all';
+  String? _selectedFacultySlug;
+  final List<NewsFaculty> _faculties = [];
   final Set<String> _selectedTags = <String>{};
 
   bool _isInitialLoading = true;
+  bool _isFacultyNewsLoading = false;
   String? _errorMessage;
 
   bool _showBackToTopButton = false;
@@ -201,8 +206,8 @@ class _NewsTabViewState extends State<NewsTabView> {
     try {
       // 1. Load from cache first (no network)
       final cachedData = await NewsFetcher().getCachedNews();
-      final cachedSummaryWidgets =
-          await MasterNewsWidgetsRepository().getCachedWidgets();
+      final cachedSummaryWidgets = await MasterNewsWidgetsRepository()
+          .getCachedWidgets();
       final hydratedCached = _bindNewsActions(cachedData);
 
       if (mounted) {
@@ -216,12 +221,15 @@ class _NewsTabViewState extends State<NewsTabView> {
             _articles.addAll(hydratedCached);
           }
         });
+        _logSummaryWidgets('after cached load');
+        _precacheNewsImages(hydratedCached);
       }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _handleStartupChanged();
       });
+      unawaited(_loadFaculties());
     } catch (e) {
       debugPrint("Failed to load initial news cache: $e");
       if (_articles.isEmpty) {
@@ -230,12 +238,34 @@ class _NewsTabViewState extends State<NewsTabView> {
           _handleStartupChanged();
         });
       }
+      unawaited(_loadFaculties());
     }
+  }
+
+  Future<void> _loadFaculties({bool forceRefresh = false}) async {
+    final faculties = await NewsFetcher().fetchFaculties(
+      forceRefresh: forceRefresh,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _faculties
+        ..clear()
+        ..addAll(faculties);
+      if (faculties.isNotEmpty &&
+          _selectedFacultySlug != null &&
+          !_faculties.any((faculty) => faculty.slug == _selectedFacultySlug)) {
+        _selectedFacultySlug = null;
+      }
+    });
   }
 
   Future<void> _refreshInBackground() async {
     try {
-      final newData = await NewsFetcher().fetchLatestNews(forceRefresh: true);
+      final newData = await NewsFetcher().fetchLatestNews(
+        forceRefresh: true,
+        facultySlug: _selectedFacultySlug,
+      );
       final widgets = await MasterNewsWidgetsRepository().fetchWidgets(
         forceRefresh: true,
       );
@@ -244,11 +274,14 @@ class _NewsTabViewState extends State<NewsTabView> {
         setState(() {
           _isInitialLoading = false;
           _errorMessage = null;
-          _summaryWidgets = widgets ?? _summaryWidgets;
+          _summaryWidgets =
+              widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
           _articles.clear();
           _articles.addAll(hydratedData);
           _animateAllowedSet.addAll(hydratedData);
         });
+        _logSummaryWidgets('after background refresh');
+        _precacheNewsImages(hydratedData);
       }
     } catch (e) {
       if (e is StateError) {
@@ -268,23 +301,45 @@ class _NewsTabViewState extends State<NewsTabView> {
       final widgets = await MasterNewsWidgetsRepository().fetchWidgets(
         forceRefresh: true,
       );
+      await _loadFaculties(forceRefresh: true);
       final fetchedData = _bindNewsActions(
-        await NewsFetcher().fetchLatestNews(forceRefresh: true),
+        await NewsFetcher().fetchLatestNews(
+          forceRefresh: true,
+          facultySlug: _selectedFacultySlug,
+        ),
       );
       if (!mounted) return;
+
+      if (_selectedFacultySlug != null) {
+        setState(() {
+          _summaryWidgets =
+              widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
+          _articles
+            ..clear()
+            ..addAll(fetchedData);
+          _animateAllowedSet.addAll(fetchedData);
+        });
+        _logSummaryWidgets('after faculty pull-to-refresh');
+        _precacheNewsImages(fetchedData);
+        _showToast("Haberler yenilendi", Icons.check_circle_rounded, true);
+        return;
+      }
 
       final List<NewsView> newItems = fetchedData.where((newItem) {
         return !_articles.contains(newItem);
       }).toList();
 
       setState(() {
-        _summaryWidgets = widgets ?? _summaryWidgets;
+        _summaryWidgets =
+            widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
       });
+      _logSummaryWidgets('after pull-to-refresh');
 
       if (newItems.isNotEmpty) {
         setState(() {
           _articles.insertAll(0, newItems);
         });
+        _precacheNewsImages(newItems);
 
         if (mounted) {
           _showToast(
@@ -303,6 +358,37 @@ class _NewsTabViewState extends State<NewsTabView> {
     }
   }
 
+  Future<void> _reloadNewsForFacultyFilter() async {
+    setState(() {
+      _isFacultyNewsLoading = true;
+    });
+
+    try {
+      final fetchedData = _bindNewsActions(
+        await NewsFetcher().fetchLatestNews(
+          forceRefresh: true,
+          facultySlug: _selectedFacultySlug,
+        ),
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _articles
+          ..clear()
+          ..addAll(fetchedData);
+        _animateAllowedSet.addAll(fetchedData);
+        _isFacultyNewsLoading = false;
+      });
+      _precacheNewsImages(fetchedData);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isFacultyNewsLoading = false;
+      });
+      _showToast("Haberler yüklenemedi", Icons.error_outline_rounded, false);
+    }
+  }
+
   List<NewsView> _bindNewsActions(List<NewsView> items) {
     return items.map(_bindNewsActionsForItem).toList(growable: false);
   }
@@ -311,6 +397,19 @@ class _NewsTabViewState extends State<NewsTabView> {
     return item.copyWith(
       onToggleFavorite: (isLiked) => _handleNewsLikeToggle(item.id, isLiked),
     );
+  }
+
+  void _precacheNewsImages(List<NewsView> items) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      for (final item in items.take(_imagePrefetchLimit)) {
+        final url = item.heroImage?.trim();
+        if (url == null || url.isEmpty) continue;
+
+        unawaited(precacheImage(CachedNetworkImageProvider(url), context));
+      }
+    });
   }
 
   void _handleNewsLikeToggle(int newsId, bool isLiked) {
@@ -418,11 +517,31 @@ class _NewsTabViewState extends State<NewsTabView> {
       }
     }
 
+    final facultyName = _selectedFacultyName;
+    if (facultyName != null) {
+      parts.add(facultyName);
+    }
+
     if (parts.isEmpty) {
       return 'Tümü';
     }
 
     return parts.join(' • ');
+  }
+
+  String? get _selectedFacultyName {
+    final selectedSlug = _selectedFacultySlug;
+    if (selectedSlug == null) {
+      return null;
+    }
+
+    for (final faculty in _faculties) {
+      if (faculty.slug == selectedSlug) {
+        return faculty.name;
+      }
+    }
+
+    return selectedSlug;
   }
 
   bool _isToday(DateTime? date) {
@@ -451,6 +570,76 @@ class _NewsTabViewState extends State<NewsTabView> {
     return !date.isBefore(startOfWeek) && date.isBefore(endOfWeek);
   }
 
+  /*
+  MasterNewsWidgetsView _buildLocalSummaryWidgets() {
+    final todayNewsCount = _articles.where((item) => _isToday(item.publishedAt)).length;
+    final weekNewsCount = _articles.where((item) => _isThisWeek(item.publishedAt)).length;
+
+    return MasterNewsWidgetsView(
+      sections: [
+        MasterNewsWidgetSection(
+          id: 'today',
+          title: 'Bugün',
+          cards: [
+            MasterNewsWidgetCard(
+              id: 'fallback-today-event',
+              kind: MasterNewsWidgetCardKind.event,
+              subtitle: 'Etkinlik sekmesini aç',
+              value: 'Bugünkü etkinlikleri incele',
+              actionType: MasterNewsWidgetActionType.openTab,
+              targetTabIndex: 1,
+            ),
+            MasterNewsWidgetCard(
+              id: 'fallback-today-news',
+              kind: MasterNewsWidgetCardKind.news,
+              subtitle: 'Bugün yayımlanan haber',
+              value: '$todayNewsCount haber',
+              actionType: MasterNewsWidgetActionType.scrollNewsList,
+            ),
+            MasterNewsWidgetCard(
+              id: 'fallback-today-community',
+              kind: MasterNewsWidgetCardKind.community,
+              subtitle: 'Topluluk sekmesini aç',
+              value: 'Bugünkü gönderileri incele',
+              actionType: MasterNewsWidgetActionType.openTab,
+              targetTabIndex: 2,
+            ),
+          ],
+        ),
+        MasterNewsWidgetSection(
+          id: 'week',
+          title: 'Bu Hafta',
+          cards: [
+            MasterNewsWidgetCard(
+              id: 'fallback-week-event',
+              kind: MasterNewsWidgetCardKind.event,
+              subtitle: 'Etkinlik sekmesini aç',
+              value: 'Bu haftaki etkinlikleri incele',
+              actionType: MasterNewsWidgetActionType.openTab,
+              targetTabIndex: 1,
+            ),
+            MasterNewsWidgetCard(
+              id: 'fallback-week-news',
+              kind: MasterNewsWidgetCardKind.news,
+              subtitle: 'Bu hafta yayımlanan haber',
+              value: '$weekNewsCount haber',
+              actionType: MasterNewsWidgetActionType.scrollNewsList,
+            ),
+            MasterNewsWidgetCard(
+              id: 'fallback-week-community',
+              kind: MasterNewsWidgetCardKind.community,
+              subtitle: 'Topluluk sekmesini aç',
+              value: 'Bu haftaki gönderileri incele',
+              actionType: MasterNewsWidgetActionType.openTab,
+              targetTabIndex: 2,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  */
   List<NewsView> get _filteredArticles {
     final items = _articles.where((item) {
       final matchesDate = switch (_selectedDatePreset) {
@@ -527,11 +716,15 @@ class _NewsTabViewState extends State<NewsTabView> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: active ? colorScheme.primary : colorScheme.onSurface,
-                  fontWeight: FontWeight.w700,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 150),
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: active ? colorScheme.primary : colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -553,7 +746,9 @@ class _NewsTabViewState extends State<NewsTabView> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final hasActiveFilters =
-        _selectedDatePreset != 'all' || _selectedTags.isNotEmpty;
+        _selectedDatePreset != 'all' ||
+        _selectedTags.isNotEmpty ||
+        _selectedFacultySlug != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -575,6 +770,17 @@ class _NewsTabViewState extends State<NewsTabView> {
                 fontWeight: FontWeight.w800,
               ),
             ),
+            if (_isFacultyNewsLoading) ...[
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
             const Spacer(),
             _buildFilterPill(
               context,
@@ -598,6 +804,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   Future<void> _openFilterSheet() async {
     String tempSortKey = _selectedSortKey;
     String tempDatePreset = _selectedDatePreset;
+    String? tempFacultySlug = _selectedFacultySlug;
     final Set<String> tempTags = {..._selectedTags};
 
     await showModalBottomSheet<void>(
@@ -724,6 +931,43 @@ class _NewsTabViewState extends State<NewsTabView> {
                     ),
                     const SizedBox(height: 18),
                     Text(
+                      'Fakülte',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_faculties.isEmpty)
+                      Text(
+                        'Fakülte listesi yükleniyor.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          buildChoice(
+                            label: 'Tümü',
+                            selected: tempFacultySlug == null,
+                            onTap: () =>
+                                setModalState(() => tempFacultySlug = null),
+                          ),
+                          ..._faculties.map((faculty) {
+                            return buildChoice(
+                              label: faculty.name,
+                              selected: tempFacultySlug == faculty.slug,
+                              onTap: () => setModalState(
+                                () => tempFacultySlug = faculty.slug,
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    const SizedBox(height: 18),
+                    Text(
                       'Etiketler',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -785,6 +1029,7 @@ class _NewsTabViewState extends State<NewsTabView> {
                               setModalState(() {
                                 tempSortKey = 'newest';
                                 tempDatePreset = 'all';
+                                tempFacultySlug = null;
                                 tempTags.clear();
                               });
                             },
@@ -795,14 +1040,20 @@ class _NewsTabViewState extends State<NewsTabView> {
                         Expanded(
                           child: FilledButton(
                             onPressed: () {
+                              final facultyChanged =
+                                  _selectedFacultySlug != tempFacultySlug;
                               setState(() {
                                 _selectedSortKey = tempSortKey;
                                 _selectedDatePreset = tempDatePreset;
+                                _selectedFacultySlug = tempFacultySlug;
                                 _selectedTags
                                   ..clear()
                                   ..addAll(tempTags);
                               });
                               Navigator.of(context).pop();
+                              if (facultyChanged) {
+                                unawaited(_reloadNewsForFacultyFilter());
+                              }
                             },
                             child: const Text('Uygula'),
                           ),
@@ -1357,6 +1608,9 @@ class _NewsTabViewState extends State<NewsTabView> {
   List<Widget> _buildSummarySlivers(BuildContext context) {
     final summaryWidgets = _summaryWidgets;
     if (summaryWidgets == null) {
+      debugPrint(
+        '[NewsTabView] Summary widgets are null; showing loading state.',
+      );
       return const [
         SliverToBoxAdapter(child: _LoadingSummaryCard()),
         SliverToBoxAdapter(child: _LoadingSummaryCard()),
@@ -1364,6 +1618,9 @@ class _NewsTabViewState extends State<NewsTabView> {
     }
 
     if (summaryWidgets.sections.isEmpty) {
+      debugPrint(
+        '[NewsTabView] Summary widgets parsed with 0 sections; showing fallback card.',
+      );
       return [
         SliverToBoxAdapter(
           child: _buildSummaryUnavailableCard(
@@ -1376,11 +1633,12 @@ class _NewsTabViewState extends State<NewsTabView> {
 
     final slivers = <Widget>[];
     for (final section in summaryWidgets.sections) {
+      debugPrint(
+        '[NewsTabView] Rendering section id=${section.id} title="${section.title}" cards=${section.cards.length}',
+      );
       if (section.title.trim().isNotEmpty) {
         slivers.add(
-          SliverToBoxAdapter(
-            child: _buildSectionLabel(context, section.title),
-          ),
+          SliverToBoxAdapter(child: _buildSectionLabel(context, section.title)),
         );
       }
 
@@ -1411,6 +1669,19 @@ class _NewsTabViewState extends State<NewsTabView> {
     }
 
     return slivers;
+  }
+
+  void _logSummaryWidgets(String stage) {
+    final summaryWidgets = _summaryWidgets;
+    if (summaryWidgets == null) {
+      debugPrint('[NewsTabView] $stage: summary widgets are null.');
+      return;
+    }
+
+    debugPrint(
+      '[NewsTabView] $stage: sections=${summaryWidgets.sections.length} '
+      '${summaryWidgets.sections.map((s) => '${s.id}:${s.cards.length}').join(', ')}',
+    );
   }
 
   Widget _buildSummaryUnavailableCard(BuildContext context, String message) {
@@ -1695,6 +1966,7 @@ class _NewsTabViewState extends State<NewsTabView> {
           displacement: 20,
           edgeOffset: 0,
           child: CustomScrollView(
+            cacheExtent: 900,
             controller: _scrollController,
             key: const PageStorageKey('news_tab'),
             physics: const AlwaysScrollableScrollPhysics(),

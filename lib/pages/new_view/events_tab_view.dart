@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/event_repository.dart';
@@ -8,8 +9,6 @@ import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/no_events.dart';
-import 'package:omusiber/backend/auth/auth_service.dart';
-import 'package:omusiber/widgets/create_event_sheet.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 // --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
@@ -102,20 +101,17 @@ class EventsTabView extends StatefulWidget {
 class _EventsTabViewState extends State<EventsTabView> {
   final AppStartupController _startupController = AppStartupController.instance;
   static const Duration _backgroundRefreshDelay = Duration(seconds: 4);
-  static const Duration _permissionCheckDelay = Duration(seconds: 5);
+  static const int _imagePrefetchLimit = 5;
   final EventRepository _repo = EventRepository();
   final Set<String> _hasAnimatedIds = {};
 
   bool _showBackToTopButton = false;
-  bool _canCreateEvent = false;
 
   final List<PostView> _events = [];
   bool _isInitialLoading = true;
   String? _errorMessage;
-  bool _permissionCheckQueued = false;
   bool _refreshQueued = false;
   Timer? _backgroundRefreshTimer;
-  Timer? _permissionCheckTimer;
 
   @override
   void initState() {
@@ -124,7 +120,6 @@ class _EventsTabViewState extends State<EventsTabView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadInitialData();
-      _handleStartupChanged();
     });
   }
 
@@ -133,14 +128,16 @@ class _EventsTabViewState extends State<EventsTabView> {
       // 1. Load from cache first (no network)
       final cached = await _repo.getCachedEvents();
       if (mounted) {
+        final cachedEvents = freshWithMocks(cached);
         setState(() {
           if (cached.isNotEmpty) {
             _isInitialLoading = false;
             _errorMessage = null;
             _events.clear();
-            _events.addAll(freshWithMocks(cached));
+            _events.addAll(cachedEvents);
           }
         });
+        _precacheEventImages(cachedEvents);
       }
 
       // 2. Schedule refresh AFTER render
@@ -159,12 +156,14 @@ class _EventsTabViewState extends State<EventsTabView> {
     try {
       final fresh = await _repo.fetchEvents(forceRefresh: true);
       if (mounted) {
+        final freshEvents = freshWithMocks(fresh);
         setState(() {
           _isInitialLoading = false;
           _errorMessage = null;
           _events.clear();
-          _events.addAll(freshWithMocks(fresh));
+          _events.addAll(freshEvents);
         });
+        _precacheEventImages(freshEvents);
       }
     } catch (e) {
       debugPrint("Background refresh failed: $e");
@@ -181,23 +180,10 @@ class _EventsTabViewState extends State<EventsTabView> {
     return [...fresh];
   }
 
-  Future<void> _checkPermissions() async {
-    if (!_startupController.canUseAuthenticatedApis) {
-      return;
-    }
-    final allowed = await AuthService().isWhitelisted();
-    if (mounted) {
-      setState(() {
-        _canCreateEvent = allowed;
-      });
-    }
-  }
-
   @override
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
     _backgroundRefreshTimer?.cancel();
-    _permissionCheckTimer?.cancel();
     super.dispose();
   }
 
@@ -207,31 +193,6 @@ class _EventsTabViewState extends State<EventsTabView> {
     }
 
     _scheduleBackgroundRefresh();
-    if (_permissionCheckQueued) {
-      return;
-    }
-    _permissionCheckQueued = true;
-    final delay = _startupController.startupDeferral(_permissionCheckDelay);
-    _permissionCheckTimer?.cancel();
-    if (delay == Duration.zero) {
-      unawaited(
-        _checkPermissions().whenComplete(() {
-          _permissionCheckQueued = false;
-        }),
-      );
-      return;
-    }
-    _permissionCheckTimer = Timer(delay, () {
-      if (!mounted) {
-        _permissionCheckQueued = false;
-        return;
-      }
-      unawaited(
-        _checkPermissions().whenComplete(() {
-          _permissionCheckQueued = false;
-        }),
-      );
-    });
   }
 
   void _scheduleBackgroundRefresh() {
@@ -273,12 +234,29 @@ class _EventsTabViewState extends State<EventsTabView> {
     }
   }
 
+  void _precacheEventImages(List<PostView> items) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      for (final event in items.take(_imagePrefetchLimit)) {
+        final url = _eventImageUrl(event);
+        if (url.isEmpty) continue;
+
+        unawaited(precacheImage(CachedNetworkImageProvider(url), context));
+      }
+    });
+  }
+
+  String _eventImageUrl(PostView e) {
+    return e.thubnailUrl.trim().isNotEmpty
+        ? e.thubnailUrl.trim()
+        : (e.imageLinks.isNotEmpty ? e.imageLinks.first.trim() : '');
+  }
+
   Widget _eventToCard(BuildContext context, PostView? e) {
     if (e == null) return const SizedBox.shrink();
 
-    final imageUrl = (e.thubnailUrl.trim().isNotEmpty)
-        ? e.thubnailUrl.trim()
-        : (e.imageLinks.isNotEmpty ? e.imageLinks.first.trim() : '');
+    final imageUrl = _eventImageUrl(e);
 
     final tags = e.tags.map((t) => EventTag(t, Icons.tag)).toList();
 
@@ -436,6 +414,7 @@ class _EventsTabViewState extends State<EventsTabView> {
           displacement: 20,
           edgeOffset: 0,
           child: CustomScrollView(
+            cacheExtent: 900,
             key: const PageStorageKey('events_tab'),
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -480,37 +459,14 @@ class _EventsTabViewState extends State<EventsTabView> {
           ),
         ),
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_canCreateEvent)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: FloatingActionButton(
-                heroTag: 'createEvent',
-                onPressed: () async {
-                  final created = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CreateEventPage()),
-                  );
-                  if (created == true) {
-                    await _refreshInBackground();
-                  }
-                },
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ),
-
-          if (_showBackToTopButton)
-            FloatingActionButton(
+      floatingActionButton: _showBackToTopButton
+          ? FloatingActionButton(
               heroTag: 'backToTop',
               onPressed: _scrollToTop,
               mini: true,
               child: const Icon(Icons.arrow_upward),
-            ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 

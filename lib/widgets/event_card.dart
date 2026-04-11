@@ -92,19 +92,31 @@ class _EventCardState extends State<EventCard> {
                   // Image
                   AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: CachedNetworkImage(
-                      imageUrl: widget.imageUrl,
-                      fit: BoxFit.cover,
-                      fadeInDuration: const Duration(milliseconds: 220),
-                      fadeOutDuration: const Duration(milliseconds: 120),
-                      placeholder: (context, url) =>
-                          const _EventImageShimmerPlaceholder(),
-                      errorWidget: (context, url, error) => Container(
-                        color: cs.surfaceContainerHighest,
-                        child: const Center(
-                          child: Icon(Icons.image_not_supported_outlined),
-                        ),
-                      ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cacheWidth = _imageCacheWidth(
+                          context,
+                          constraints.maxWidth,
+                        );
+                        final cacheHeight = (cacheWidth * 9 / 16).round();
+
+                        return CachedNetworkImage(
+                          imageUrl: widget.imageUrl,
+                          fit: BoxFit.cover,
+                          memCacheWidth: cacheWidth,
+                          memCacheHeight: cacheHeight,
+                          fadeInDuration: const Duration(milliseconds: 220),
+                          fadeOutDuration: const Duration(milliseconds: 120),
+                          placeholder: (context, url) =>
+                              const _EventImageShimmerPlaceholder(),
+                          errorWidget: (context, url, error) => Container(
+                            color: cs.surfaceContainerHighest,
+                            child: const Center(
+                              child: Icon(Icons.image_not_supported_outlined),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   // Gradient Overlay
@@ -380,6 +392,14 @@ class _EventCardState extends State<EventCard> {
         ),
       ),
     );
+  }
+
+  int _imageCacheWidth(BuildContext context, double logicalWidth) {
+    final width = logicalWidth.isFinite
+        ? logicalWidth
+        : MediaQuery.of(context).size.width;
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    return (width * pixelRatio).round().clamp(1, 4096).toInt();
   }
 
   void _toast(BuildContext context, String msg) {

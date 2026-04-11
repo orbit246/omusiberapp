@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/view/news_view.dart';
@@ -35,11 +36,29 @@ class NewsCard extends StatelessWidget {
               if (view.heroImage != null)
                 AspectRatio(
                   aspectRatio: 16 / 6.3,
-                  child: Image.network(
-                    view.heroImage!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: colorScheme.surfaceContainerHighest),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cacheWidth = _imageCacheWidth(
+                        context,
+                        constraints.maxWidth,
+                      );
+                      final cacheHeight = (cacheWidth * 6.3 / 16).round();
+
+                      return CachedNetworkImage(
+                        imageUrl: view.heroImage!,
+                        fit: BoxFit.cover,
+                        memCacheWidth: cacheWidth,
+                        memCacheHeight: cacheHeight,
+                        fadeInDuration: const Duration(milliseconds: 160),
+                        fadeOutDuration: const Duration(milliseconds: 80),
+                        placeholder: (_, __) => Container(
+                          color: colorScheme.surfaceContainerHighest,
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: colorScheme.surfaceContainerHighest,
+                        ),
+                      );
+                    },
                   ),
                 ),
 
@@ -208,6 +227,14 @@ class NewsCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  int _imageCacheWidth(BuildContext context, double logicalWidth) {
+    final width = logicalWidth.isFinite
+        ? logicalWidth
+        : MediaQuery.of(context).size.width;
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    return (width * pixelRatio).round().clamp(1, 4096).toInt();
   }
 
   String _formatCompactTR(int count) {

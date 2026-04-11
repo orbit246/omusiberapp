@@ -133,63 +133,6 @@ class EventRepository {
     return Stream.fromFuture(fetchEvents(forceRefresh: forceRefresh));
   }
 
-  Future<void> addEvent(PostView event) async {
-    await AppStartupController.instance.ensureAuthenticatedSession();
-    final dynamic rawEventDate = event.metadata['eventDate'];
-    final String eventDate = rawEventDate is DateTime
-        ? rawEventDate.toIso8601String()
-        : rawEventDate?.toString() ?? DateTime.now().toIso8601String();
-    final dynamic rawEventLength = event.metadata['eventLength'];
-    final double? eventLength = rawEventLength is num
-        ? rawEventLength.toDouble()
-        : double.tryParse(rawEventLength?.toString() ?? '');
-
-    // Prepare content for API
-    final Map<String, dynamic> body = {
-      'title': event.title,
-      'date': eventDate,
-      'description': event.description,
-      'tags': jsonEncode(event.tags), // Send as JSON string
-    };
-
-    if (eventLength != null) {
-      body['eventLength'] = eventLength;
-    }
-    if (event.location.trim().isNotEmpty) {
-      body['location'] = event.location.trim();
-    }
-    if (event.maxContributors > 0) {
-      body['maxJoiners'] = event.maxContributors;
-    }
-    if (event.thubnailUrl.trim().isNotEmpty) {
-      body['thumbnailUrl'] = event.thubnailUrl;
-    }
-    if (event.imageLinks.isNotEmpty) {
-      body['carouselImages'] = jsonEncode(event.imageLinks);
-    }
-
-    try {
-      final headers = await _authorizedHeaders(includeJsonContentType: true);
-      final response = await http.post(
-        Uri.parse('$_baseUrl/events/create'),
-        headers: headers,
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        debugPrint('Event created successfully.');
-        return;
-      } else {
-        throw Exception(
-          'Failed to create event: ${response.statusCode} ${response.body}',
-        );
-      }
-    } catch (e) {
-      debugPrint('Error creating event via API: $e');
-      rethrow;
-    }
-  }
-
   Future<void> deleteEvent(String eventId) async {
     try {
       await AppStartupController.instance.ensureAuthenticatedSession();

@@ -10,6 +10,20 @@ import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class NewsFaculty {
+  final String name;
+  final String slug;
+
+  const NewsFaculty({required this.name, required this.slug});
+
+  factory NewsFaculty.fromJson(Map<String, dynamic> json) {
+    return NewsFaculty(
+      name: json['name'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
+    );
+  }
+}
+
 class NewsFetcher {
   static final NewsFetcher _instance = NewsFetcher._internal();
   factory NewsFetcher() => _instance;
@@ -29,6 +43,7 @@ class NewsFetcher {
 
   static const String _storageKey = 'cached_news_list';
   List<NewsView>? _cachedNews;
+  List<NewsFaculty>? _cachedFaculties;
   DateTime? _lastFetchTime;
   static const Duration _cacheDuration = Duration(minutes: 30);
 
@@ -86,9 +101,57 @@ class NewsFetcher {
     debugPrint('🔴 [NewsFetcher ERROR] $msg\n   Example: $error');
   }
 
-  Future<List<NewsView>> fetchLatestNews({bool forceRefresh = false}) async {
+  Future<List<NewsFaculty>> fetchFaculties({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedFaculties != null) {
+      return _cachedFaculties!;
+    }
+
+    final uri = Uri.parse('$_baseUrl/faculties');
+    _log('Fetching faculties from: $uri');
+
+    try {
+      final response = await http.get(uri, headers: _headers).timeout(timeout);
+
+      if (response.statusCode != 200) {
+        throw HttpException('HTTP ${response.statusCode}', uri: uri);
+      }
+
+      final List<dynamic> data = json.decode(response.body);
+      final faculties =
+          data
+              .whereType<Map<String, dynamic>>()
+              .map(NewsFaculty.fromJson)
+              .where((faculty) {
+                return faculty.name.trim().isNotEmpty &&
+                    faculty.slug.trim().isNotEmpty;
+              })
+              .toList()
+            ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+            );
+
+      _cachedFaculties = faculties;
+      _log('Fetched ${faculties.length} faculties from API.');
+      return faculties;
+    } catch (e) {
+      _logError('Failed to fetch faculties', e);
+      return _cachedFaculties ?? [];
+    }
+  }
+
+  Future<List<NewsView>> fetchLatestNews({
+    bool forceRefresh = false,
+    String? facultySlug,
+  }) async {
+    final normalizedFacultySlug = facultySlug?.trim();
+    final hasFacultyFilter =
+        normalizedFacultySlug != null && normalizedFacultySlug.isNotEmpty;
+
     // 1. Cache Check (Memory)
-    if (!forceRefresh && _cachedNews != null && _lastFetchTime != null) {
+    if (!hasFacultyFilter &&
+        !forceRefresh &&
+        _cachedNews != null &&
+        _lastFetchTime != null) {
       if (DateTime.now().difference(_lastFetchTime!) < _cacheDuration) {
         _log('Returning memory cached data.');
         return _cachedNews!;
@@ -96,28 +159,29 @@ class NewsFetcher {
     }
 
     // if memory cache is empty, try to load from persistent storage
-    if (_cachedNews == null || _cachedNews!.isEmpty) {
+    if (!hasFacultyFilter && (_cachedNews == null || _cachedNews!.isEmpty)) {
       await getCachedNews();
       if (!forceRefresh && _cachedNews != null && _cachedNews!.isNotEmpty) {
         return _cachedNews!;
       }
     }
 
-    _log('Fetching news from: $_baseUrl/news');
+    final uri = Uri.parse('$_baseUrl/news').replace(
+      queryParameters: hasFacultyFilter
+          ? <String, String>{'faculty': normalizedFacultySlug}
+          : null,
+    );
+
+    _log('Fetching news from: $uri');
 
     List<NewsView> result = [];
 
     try {
       final headers = await _authorizedHeaders();
-      final response = await http
-          .get(Uri.parse('$_baseUrl/news'), headers: headers)
-          .timeout(timeout);
+      final response = await http.get(uri, headers: headers).timeout(timeout);
 
       if (response.statusCode != 200) {
-        throw HttpException(
-          'HTTP ${response.statusCode}',
-          uri: Uri.parse('$_baseUrl/news'),
-        );
+        throw HttpException('HTTP ${response.statusCode}', uri: uri);
       }
 
       final List<dynamic> data = json.decode(response.body);
@@ -128,18 +192,21 @@ class NewsFetcher {
 
       _log('Fetched ${result.length} items from API.');
 
-      // Persist to storage
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _storageKey,
-        json.encode(result.map((e) => e.toJson()).toList()),
-      );
+      if (!hasFacultyFilter) {
+        // Persist only the default feed so faculty-filtered results do not
+        // replace the normal cached news list.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          _storageKey,
+          json.encode(result.map((e) => e.toJson()).toList()),
+        );
+      }
     } catch (e) {
       if (e is StateError) {
         rethrow;
       }
       _logError('CRITICAL FAILURE in fetchLatestNews', e);
-      if (_cachedNews != null && _cachedNews!.isNotEmpty) {
+      if (!hasFacultyFilter && _cachedNews != null && _cachedNews!.isNotEmpty) {
         return _cachedNews!;
       }
       return [];
@@ -147,12 +214,14 @@ class NewsFetcher {
 
     // 3. Save to Memory Cache
     if (result.isNotEmpty) {
-      _cachedNews = result;
-      _lastFetchTime = DateTime.now();
+      if (!hasFacultyFilter) {
+        _cachedNews = result;
+        _lastFetchTime = DateTime.now();
+      }
       return result;
     }
 
-    if (_cachedNews != null && _cachedNews!.isNotEmpty) {
+    if (!hasFacultyFilter && _cachedNews != null && _cachedNews!.isNotEmpty) {
       return _cachedNews!;
     }
 

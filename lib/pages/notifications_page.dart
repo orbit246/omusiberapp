@@ -23,7 +23,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: const AppNavigationBar(),
+      bottomNavigationBar: const AppNavigationBar(currentIndex: 2),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: SimpleAppbar(title: "Bildirimler"),

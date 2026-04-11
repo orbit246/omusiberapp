@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
-import 'package:omusiber/pages/news_page.dart';
 import 'package:omusiber/pages/notifications_page.dart';
-import 'package:omusiber/pages/removed/profile_page.dart';
 import 'package:omusiber/pages/saved_events_page.dart';
-import 'package:omusiber/pages/updated_page.dart';
 
 class AppNavigationBar extends StatefulWidget {
-  const AppNavigationBar({super.key});
+  const AppNavigationBar({super.key, this.currentIndex = 0});
+
+  final int currentIndex;
 
   @override
   State<AppNavigationBar> createState() => App_NavigationBarState();
@@ -18,30 +17,22 @@ class App_NavigationBarState extends State<AppNavigationBar> {
   Widget build(BuildContext context) {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
-      currentIndex: SimplifiedHomePageState.selectedIndexNotifier.value,
+      currentIndex: widget.currentIndex,
       onTap: (index) {
-        setState(() {
-          SimplifiedHomePageState.selectedIndexNotifier.value = index;
+        if (index == widget.currentIndex) {
+          return;
+        }
 
-          // Update the UI or perform any other actions based on the selected index
-          // For example, you might want to navigate to a different page
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) {
-                switch (index) {
-                  case 0:
-                    return MasterView(); // Replace with your actual event page widget
-                  case 1:
-                    return SimplifiedHomePageState(); // Replace with your actual profile page widget
-                    case 2:
-                    return NotificationsPage();
-                  default:
-                    return SavedEventsPage(); // Fallback to a default page
-                }
-              },
-            ),
-          );
-        });
+        final Widget destination = switch (index) {
+          0 => const MasterView(initialTabIndex: 0),
+          1 => const MasterView(initialTabIndex: 1),
+          2 => const NotificationsPage(),
+          _ => const SavedEventsPage(),
+        };
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => destination),
+        );
       },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "Haberler"),

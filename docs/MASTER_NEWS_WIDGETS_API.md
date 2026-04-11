@@ -45,6 +45,12 @@ Authorization: Bearer <firebase-id-token>
 Accept: application/json
 ```
 
+If this endpoint returns `401` with `Invalid token` while `/news` works in the
+same app session, the backend auth middleware for `/master/news-widgets` is not
+accepting the same Firebase project/token configuration as the rest of the API.
+The frontend retries once with a force-refreshed Firebase ID token, but it does
+not calculate or fake widget counts locally after auth failure.
+
 ## Required Response Shape
 
 The endpoint must return a JSON object with a top-level `sections` array.

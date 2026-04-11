@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:omusiber/pages/updated_page.dart';
-import 'package:omusiber/widgets/event_toggle.dart';
 import 'package:omusiber/widgets/profile/profile_stat_widget.dart';
 import 'package:omusiber/widgets/shared/navbar.dart';
 
