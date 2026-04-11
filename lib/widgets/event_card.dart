@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
 // Note: Removed test_widget import as it's no longer needed for expansion
@@ -369,16 +371,18 @@ class _EventCardState extends State<EventCard> {
                         const SizedBox(width: 8),
                         IconButton.filledTonal(
                           onPressed: () {
-                            // Simple share
                             if (widget.onShare != null) {
                               widget.onShare!.call();
-                            } else {
-                              SharePlus.instance.share(
-                                ShareParams(
-                                  text: '${widget.title}\n${widget.location}',
-                                ),
-                              );
+                              return;
                             }
+
+                            unawaited(
+                              ShareService.sharePlainText(
+                                context,
+                                title: widget.title,
+                                text: _fallbackShareText(),
+                              ),
+                            );
                           },
                           icon: const Icon(Icons.share_outlined),
                         ),
@@ -409,6 +413,15 @@ class _EventCardState extends State<EventCard> {
       backgroundColor: Colors.black87,
       textColor: Colors.white,
     );
+  }
+
+  String _fallbackShareText() {
+    return [
+      widget.title,
+      widget.datetimeText,
+      widget.location,
+      widget.description,
+    ].whereType<String>().where((line) => line.trim().isNotEmpty).join('\n\n');
   }
 }
 

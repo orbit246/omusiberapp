@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/excel_viewer_page.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
@@ -417,7 +418,8 @@ class _NewsItemPageState extends State<NewsItemPage> {
                     children: [
                       // Share Button
                       IconButton(
-                        onPressed: view.onShare,
+                        onPressed: () =>
+                            unawaited(ShareService.shareNews(context, view)),
                         icon: const Icon(Icons.share_outlined),
                         tooltip: 'Paylaş',
                       ),

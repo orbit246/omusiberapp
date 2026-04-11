@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -192,7 +193,12 @@ class NewsFetcher {
 
       _log('Fetched ${result.length} items from API.');
 
-      if (!hasFacultyFilter) {
+      if (!hasFacultyFilter &&
+          !jsonListEquals<NewsView>(
+            _cachedNews ?? const <NewsView>[],
+            result,
+            (item) => item.toJson(),
+          )) {
         // Persist only the default feed so faculty-filtered results do not
         // replace the normal cached news list.
         final prefs = await SharedPreferences.getInstance();

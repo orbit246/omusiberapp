@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/news_item_page.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
@@ -160,7 +161,11 @@ class NewsCard extends StatelessWidget {
                             const SizedBox(width: 16),
                             _ActionButton(
                               icon: Icons.share_outlined,
-                              onTap: view.onShare,
+                              onTap:
+                                  view.onShare ??
+                                  () => unawaited(
+                                    ShareService.shareNews(context, view),
+                                  ),
                             ),
                           ],
                         ),

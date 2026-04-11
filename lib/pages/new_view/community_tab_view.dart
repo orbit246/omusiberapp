@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/community_repository.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/widgets/community_post_card.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
@@ -102,8 +104,21 @@ class _CommunityTabViewState extends State<CommunityTabView> {
     try {
       final posts = await _repo.fetchPosts(forceRefresh: true);
       if (mounted) {
+        final shouldReplacePosts = !jsonListEquals<CommunityPost>(
+          _posts,
+          posts,
+          (item) => item.toJson(),
+        );
+        final shouldClearLoading = _isLoading && _posts.isEmpty;
+
+        if (!shouldReplacePosts && !shouldClearLoading) {
+          return;
+        }
+
         setState(() {
-          _posts = posts;
+          if (shouldReplacePosts) {
+            _posts = posts;
+          }
           _isLoading = false;
         });
       }
@@ -168,7 +183,12 @@ class _CommunityTabViewState extends State<CommunityTabView> {
         itemCount: _posts.length,
         itemBuilder: (context, index) {
           final post = _posts[index];
-          return CommunityPostCard(post: post, onLike: () => _toggleLike(post));
+          return CommunityPostCard(
+            post: post,
+            onLike: () => _toggleLike(post),
+            onShare: () =>
+                unawaited(ShareService.shareCommunityPost(context, post)),
+          );
         },
       ),
     );

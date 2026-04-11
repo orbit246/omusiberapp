@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:intl/intl.dart';
 import 'package:omusiber/widgets/poll_widget.dart';
@@ -8,8 +11,14 @@ import 'package:omusiber/widgets/shared/app_markdown.dart';
 class CommunityPostCard extends StatelessWidget {
   final CommunityPost post;
   final VoidCallback? onLike;
+  final VoidCallback? onShare;
 
-  const CommunityPostCard({super.key, required this.post, this.onLike});
+  const CommunityPostCard({
+    super.key,
+    required this.post,
+    this.onLike,
+    this.onShare,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +144,11 @@ class CommunityPostCard extends StatelessWidget {
                       color: cs.onSurfaceVariant,
                       size: 20,
                     ),
-                    onPressed: () {},
+                    onPressed:
+                        onShare ??
+                        () => unawaited(
+                          ShareService.shareCommunityPost(context, post),
+                        ),
                     visualDensity: VisualDensity.compact,
                   ),
                 ],

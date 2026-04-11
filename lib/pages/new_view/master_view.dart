@@ -42,11 +42,18 @@ class _MasterViewState extends State<MasterView>
   final AppStartupController _startupController = AppStartupController.instance;
   static const Duration _notificationsInitDelay = Duration(seconds: 4);
   static const Duration _updateCheckDelay = Duration(seconds: 12);
+  static const Duration _updateCheckScheduleDelay = Duration(seconds: 4);
+  static const Duration _decorativeLayerDelay = Duration(milliseconds: 300);
   bool _notificationsInitialized = false;
   bool _notificationsInitScheduled = false;
   bool _updateCheckScheduled = false;
+  bool _badgeCheckStarted = false;
+  bool _decorativeLayersEnabled = false;
   final Set<int> _activatedTabs = <int>{};
+  Timer? _decorativeLayerTimer;
   Timer? _notificationsInitTimer;
+  Timer? _permissionReminderTimer;
+  Timer? _updateCheckStartTimer;
   Timer? _updateCheckTimer;
 
   @override
@@ -72,14 +79,10 @@ class _MasterViewState extends State<MasterView>
       if (!mounted) {
         return;
       }
-      _checkBadges();
       _startPermissionReminder();
       _handleStartupChanged();
-      if (_updateCheckScheduled) {
-        return;
-      }
-      _updateCheckScheduled = true;
-      _scheduleUpdateCheck();
+      _scheduleUpdateCheckAfterStartupBreath();
+      _enableDecorativeLayersAfterFirstPaint();
     });
   }
 
@@ -121,6 +124,32 @@ class _MasterViewState extends State<MasterView>
     });
   }
 
+  void _scheduleUpdateCheckAfterStartupBreath() {
+    if (_updateCheckScheduled) {
+      return;
+    }
+
+    _updateCheckScheduled = true;
+    _updateCheckStartTimer?.cancel();
+    _updateCheckStartTimer = Timer(_updateCheckScheduleDelay, () {
+      if (!mounted) return;
+      _scheduleUpdateCheck();
+    });
+  }
+
+  void _enableDecorativeLayersAfterFirstPaint() {
+    if (_decorativeLayersEnabled || _decorativeLayerTimer != null) {
+      return;
+    }
+
+    _decorativeLayerTimer = Timer(_decorativeLayerDelay, () {
+      if (!mounted) return;
+      setState(() {
+        _decorativeLayersEnabled = true;
+      });
+    });
+  }
+
   void _handleTabAnimationChanged() {
     final animation = _tabController.animation;
     if (animation == null) {
@@ -137,7 +166,8 @@ class _MasterViewState extends State<MasterView>
   }
 
   void _startPermissionReminder() {
-    Future.delayed(const Duration(seconds: 30), () async {
+    _permissionReminderTimer?.cancel();
+    _permissionReminderTimer = Timer(const Duration(seconds: 30), () async {
       if (!mounted) return;
       final hasPermission = await SimpleNotifications().checkPermission();
       if (!hasPermission && mounted) {
@@ -181,77 +211,86 @@ class _MasterViewState extends State<MasterView>
   }
 
   Future<void> _checkBadges() async {
-    // 0: News
-    final lastViewedNews = await _badgeService.getLastViewedNews();
-    if (lastViewedNews != null) {
-      // Use getCachedNews instead of fetchLatestNews to avoid network on startup
-      final news = await NewsFetcher().getCachedNews();
-      if (news.isNotEmpty) {
-        final latest = news.first.publishedAt ?? DateTime.now();
-        if (latest.isAfter(lastViewedNews)) {
-          if (mounted) setState(() => _unreadStates[0] = true);
-        } else {
-          if (mounted) setState(() => _unreadStates[0] = false);
-        }
-      }
-    } else {
-      if (mounted) setState(() => _unreadStates[0] = true);
+    final lastViewed = await Future.wait<DateTime?>([
+      _badgeService.getLastViewedNews(),
+      _badgeService.getLastViewedEvents(),
+      _badgeService.getLastViewedNotifs(),
+      _badgeService.getLastViewedCommunity(),
+    ]);
+    final cached = await Future.wait<Object>([
+      NewsFetcher().getCachedNews(),
+      EventRepository().getCachedEvents(),
+      SimpleNotifications().loadSaved(),
+      CommunityRepository().getCachedPosts(),
+    ]);
+
+    if (!mounted) return;
+
+    final nextUnreadStates = List<bool>.from(_unreadStates);
+    var nextUnreadNotifications = _unreadNotifications;
+
+    final lastViewedNews = lastViewed[0];
+    final news = cached[0] as List;
+    if (lastViewedNews == null) {
+      nextUnreadStates[0] = true;
+    } else if (news.isNotEmpty) {
+      final latest = news.first.publishedAt ?? DateTime.now();
+      nextUnreadStates[0] = latest.isAfter(lastViewedNews);
     }
 
-    // 1: Events
-    final lastViewedEvents = await _badgeService.getLastViewedEvents();
-    if (lastViewedEvents != null) {
-      // Use getCachedEvents to avoid network
-      final events = await EventRepository().getCachedEvents();
-      if (events.isNotEmpty) {
-        DateTime? latestEventDate;
-        for (final e in events) {
-          final createdStr = e.metadata['createdAt'];
-          if (createdStr != null) {
-            final dt = DateTime.tryParse(createdStr);
-            if (dt != null) {
-              if (latestEventDate == null || dt.isAfter(latestEventDate)) {
-                latestEventDate = dt;
-              }
-            }
-          }
-        }
+    final lastViewedEvents = lastViewed[1];
+    final events = cached[1] as List;
+    if (lastViewedEvents == null) {
+      nextUnreadStates[1] = true;
+    } else if (events.isNotEmpty) {
+      DateTime? latestEventDate;
+      for (final event in events) {
+        final createdStr = event.metadata['createdAt'];
+        if (createdStr == null) continue;
 
-        if (latestEventDate != null &&
-            latestEventDate.isAfter(lastViewedEvents)) {
-          if (mounted) setState(() => _unreadStates[1] = true);
-        } else {
-          if (mounted) setState(() => _unreadStates[1] = false);
+        final dt = DateTime.tryParse(createdStr.toString());
+        if (dt != null &&
+            (latestEventDate == null || dt.isAfter(latestEventDate))) {
+          latestEventDate = dt;
         }
       }
-    } else {
-      if (mounted) setState(() => _unreadStates[1] = true);
+
+      if (latestEventDate != null) {
+        nextUnreadStates[1] = latestEventDate.isAfter(lastViewedEvents);
+      }
     }
 
-    // Notifications (Discrete Badge)
-    final lastViewedNotifs = await _badgeService.getLastViewedNotifs();
-    final notifs = await SimpleNotifications().loadSaved();
+    final lastViewedNotifs = lastViewed[2];
+    final notifs = cached[2] as List;
     if (notifs.isNotEmpty) {
       final latest = notifs.first.receivedAt;
-      if (lastViewedNotifs == null || latest.isAfter(lastViewedNotifs)) {
-        if (mounted) setState(() => _unreadNotifications = true);
-      } else {
-        if (mounted) setState(() => _unreadNotifications = false);
-      }
+      nextUnreadNotifications =
+          lastViewedNotifs == null || latest.isAfter(lastViewedNotifs);
     }
 
-    // 2: Community
-    final lastViewedCommunity = await _badgeService.getLastViewedCommunity();
-    // CommunityRepository currently doesn't have persistent cache, but it has mock data
-    final posts = await CommunityRepository().getCachedPosts();
+    final lastViewedCommunity = lastViewed[3];
+    final posts = cached[3] as List;
     if (posts.isNotEmpty) {
       final latest = posts.first.createdAt;
-      if (lastViewedCommunity == null || latest.isAfter(lastViewedCommunity)) {
-        if (mounted) setState(() => _unreadStates[2] = true);
-      } else {
-        if (mounted) setState(() => _unreadStates[2] = false);
-      }
+      nextUnreadStates[2] =
+          lastViewedCommunity == null || latest.isAfter(lastViewedCommunity);
     }
+
+    setState(() {
+      _unreadStates
+        ..clear()
+        ..addAll(nextUnreadStates);
+      _unreadNotifications = nextUnreadNotifications;
+    });
+  }
+
+  void _checkBadgesAfterFirstProfileLoad() {
+    if (_badgeCheckStarted) {
+      return;
+    }
+
+    _badgeCheckStarted = true;
+    unawaited(_checkBadges());
   }
 
   String _titleForIndex(int index) {
@@ -288,9 +327,12 @@ class _MasterViewState extends State<MasterView>
   }
 
   void _openSettingsPage() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            SettingsPage(onFirstProfileLoad: _checkBadgesAfterFirstProfileLoad),
+      ),
+    );
   }
 
   void _openAcademicCalendarSheet() {
@@ -620,7 +662,10 @@ class _MasterViewState extends State<MasterView>
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
     _tabController.animation?.removeListener(_handleTabAnimationChanged);
+    _decorativeLayerTimer?.cancel();
     _notificationsInitTimer?.cancel();
+    _permissionReminderTimer?.cancel();
+    _updateCheckStartTimer?.cancel();
     _updateCheckTimer?.cancel();
     _tabController.dispose();
     super.dispose();
@@ -631,7 +676,9 @@ class _MasterViewState extends State<MasterView>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final accentColors = _backgroundAccentColors(colorScheme, isDark);
+    final accentColors = _decorativeLayersEnabled
+        ? _backgroundAccentColors(colorScheme, isDark)
+        : null;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -706,33 +753,37 @@ class _MasterViewState extends State<MasterView>
       ),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    accentColors.first.withValues(alpha: isDark ? 0.10 : 0.07),
-                    theme.scaffoldBackgroundColor,
-                    theme.scaffoldBackgroundColor,
-                  ],
-                  stops: const [0.0, 0.26, 1.0],
+          if (accentColors != null) ...[
+            Positioned.fill(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      accentColors.first.withValues(
+                        alpha: isDark ? 0.10 : 0.07,
+                      ),
+                      theme.scaffoldBackgroundColor,
+                      theme.scaffoldBackgroundColor,
+                    ],
+                    stops: const [0.0, 0.26, 1.0],
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: _buildBackdropLayer(
-                accentColors: accentColors,
-                isDark: isDark,
-                baseColor: theme.scaffoldBackgroundColor,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _buildBackdropLayer(
+                  accentColors: accentColors,
+                  isDark: isDark,
+                  baseColor: theme.scaffoldBackgroundColor,
+                ),
               ),
             ),
-          ),
+          ],
           NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [

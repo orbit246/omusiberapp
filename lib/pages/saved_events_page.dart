@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/home/simple_appbar.dart';
 import 'package:omusiber/widgets/shared/navbar.dart';
 
@@ -13,7 +16,10 @@ class SavedEventsPage extends StatelessWidget {
 
     return Scaffold(
       bottomNavigationBar: const AppNavigationBar(),
-      appBar: PreferredSize(preferredSize: const Size.fromHeight(60), child: SimpleAppbar(title: "Kaydedilenler")),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: SimpleAppbar(title: "Kaydedilenler"),
+      ),
 
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -30,7 +36,10 @@ class SavedEventsPage extends StatelessWidget {
                       height: 200,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.asset("assets/image.png", fit: BoxFit.cover),
+                        child: Image.asset(
+                          "assets/image.png",
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
 
@@ -41,7 +50,9 @@ class SavedEventsPage extends StatelessWidget {
                       "Etkinlik Adı — Çok Uzun Başlık Buraya Sığar ve En Fazla İki Satır Olur",
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: tt.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
 
                     const Divider(),
@@ -77,7 +88,10 @@ class SavedEventsPage extends StatelessWidget {
                             height: 45,
                             child: ElevatedButton(
                               onPressed: () {},
-                              child: Text("Detaylar", style: Theme.of(context).textTheme.labelLarge),
+                              child: Text(
+                                "Detaylar",
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
                             ),
                           ),
                         ),
@@ -88,18 +102,35 @@ class SavedEventsPage extends StatelessWidget {
                           onPressed: () {},
                           icon: const Icon(Icons.bookmark_outline),
                           style: ButtonStyle(
-                            fixedSize: const WidgetStatePropertyAll(Size(45, 45)),
-                            backgroundColor: WidgetStatePropertyAll(cs.surfaceVariant),
+                            fixedSize: const WidgetStatePropertyAll(
+                              Size(45, 45),
+                            ),
+                            backgroundColor: WidgetStatePropertyAll(
+                              cs.surfaceVariant,
+                            ),
                             iconSize: const WidgetStatePropertyAll(28),
                           ),
                         ),
                         const SizedBox(width: 6),
                         IconButton.filledTonal(
-                          onPressed: () {},
+                          onPressed: () {
+                            unawaited(
+                              ShareService.sharePlainText(
+                                context,
+                                title: 'Etkinlik Adi',
+                                text:
+                                    'Etkinlik Adi\n\n11:00 AM, Pers 23 Agustos\n\nSamsun Teknoloji Merkezi, Atakum',
+                              ),
+                            );
+                          },
                           icon: const Icon(Icons.share_outlined),
                           style: ButtonStyle(
-                            fixedSize: const WidgetStatePropertyAll(Size(45, 45)),
-                            backgroundColor: WidgetStatePropertyAll(cs.surfaceVariant),
+                            fixedSize: const WidgetStatePropertyAll(
+                              Size(45, 45),
+                            ),
+                            backgroundColor: WidgetStatePropertyAll(
+                              cs.surfaceVariant,
+                            ),
                             iconSize: const WidgetStatePropertyAll(28),
                           ),
                         ),

@@ -5,7 +5,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EventDetailsPage extends StatefulWidget {
@@ -481,13 +481,8 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                     children: [
                       // Share
                       IconButton(
-                        onPressed: () {
-                          SharePlus.instance.share(
-                            ShareParams(
-                              text: '${event.title}\n${event.location}',
-                            ),
-                          );
-                        },
+                        onPressed: () =>
+                            unawaited(ShareService.shareEvent(context, event)),
                         icon: const Icon(Icons.share_outlined),
                         tooltip: 'Paylaş',
                       ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -108,13 +109,18 @@ class EventRepository {
           .toList();
       _sortEventsMostRecent(events);
 
-      // Persist to storage
+      if (!jsonListEquals<PostView>(
+        _cachedEvents ?? const <PostView>[],
+        events,
+        (item) => item.toJson(),
+      )) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          _storageKey,
+          json.encode(events.map((e) => e.toJson()).toList()),
+        );
+      }
       _cachedEvents = events;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _storageKey,
-        json.encode(events.map((e) => e.toJson()).toList()),
-      );
 
       return events;
     } catch (e) {

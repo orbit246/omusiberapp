@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -111,17 +112,21 @@ class CommunityRepository {
         );
       }
 
-      _cachedPosts = apiPosts;
+      final sortedPosts = apiPosts
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      // Sort by newest
-      _cachedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      // Persist to storage
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _storageKey,
-        json.encode(_cachedPosts.map((e) => e.toJson()).toList()),
-      );
+      if (!jsonListEquals<CommunityPost>(
+        _cachedPosts,
+        sortedPosts,
+        (item) => item.toJson(),
+      )) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          _storageKey,
+          json.encode(sortedPosts.map((e) => e.toJson()).toList()),
+        );
+      }
+      _cachedPosts = sortedPosts;
 
       return _cachedPosts;
     } catch (e) {

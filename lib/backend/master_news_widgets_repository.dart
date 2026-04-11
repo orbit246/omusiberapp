@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,10 +82,7 @@ class MasterNewsWidgetsRepository {
     bool forceRefreshToken = false,
   }) async {
     final token = await _getAuthToken(forceRefresh: forceRefreshToken);
-    return {
-      ..._baseHeaders,
-      'Authorization': 'Bearer $token',
-    };
+    return {..._baseHeaders, 'Authorization': 'Bearer $token'};
   }
 
   Future<http.Response> _getWidgetsResponse() async {
@@ -93,15 +91,17 @@ class MasterNewsWidgetsRepository {
       'GET $_widgetsUri authPresent=${headers['Authorization']?.isNotEmpty == true}',
     );
 
-    var response = await http.get(_widgetsUri, headers: headers).timeout(
-      timeout,
-    );
+    var response = await http
+        .get(_widgetsUri, headers: headers)
+        .timeout(timeout);
 
     if (response.statusCode != 401) {
       return response;
     }
 
-    _log('Authorized request returned 401; retrying with refreshed Firebase ID token.');
+    _log(
+      'Authorized request returned 401; retrying with refreshed Firebase ID token.',
+    );
     headers = await _authorizedHeaders(forceRefreshToken: true);
     return http.get(_widgetsUri, headers: headers).timeout(timeout);
   }
@@ -121,7 +121,8 @@ class MasterNewsWidgetsRepository {
       return _cachedWidgets;
     }
 
-    if (!forceRefresh && (_cachedWidgets == null || _cachedWidgets!.sections.isEmpty)) {
+    if (!forceRefresh &&
+        (_cachedWidgets == null || _cachedWidgets!.sections.isEmpty)) {
       await getCachedWidgets();
       if (_cachedWidgets != null && _cachedWidgets!.sections.isNotEmpty) {
         _log('Using persisted cache after cache lookup.');
@@ -136,10 +137,7 @@ class MasterNewsWidgetsRepository {
       );
 
       if (response.statusCode != 200) {
-        throw HttpException(
-          'HTTP ${response.statusCode}',
-          uri: _widgetsUri,
-        );
+        throw HttpException('HTTP ${response.statusCode}', uri: _widgetsUri);
       }
 
       final decoded = json.decode(response.body);
@@ -154,11 +152,12 @@ class MasterNewsWidgetsRepository {
       _log(
         'Parsed sections=${widgets.sections.length} details=${widgets.sections.map((s) => '${s.id}:${s.cards.length}').join(', ')}',
       );
+      if (!jsonPayloadEquals(_cachedWidgets?.toJson(), widgets.toJson())) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_storageKey, json.encode(widgets.toJson()));
+      }
       _cachedWidgets = widgets;
       _lastFetchTime = DateTime.now();
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_storageKey, json.encode(widgets.toJson()));
 
       return widgets;
     } catch (e) {

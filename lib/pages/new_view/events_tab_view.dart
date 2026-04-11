@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
@@ -157,13 +159,31 @@ class _EventsTabViewState extends State<EventsTabView> {
       final fresh = await _repo.fetchEvents(forceRefresh: true);
       if (mounted) {
         final freshEvents = freshWithMocks(fresh);
+        final shouldReplaceEvents = !jsonListEquals<PostView>(
+          _events,
+          freshEvents,
+          (item) => item.toJson(),
+        );
+        final shouldClearLoading = _isInitialLoading && _events.isEmpty;
+
+        if (!shouldReplaceEvents &&
+            !shouldClearLoading &&
+            _errorMessage == null) {
+          return;
+        }
+
         setState(() {
           _isInitialLoading = false;
           _errorMessage = null;
-          _events.clear();
-          _events.addAll(freshEvents);
+          if (shouldReplaceEvents) {
+            _events
+              ..clear()
+              ..addAll(freshEvents);
+          }
         });
-        _precacheEventImages(freshEvents);
+        if (shouldReplaceEvents) {
+          _precacheEventImages(freshEvents);
+        }
       }
     } catch (e) {
       debugPrint("Background refresh failed: $e");
@@ -188,7 +208,7 @@ class _EventsTabViewState extends State<EventsTabView> {
   }
 
   void _handleStartupChanged() {
-    if (!_startupController.canUseAuthenticatedApis) {
+    if (!_startupController.canUseAuthenticatedApis || _refreshQueued) {
       return;
     }
 
@@ -341,7 +361,7 @@ class _EventsTabViewState extends State<EventsTabView> {
         if (!isBookmarked) return;
         unawaited(_repo.trackEventLike(e.id, isLiked: true));
       },
-      onShare: () {},
+      onShare: () => unawaited(ShareService.shareEvent(context, e)),
     );
   }
 

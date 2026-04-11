@@ -120,7 +120,6 @@ class AppStartupController extends ChangeNotifier {
       _firebaseReady = true;
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-      unawaited(SimpleNotifications.ensureInitialized());
 
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {

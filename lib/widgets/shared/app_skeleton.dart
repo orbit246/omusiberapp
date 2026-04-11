@@ -45,7 +45,7 @@ class _AppSkeletonState extends State<AppSkeleton>
       colorScheme.surfaceContainerHighest,
       0.42,
     )!;
-    final highlight = Color.lerp(base, Colors.white, 0.12)!;
+    final highlight = Color.lerp(base, Colors.white, 0.28)!;
 
     return Container(
       width: widget.width,

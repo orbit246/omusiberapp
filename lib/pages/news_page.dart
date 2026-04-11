@@ -1,16 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/share_service.dart';
+import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 
 // --- 1. ANIMATION WRAPPER ---
 class SlideInEntry extends StatefulWidget {
   final Widget child;
-  final Duration delay; 
+  final Duration delay;
 
   const SlideInEntry({
-    super.key, 
-    required this.child, 
+    super.key,
+    required this.child,
     this.delay = Duration.zero,
   });
 
@@ -18,7 +22,8 @@ class SlideInEntry extends StatefulWidget {
   State<SlideInEntry> createState() => _SlideInEntryState();
 }
 
-class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderStateMixin {
+class _SlideInEntryState extends State<SlideInEntry>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _offsetAnimation;
   late Animation<double> _fadeAnimation;
@@ -32,18 +37,12 @@ class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderSt
     );
 
     _offsetAnimation = Tween<Offset>(
-      begin: const Offset(-0.5, 0.0), 
+      begin: const Offset(-0.5, 0.0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutQuart,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
 
     // Opacity starts at 0, so it's invisible while waiting for delay
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _runAnimation();
   }
@@ -69,10 +68,7 @@ class _SlideInEntryState extends State<SlideInEntry> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _offsetAnimation,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _offsetAnimation, child: widget.child),
     );
   }
 }
@@ -108,11 +104,11 @@ class NewsTabView extends StatefulWidget {
 
 class _NewsTabViewState extends State<NewsTabView> {
   final List<dynamic> _articles = [];
-  
+
   // Stores temporary delays for the "current" batch of new items.
   // We use this to tell Item A to wait 0ms, Item B to wait 150ms, etc.
   final Map<dynamic, Duration> _staggerDelays = {};
-  
+
   bool _isInitialLoading = true;
   String? _errorMessage;
 
@@ -124,7 +120,7 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _loadInitialData() async {
     try {
-      final newData = await NewsFetcher().fetchLatestNews();
+      final newData = _bindNewsActions(await NewsFetcher().fetchLatestNews());
       if (mounted) {
         setState(() {
           _isInitialLoading = false;
@@ -144,7 +140,9 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _handleRefresh() async {
     try {
-      final fetchedData = await NewsFetcher().fetchLatestNews();
+      final fetchedData = _bindNewsActions(
+        await NewsFetcher().fetchLatestNews(),
+      );
       if (!mounted) return;
 
       final List<dynamic> newItems = fetchedData.where((newItem) {
@@ -207,7 +205,21 @@ class _NewsTabViewState extends State<NewsTabView> {
     });
   }
 
-  void _showStyledToast({required String message, required IconData icon, required bool isSuccess}) {
+  List<NewsView> _bindNewsActions(List<NewsView> items) {
+    return items
+        .map(
+          (item) => item.copyWith(
+            onShare: () => unawaited(ShareService.shareNews(context, item)),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  void _showStyledToast({
+    required String message,
+    required IconData icon,
+    required bool isSuccess,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -216,14 +228,18 @@ class _NewsTabViewState extends State<NewsTabView> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: const StadiumBorder(),
-        backgroundColor: isSuccess ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+        backgroundColor: isSuccess
+            ? colorScheme.primary
+            : colorScheme.surfaceContainerHighest,
         elevation: 6,
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon, 
-              color: isSuccess ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+              icon,
+              color: isSuccess
+                  ? colorScheme.onPrimary
+                  : colorScheme.onSurfaceVariant,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -231,7 +247,9 @@ class _NewsTabViewState extends State<NewsTabView> {
               child: Text(
                 message,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: isSuccess ? colorScheme.onPrimary : colorScheme.onSurface,
+                  color: isSuccess
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -256,39 +274,40 @@ class _NewsTabViewState extends State<NewsTabView> {
     return CustomScrollView(
       key: const PageStorageKey('news_tab'),
       physics: const RefreshSafeScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics()
+        parent: AlwaysScrollableScrollPhysics(),
       ),
       slivers: [
         CupertinoSliverRefreshControl(
           onRefresh: _handleRefresh,
-          refreshTriggerPullDistance: 50.0, 
-          refreshIndicatorExtent: 40.0, 
+          refreshTriggerPullDistance: 50.0,
+          refreshIndicatorExtent: 40.0,
         ),
-        
+
         const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
         SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final newsItem = _articles[index];
-              
-              // Check if we have a specific delay assigned for this item (from the recent fetch)
-              // If not found, delay is 0 (it's an old item or just scrolled into view).
-              final animationDelay = _staggerDelays[newsItem] ?? Duration.zero;
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final newsItem = _articles[index];
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0, left: 16.0, right: 16.0),
-                child: SlideInEntry(
-                  // KEY IS CRITICAL: Ensures the animation state is tied to the DATA,
-                  // not the index. Prevents re-animating old items when they shift down.
-                  key: ValueKey(newsItem), 
-                  delay: animationDelay,
-                  child: NewsCard(view: newsItem),
-                ),
-              );
-            },
-            childCount: _articles.length,
-          ),
+            // Check if we have a specific delay assigned for this item (from the recent fetch)
+            // If not found, delay is 0 (it's an old item or just scrolled into view).
+            final animationDelay = _staggerDelays[newsItem] ?? Duration.zero;
+
+            return Padding(
+              padding: const EdgeInsets.only(
+                bottom: 12.0,
+                left: 16.0,
+                right: 16.0,
+              ),
+              child: SlideInEntry(
+                // KEY IS CRITICAL: Ensures the animation state is tied to the DATA,
+                // not the index. Prevents re-animating old items when they shift down.
+                key: ValueKey(newsItem),
+                delay: animationDelay,
+                child: NewsCard(view: newsItem),
+              ),
+            );
+          }, childCount: _articles.length),
         ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 80)),

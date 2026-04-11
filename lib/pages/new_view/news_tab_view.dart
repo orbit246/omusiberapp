@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/master_news_widgets_repository.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
@@ -121,6 +123,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
   bool _refreshQueued = false;
+  Future<void>? _facultiesLoadFuture;
   Timer? _backgroundRefreshTimer;
 
   @override
@@ -160,6 +163,10 @@ class _NewsTabViewState extends State<NewsTabView> {
   }
 
   void _scheduleBackgroundRefresh() {
+    if (_refreshQueued) {
+      return;
+    }
+
     final delay = _startupController.startupDeferral(_backgroundRefreshDelay);
     _backgroundRefreshTimer?.cancel();
     if (delay == Duration.zero) {
@@ -204,10 +211,12 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _loadInitialData() async {
     try {
-      // 1. Load from cache first (no network)
-      final cachedData = await NewsFetcher().getCachedNews();
-      final cachedSummaryWidgets = await MasterNewsWidgetsRepository()
-          .getCachedWidgets();
+      final cachedResults = await Future.wait<dynamic>([
+        NewsFetcher().getCachedNews(),
+        MasterNewsWidgetsRepository().getCachedWidgets(),
+      ]);
+      final cachedData = cachedResults[0] as List<NewsView>;
+      final cachedSummaryWidgets = cachedResults[1] as MasterNewsWidgetsView?;
       final hydratedCached = _bindNewsActions(cachedData);
 
       if (mounted) {
@@ -229,7 +238,6 @@ class _NewsTabViewState extends State<NewsTabView> {
         if (!mounted) return;
         _handleStartupChanged();
       });
-      unawaited(_loadFaculties());
     } catch (e) {
       debugPrint("Failed to load initial news cache: $e");
       if (_articles.isEmpty) {
@@ -238,11 +246,25 @@ class _NewsTabViewState extends State<NewsTabView> {
           _handleStartupChanged();
         });
       }
-      unawaited(_loadFaculties());
     }
   }
 
   Future<void> _loadFaculties({bool forceRefresh = false}) async {
+    if (!forceRefresh && _facultiesLoadFuture != null) {
+      return _facultiesLoadFuture;
+    }
+
+    final loadFuture = _loadFacultiesNow(forceRefresh: forceRefresh);
+    if (!forceRefresh) {
+      _facultiesLoadFuture = loadFuture.whenComplete(() {
+        _facultiesLoadFuture = null;
+      });
+      return _facultiesLoadFuture!;
+    }
+    return loadFuture;
+  }
+
+  Future<void> _loadFacultiesNow({bool forceRefresh = false}) async {
     final faculties = await NewsFetcher().fetchFaculties(
       forceRefresh: forceRefresh,
     );
@@ -262,26 +284,54 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _refreshInBackground() async {
     try {
-      final newData = await NewsFetcher().fetchLatestNews(
-        forceRefresh: true,
-        facultySlug: _selectedFacultySlug,
-      );
-      final widgets = await MasterNewsWidgetsRepository().fetchWidgets(
-        forceRefresh: true,
-      );
+      final refreshResults = await Future.wait<dynamic>([
+        NewsFetcher().fetchLatestNews(
+          forceRefresh: true,
+          facultySlug: _selectedFacultySlug,
+        ),
+        MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true),
+      ]);
+      final newData = refreshResults[0] as List<NewsView>;
+      final widgets = refreshResults[1] as MasterNewsWidgetsView?;
       final hydratedData = _bindNewsActions(newData);
       if (mounted) {
+        final resolvedWidgets =
+            widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
+        final shouldReplaceArticles = !jsonListEquals<NewsView>(
+          _articles,
+          hydratedData,
+          (item) => item.toJson(),
+        );
+        final shouldReplaceWidgets = !_summaryWidgetsMatch(
+          _summaryWidgets,
+          resolvedWidgets,
+        );
+        final shouldClearLoading = _isInitialLoading && _articles.isEmpty;
+
+        if (!shouldReplaceArticles &&
+            !shouldReplaceWidgets &&
+            !shouldClearLoading &&
+            _errorMessage == null) {
+          return;
+        }
+
         setState(() {
           _isInitialLoading = false;
           _errorMessage = null;
-          _summaryWidgets =
-              widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
-          _articles.clear();
-          _articles.addAll(hydratedData);
-          _animateAllowedSet.addAll(hydratedData);
+          if (shouldReplaceWidgets || _summaryWidgets == null) {
+            _summaryWidgets = resolvedWidgets;
+          }
+          if (shouldReplaceArticles) {
+            _articles
+              ..clear()
+              ..addAll(hydratedData);
+            _animateAllowedSet.addAll(hydratedData);
+          }
         });
         _logSummaryWidgets('after background refresh');
-        _precacheNewsImages(hydratedData);
+        if (shouldReplaceArticles) {
+          _precacheNewsImages(hydratedData);
+        }
       }
     } catch (e) {
       if (e is StateError) {
@@ -298,16 +348,16 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _handleRefresh() async {
     try {
-      final widgets = await MasterNewsWidgetsRepository().fetchWidgets(
-        forceRefresh: true,
-      );
-      await _loadFaculties(forceRefresh: true);
-      final fetchedData = _bindNewsActions(
-        await NewsFetcher().fetchLatestNews(
+      final refreshResults = await Future.wait<dynamic>([
+        MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true),
+        NewsFetcher().fetchLatestNews(
           forceRefresh: true,
           facultySlug: _selectedFacultySlug,
         ),
-      );
+        _loadFaculties(forceRefresh: true),
+      ]);
+      final widgets = refreshResults[0] as MasterNewsWidgetsView?;
+      final fetchedData = _bindNewsActions(refreshResults[1] as List<NewsView>);
       if (!mounted) return;
 
       if (_selectedFacultySlug != null) {
@@ -393,9 +443,17 @@ class _NewsTabViewState extends State<NewsTabView> {
     return items.map(_bindNewsActionsForItem).toList(growable: false);
   }
 
+  bool _summaryWidgetsMatch(
+    MasterNewsWidgetsView? current,
+    MasterNewsWidgetsView next,
+  ) {
+    return jsonPayloadEquals(current?.toJson(), next.toJson());
+  }
+
   NewsView _bindNewsActionsForItem(NewsView item) {
     return item.copyWith(
       onToggleFavorite: (isLiked) => _handleNewsLikeToggle(item.id, isLiked),
+      onShare: () => unawaited(ShareService.shareNews(context, item)),
     );
   }
 
@@ -802,6 +860,11 @@ class _NewsTabViewState extends State<NewsTabView> {
   }
 
   Future<void> _openFilterSheet() async {
+    if (_faculties.isEmpty) {
+      await _loadFaculties();
+      if (!mounted) return;
+    }
+
     String tempSortKey = _selectedSortKey;
     String tempDatePreset = _selectedDatePreset;
     String? tempFacultySlug = _selectedFacultySlug;
@@ -847,220 +910,224 @@ class _NewsTabViewState extends State<NewsTabView> {
             }
 
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Haber filtreleri',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Sıralama',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        buildChoice(
-                          label: 'En Yeni',
-                          selected: tempSortKey == 'newest',
-                          onTap: () =>
-                              setModalState(() => tempSortKey = 'newest'),
-                        ),
-                        buildChoice(
-                          label: 'En Eski',
-                          selected: tempSortKey == 'oldest',
-                          onTap: () =>
-                              setModalState(() => tempSortKey = 'oldest'),
-                        ),
-                        buildChoice(
-                          label: 'En Çok Okunan',
-                          selected: tempSortKey == 'popular',
-                          onTap: () =>
-                              setModalState(() => tempSortKey = 'popular'),
-                        ),
-                        buildChoice(
-                          label: 'Bugün',
-                          selected: tempSortKey == 'today',
-                          onTap: () =>
-                              setModalState(() => tempSortKey = 'today'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Zaman aralığı',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        buildChoice(
-                          label: 'Tümü',
-                          selected: tempDatePreset == 'all',
-                          onTap: () =>
-                              setModalState(() => tempDatePreset = 'all'),
-                        ),
-                        buildChoice(
-                          label: 'Bugün',
-                          selected: tempDatePreset == 'today',
-                          onTap: () =>
-                              setModalState(() => tempDatePreset = 'today'),
-                        ),
-                        buildChoice(
-                          label: 'Bu Hafta',
-                          selected: tempDatePreset == 'week',
-                          onTap: () =>
-                              setModalState(() => tempDatePreset = 'week'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Fakülte',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_faculties.isEmpty)
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Fakülte listesi yükleniyor.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                        'Haber filtreleri',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
-                      )
-                    else
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Sıralama',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          buildChoice(
+                            label: 'En Yeni',
+                            selected: tempSortKey == 'newest',
+                            onTap: () =>
+                                setModalState(() => tempSortKey = 'newest'),
+                          ),
+                          buildChoice(
+                            label: 'En Eski',
+                            selected: tempSortKey == 'oldest',
+                            onTap: () =>
+                                setModalState(() => tempSortKey = 'oldest'),
+                          ),
+                          buildChoice(
+                            label: 'En Çok Okunan',
+                            selected: tempSortKey == 'popular',
+                            onTap: () =>
+                                setModalState(() => tempSortKey = 'popular'),
+                          ),
+                          buildChoice(
+                            label: 'Bugün',
+                            selected: tempSortKey == 'today',
+                            onTap: () =>
+                                setModalState(() => tempSortKey = 'today'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Zaman aralığı',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           buildChoice(
                             label: 'Tümü',
-                            selected: tempFacultySlug == null,
+                            selected: tempDatePreset == 'all',
                             onTap: () =>
-                                setModalState(() => tempFacultySlug = null),
+                                setModalState(() => tempDatePreset = 'all'),
                           ),
-                          ..._faculties.map((faculty) {
-                            return buildChoice(
-                              label: faculty.name,
-                              selected: tempFacultySlug == faculty.slug,
-                              onTap: () => setModalState(
-                                () => tempFacultySlug = faculty.slug,
-                              ),
-                            );
-                          }),
+                          buildChoice(
+                            label: 'Bugün',
+                            selected: tempDatePreset == 'today',
+                            onTap: () =>
+                                setModalState(() => tempDatePreset = 'today'),
+                          ),
+                          buildChoice(
+                            label: 'Bu Hafta',
+                            selected: tempDatePreset == 'week',
+                            onTap: () =>
+                                setModalState(() => tempDatePreset = 'week'),
+                          ),
                         ],
                       ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Etiketler',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_availableTags.isEmpty)
+                      const SizedBox(height: 18),
                       Text(
-                        'Henüz filtrelenebilir etiket yok.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                        'Fakülte',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
-                      )
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _availableTags.map((tag) {
-                          return FilterChip(
-                            label: Text(tag),
-                            selected: tempTags.contains(tag),
-                            onSelected: (selected) {
-                              setModalState(() {
-                                if (selected) {
-                                  tempTags.add(tag);
-                                } else {
-                                  tempTags.remove(tag);
-                                }
-                              });
-                            },
-                            labelStyle: theme.textTheme.labelLarge?.copyWith(
-                              color: tempTags.contains(tag)
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            selectedColor: colorScheme.primaryContainer
-                                .withValues(alpha: 0.9),
-                            backgroundColor: colorScheme.surfaceContainerLow,
-                            side: BorderSide(
-                              color: tempTags.contains(tag)
-                                  ? colorScheme.primary.withValues(alpha: 0.24)
-                                  : colorScheme.outlineVariant.withValues(
-                                      alpha: 0.3,
-                                    ),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          );
-                        }).toList(),
                       ),
-                    const SizedBox(height: 22),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setModalState(() {
-                                tempSortKey = 'newest';
-                                tempDatePreset = 'all';
-                                tempFacultySlug = null;
-                                tempTags.clear();
-                              });
-                            },
-                            child: const Text('Sıfırla'),
+                      const SizedBox(height: 10),
+                      if (_faculties.isEmpty)
+                        Text(
+                          'Fakülte listesi yükleniyor.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            buildChoice(
+                              label: 'Tümü',
+                              selected: tempFacultySlug == null,
+                              onTap: () =>
+                                  setModalState(() => tempFacultySlug = null),
+                            ),
+                            ..._faculties.map((faculty) {
+                              return buildChoice(
+                                label: faculty.name,
+                                selected: tempFacultySlug == faculty.slug,
+                                onTap: () => setModalState(
+                                  () => tempFacultySlug = faculty.slug,
+                                ),
+                              );
+                            }),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () {
-                              final facultyChanged =
-                                  _selectedFacultySlug != tempFacultySlug;
-                              setState(() {
-                                _selectedSortKey = tempSortKey;
-                                _selectedDatePreset = tempDatePreset;
-                                _selectedFacultySlug = tempFacultySlug;
-                                _selectedTags
-                                  ..clear()
-                                  ..addAll(tempTags);
-                              });
-                              Navigator.of(context).pop();
-                              if (facultyChanged) {
-                                unawaited(_reloadNewsForFacultyFilter());
-                              }
-                            },
-                            child: const Text('Uygula'),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Etiketler',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (_availableTags.isEmpty)
+                        Text(
+                          'Henüz filtrelenebilir etiket yok.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _availableTags.map((tag) {
+                            return FilterChip(
+                              label: Text(tag),
+                              selected: tempTags.contains(tag),
+                              onSelected: (selected) {
+                                setModalState(() {
+                                  if (selected) {
+                                    tempTags.add(tag);
+                                  } else {
+                                    tempTags.remove(tag);
+                                  }
+                                });
+                              },
+                              labelStyle: theme.textTheme.labelLarge?.copyWith(
+                                color: tempTags.contains(tag)
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              selectedColor: colorScheme.primaryContainer
+                                  .withValues(alpha: 0.9),
+                              backgroundColor: colorScheme.surfaceContainerLow,
+                              side: BorderSide(
+                                color: tempTags.contains(tag)
+                                    ? colorScheme.primary.withValues(
+                                        alpha: 0.24,
+                                      )
+                                    : colorScheme.outlineVariant.withValues(
+                                        alpha: 0.3,
+                                      ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                      ],
-                    ),
-                  ],
+                      const SizedBox(height: 22),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setModalState(() {
+                                  tempSortKey = 'newest';
+                                  tempDatePreset = 'all';
+                                  tempFacultySlug = null;
+                                  tempTags.clear();
+                                });
+                              },
+                              child: const Text('Sıfırla'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () {
+                                final facultyChanged =
+                                    _selectedFacultySlug != tempFacultySlug;
+                                setState(() {
+                                  _selectedSortKey = tempSortKey;
+                                  _selectedDatePreset = tempDatePreset;
+                                  _selectedFacultySlug = tempFacultySlug;
+                                  _selectedTags
+                                    ..clear()
+                                    ..addAll(tempTags);
+                                });
+                                Navigator.of(context).pop();
+                                if (facultyChanged) {
+                                  unawaited(_reloadNewsForFacultyFilter());
+                                }
+                              },
+                              child: const Text('Uygula'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );

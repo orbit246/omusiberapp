@@ -16,7 +16,9 @@ import 'dart:math';
 
 // SettingsPage must be a StatefulWidget to hold the initial random state for the easter egg
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.onFirstProfileLoad});
+
+  final VoidCallback? onFirstProfileLoad;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -39,6 +41,9 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _startupController.addListener(_handleStartupChanged);
     _handleStartupChanged();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onFirstProfileLoad?.call();
+    });
   }
 
   @override
