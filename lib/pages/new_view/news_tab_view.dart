@@ -439,6 +439,20 @@ class _NewsTabViewState extends State<NewsTabView> {
     }
   }
 
+  void _clearActiveFilters() {
+    final hadFacultyFilter = _selectedFacultySlug != null;
+
+    setState(() {
+      _selectedDatePreset = 'all';
+      _selectedFacultySlug = null;
+      _selectedTags.clear();
+    });
+
+    if (hadFacultyFilter) {
+      unawaited(_reloadNewsForFacultyFilter());
+    }
+  }
+
   List<NewsView> _bindNewsActions(List<NewsView> items) {
     return items.map(_bindNewsActionsForItem).toList(growable: false);
   }
@@ -853,6 +867,32 @@ class _NewsTabViewState extends State<NewsTabView> {
               onTap: _openFilterSheet,
               active: hasActiveFilters,
             ),
+            if (hasActiveFilters) ...[
+              const SizedBox(width: 8),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _clearActiveFilters,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Ink(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
