@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -129,9 +129,7 @@ class _SchedulePageState extends State<SchedulePage> {
 
     if (profile == null) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Profil bilgisi su anda yuklenemedi.'),
-        ),
+        const SnackBar(content: Text('Profil bilgisi su anda yuklenemedi.')),
       );
       return;
     }
@@ -407,8 +405,8 @@ class _SchedulePageState extends State<SchedulePage> {
           alpha: scheduledLesson == null
               ? 0.06
               : theme.brightness == Brightness.dark
-                  ? 0.22
-                  : 0.10,
+              ? 0.22
+              : 0.10,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
@@ -416,8 +414,8 @@ class _SchedulePageState extends State<SchedulePage> {
             alpha: scheduledLesson == null
                 ? 0.16
                 : theme.brightness == Brightness.dark
-                    ? 0.34
-                    : 0.20,
+                ? 0.34
+                : 0.20,
           ),
         ),
       ),
@@ -462,7 +460,6 @@ class _SchedulePageState extends State<SchedulePage> {
       ),
     );
   }
-
 
   Widget _buildProgramSelector(
     BuildContext context,
@@ -565,7 +562,9 @@ class _SchedulePageState extends State<SchedulePage> {
                       vertical: 14,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      color: isSelected
+                          ? AppColors.primary
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -762,6 +761,8 @@ class _SchedulePageState extends State<SchedulePage> {
                               return _buildLessonCell(
                                 context,
                                 lesson: lesson,
+                                dayLabel: day.label,
+                                slot: slot,
                                 width: dayColumnWidth,
                                 height: rowHeight,
                                 gap: cellGap,
@@ -917,6 +918,8 @@ class _SchedulePageState extends State<SchedulePage> {
   Widget _buildLessonCell(
     BuildContext context, {
     required _GridLesson? lesson,
+    required String dayLabel,
+    required _GridTimeSlot slot,
     required double width,
     required double height,
     required double gap,
@@ -953,65 +956,239 @@ class _SchedulePageState extends State<SchedulePage> {
       );
     }
 
-    return Container(
-      width: width,
-      height: height,
-      margin: EdgeInsets.only(right: gap),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      decoration: BoxDecoration(
-        color: lesson.accent.withValues(
-          alpha: theme.brightness == Brightness.dark ? 0.24 : 0.12,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
+    return GestureDetector(
+      onTap: () => _showLessonDetailsDialog(
+        context,
+        lesson: lesson,
+        dayLabel: dayLabel,
+        slot: slot,
+      ),
+      child: Container(
+        width: width,
+        height: height,
+        margin: EdgeInsets.only(right: gap),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        decoration: BoxDecoration(
           color: lesson.accent.withValues(
-            alpha: theme.brightness == Brightness.dark ? 0.42 : 0.22,
+            alpha: theme.brightness == Brightness.dark ? 0.24 : 0.12,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: lesson.accent.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.42 : 0.22,
+            ),
           ),
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: lesson.accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                lesson.badge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: lesson.accent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              lesson.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              lesson.subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: AppColors.coolGray,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showLessonDetailsDialog(
+    BuildContext context, {
+    required _GridLesson lesson,
+    required String dayLabel,
+    required _GridTimeSlot slot,
+  }) {
+    final theme = Theme.of(context);
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: lesson.accent.withValues(alpha: 0.18)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 28,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: lesson.accent.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              lesson.badge,
+                              style: GoogleFonts.inter(
+                                color: lesson.accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            lesson.title,
+                            style: GoogleFonts.inter(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: theme.textTheme.titleLarge?.color,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close),
+                      splashRadius: 18,
+                      tooltip: 'Kapat',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildLessonDetailRow(
+                  label: 'Gun',
+                  value: dayLabel,
+                  accent: lesson.accent,
+                ),
+                const SizedBox(height: 10),
+                _buildLessonDetailRow(
+                  label: 'Saat',
+                  value: '${slot.startLabel} - ${slot.endLabel}',
+                  accent: lesson.accent,
+                ),
+                const SizedBox(height: 10),
+                _buildLessonDetailRow(
+                  label: 'Ders',
+                  value: lesson.title,
+                  accent: lesson.accent,
+                ),
+                if (lesson.courseCode.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildLessonDetailRow(
+                    label: 'Kod',
+                    value: lesson.courseCode,
+                    accent: lesson.accent,
+                  ),
+                ],
+                if (lesson.classroom.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildLessonDetailRow(
+                    label: 'Sinif',
+                    value: lesson.classroom,
+                    accent: lesson.accent,
+                  ),
+                ],
+                if (lesson.instructor.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildLessonDetailRow(
+                    label: 'Hoca',
+                    value: lesson.instructor,
+                    accent: lesson.accent,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLessonDetailRow({
+    required String label,
+    required String value,
+    required Color accent,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: lesson.accent.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              lesson.badge,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: lesson.accent,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           Text(
-            lesson.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              color: theme.textTheme.bodyLarge?.color,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            lesson.subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            label,
             style: GoogleFonts.inter(
               color: AppColors.coolGray,
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              height: 1.3,
             ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -1044,6 +1221,9 @@ class _SchedulePageState extends State<SchedulePage> {
           title: lesson.courseName.trim(),
           badge: _buildLessonBadge(lesson),
           subtitle: _buildLessonSubtitle(lesson),
+          courseCode: lesson.courseCode.trim(),
+          classroom: lesson.classroom.trim(),
+          instructor: lesson.instructor.trim(),
           accent: _lessonAccent(lesson),
         );
       }
@@ -1281,7 +1461,6 @@ class _SchedulePageState extends State<SchedulePage> {
     final minute = (normalized % 60).toString().padLeft(2, '0');
     return '$hour:$minute';
   }
-
 }
 
 class _GridScheduleData {
@@ -1303,12 +1482,18 @@ class _GridLesson {
     required this.title,
     required this.badge,
     required this.subtitle,
+    required this.courseCode,
+    required this.classroom,
+    required this.instructor,
     required this.accent,
   });
 
   final String title;
   final String badge;
   final String subtitle;
+  final String courseCode;
+  final String classroom;
+  final String instructor;
   final Color accent;
 }
 

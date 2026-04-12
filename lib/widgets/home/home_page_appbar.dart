@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:omusiber/backend/auth/auth_service.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/pages/new_view/settings_page.dart';
+import 'package:omusiber/pages/new_view/user_profile_page.dart';
 
 class HomePageAppbar extends StatelessWidget {
   HomePageAppbar({super.key});
 
   final GlobalKey _profileKey = GlobalKey();
+  final UserProfileService _profileService = UserProfileService();
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 3))],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Padding(
@@ -22,19 +38,36 @@ class HomePageAppbar extends StatelessWidget {
               GestureDetector(
                 onTap: () => _showSideMenu(context),
                 child: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                  child: Icon(Icons.menu, size: 28, color: Theme.of(context).colorScheme.onSurface),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onPrimaryContainer,
+                  child: Icon(
+                    Icons.menu,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
               const Spacer(),
-              Text('Etkinlikler', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontFamily: GoogleFonts.ptSans().fontFamily)),
+              Text(
+                'Etkinlikler',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontFamily: GoogleFonts.ptSans().fontFamily,
+                ),
+              ),
               const Spacer(),
               GestureDetector(
                 key: _profileKey,
                 onTap: () => _showProfileMenu(context),
                 child: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                  child: Icon(Icons.person, size: 28, color: Theme.of(context).colorScheme.onSurface),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onPrimaryContainer,
+                  child: Icon(
+                    Icons.person,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
             ],
@@ -61,7 +94,10 @@ class HomePageAppbar extends StatelessWidget {
             width: panelWidth,
             child: Material(
               elevation: 12,
-              borderRadius: const BorderRadius.only(topRight: Radius.circular(16), bottomRight: Radius.circular(16)),
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
               child: _SideMenu(onClose: () => Navigator.of(context).pop()),
             ),
           ),
@@ -78,40 +114,105 @@ class HomePageAppbar extends StatelessWidget {
   }
 
   Future<void> _showProfileMenu(BuildContext context) async {
-    // Anchor the menu to the avatar
+    final user = FirebaseAuth.instance.currentUser;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final box = _profileKey.currentContext!.findRenderObject() as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
-    final rect = Rect.fromLTWH(offset.dx, offset.dy, box.size.width, box.size.height);
+    final rect = Rect.fromLTWH(
+      offset.dx,
+      offset.dy,
+      box.size.width,
+      box.size.height,
+    );
 
-    await showMenu(
+    final selection = await showMenu<String>(
       context: context,
-      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size).shift(const Offset(0, 50)),
+      position: RelativeRect.fromRect(
+        rect,
+        Offset.zero & overlay.size,
+      ).shift(const Offset(0, 50)),
       menuPadding: EdgeInsets.all(8),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(12), bottomRight: Radius.circular(12)),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
       ),
-      items: <PopupMenuEntry<dynamic>>[
-        PopupMenuItem<dynamic>(
-          enabled: false,
-          padding: EdgeInsets.zero,
+      items: <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'profile',
           child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
-            title: const Text('Samet'),
-            subtitle: const Text('samet@bytforge.com'),
-            onTap: () => Navigator.pop(context),
+            leading: const Icon(Icons.person_outline),
+            title: const Text('Profilim'),
+            subtitle: Text(
+              user?.isAnonymous == true
+                  ? 'Giris yaparak profilini ac'
+                  : (user?.email ?? 'Profilini ac'),
+            ),
           ),
         ),
         const PopupMenuDivider(height: 0),
-        PopupMenuItem<dynamic>(
-          child: const ListTile(leading: Icon(Icons.settings), title: Text('Ayarlar')),
-          onTap: () => Navigator.pop(context),
+        const PopupMenuItem<String>(
+          value: 'settings',
+          child: ListTile(
+            leading: Icon(Icons.settings),
+            title: Text('Ayarlar'),
+          ),
         ),
-        PopupMenuItem<dynamic>(
-          child: const ListTile(leading: Icon(Icons.logout), title: Text('Çıkış yap')),
-          onTap: () => Navigator.pop(context),
-        ),
+        if (user != null)
+          const PopupMenuItem<String>(
+            value: 'logout',
+            child: ListTile(
+              leading: Icon(Icons.logout),
+              title: Text('Cikis yap'),
+            ),
+          ),
       ],
+    );
+
+    if (selection == null || !context.mounted) return;
+
+    switch (selection) {
+      case 'profile':
+        await _openProfilePage(context);
+        break;
+      case 'settings':
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
+        break;
+      case 'logout':
+        await _authService.signOut();
+        break;
+    }
+  }
+
+  Future<void> _openProfilePage(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profili acmak icin once giris yapmalisin.'),
+        ),
+      );
+      return;
+    }
+
+    final profile = await _profileService.fetchUserProfile(user.uid);
+    if (!context.mounted) return;
+
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil bilgisi su anda yuklenemedi.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserProfilePage(profile: profile),
+      ),
     );
   }
 }
@@ -134,15 +235,44 @@ class _SideMenu extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(color: theme.primary),
             alignment: Alignment.bottomLeft,
-            child: Text('Menü', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: theme.onSurface)),
+            child: Text(
+              'Menü',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(color: theme.onSurface),
+            ),
           ),
-          ListTile(leading: const Icon(Icons.home), title: const Text('Ana Sayfa'), onTap: onClose),
-          ListTile(leading: const Icon(Icons.event), title: const Text('Etkinliklerim'), onTap: onClose),
-          ListTile(leading: const Icon(Icons.bookmark), title: const Text('Kaydedilenler'), onTap: onClose),
+          ListTile(
+            leading: const Icon(Icons.home),
+            title: const Text('Ana Sayfa'),
+            onTap: onClose,
+          ),
+          ListTile(
+            leading: const Icon(Icons.event),
+            title: const Text('Etkinliklerim'),
+            onTap: onClose,
+          ),
+          ListTile(
+            leading: const Icon(Icons.bookmark),
+            title: const Text('Kaydedilenler'),
+            onTap: onClose,
+          ),
           const Divider(height: 0),
-          ListTile(leading: const Icon(Icons.settings), title: const Text('Ayarlar'), onTap: onClose),
-          ListTile(leading: const Icon(Icons.help_outline), title: const Text('Yardım'), onTap: onClose),
-          ListTile(leading: const Icon(Icons.logout), title: const Text('Çıkış yap'), onTap: onClose),
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('Ayarlar'),
+            onTap: onClose,
+          ),
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('Yardım'),
+            onTap: onClose,
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Çıkış yap'),
+            onTap: onClose,
+          ),
         ],
       ),
     );

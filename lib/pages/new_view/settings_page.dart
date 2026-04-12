@@ -7,7 +7,9 @@ import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/models/user_badge.dart';
+import 'package:omusiber/pages/new_view/user_profile_page.dart';
 import 'package:omusiber/widgets/badge_widget.dart';
 
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
@@ -154,6 +156,32 @@ class _SettingsPageState extends State<SettingsPage> {
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS);
 
+  Future<UserProfile?> _fetchCurrentProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    return _profileService.fetchUserProfile(user.uid);
+  }
+
+  Future<void> _openCurrentProfile() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final profile = await _fetchCurrentProfile();
+
+    if (!mounted) return;
+
+    if (profile == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profil bilgisi su anda yuklenemedi.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserProfilePage(profile: profile),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -247,6 +275,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.person_outline,
+                    title: "Profilim",
+                    subtitle: "Sinif ve sube bilgilerini profilde gor",
+                    onTap: _openCurrentProfile,
+                  ),
                   if (_loadingBadges)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),

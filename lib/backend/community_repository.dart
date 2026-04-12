@@ -8,6 +8,13 @@ import 'dart:convert';
 import 'package:omusiber/backend/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class CommunityPostsPage {
+  final List<CommunityPost> posts;
+  final String? nextCursor;
+
+  const CommunityPostsPage({required this.posts, this.nextCursor});
+}
+
 class CommunityRepository {
   static final CommunityRepository _instance = CommunityRepository._internal();
   factory CommunityRepository() => _instance;
@@ -15,6 +22,9 @@ class CommunityRepository {
 
   static const String _storageKey = 'cached_community_posts';
   List<CommunityPost> _cachedPosts = [];
+  String? _nextCursor;
+
+  String? get nextCursor => _nextCursor;
 
   Future<List<CommunityPost>> getCachedPosts() async {
     if (_cachedPosts.isNotEmpty) {
@@ -43,47 +53,97 @@ class CommunityRepository {
 
   String get _baseUrl => '${Constants.baseUrl}/community';
 
-  Future<String> _getAuthToken() async {
+  Future<Map<String, String>> _authorizedHeaders({
+    bool includeJsonContentType = false,
+  }) async {
+    final token = await _getOptionalAuthToken();
+    return {
+      if (includeJsonContentType) 'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Future<Map<String, String>> _requiredAuthorizedHeaders({
+    bool includeJsonContentType = false,
+  }) async {
     final ready = await AppStartupController.instance
         .ensureAuthenticatedSession();
     if (!ready) {
       throw StateError('Authentication is not ready yet.');
     }
-    var user = FirebaseAuth.instance.currentUser;
+
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('Authentication failed: no Firebase user available.');
     }
+
     final token = await user.getIdToken();
     if (token == null || token.isEmpty) {
       throw Exception('Authentication failed: empty Firebase ID token.');
     }
-    return token;
-  }
 
-  Future<Map<String, String>> _authorizedHeaders({
-    bool includeJsonContentType = false,
-  }) async {
-    final token = await _getAuthToken();
     return {
       if (includeJsonContentType) 'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
   }
 
-  Future<List<CommunityPost>> fetchPosts({bool forceRefresh = false}) async {
-    if (!forceRefresh) {
-      final cached = await getCachedPosts();
-      if (cached.isNotEmpty) return cached;
+  Future<String?> _getOptionalAuthToken() async {
+    final ready = await AppStartupController.instance.ensureFirebaseReady();
+    if (!ready) {
+      return null;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
     }
 
     try {
-      // Fetch real data
+      final token = await user.getIdToken();
+      if (token == null || token.isEmpty) {
+        return null;
+      }
+      return token;
+    } catch (e) {
+      debugPrint('Community fetch proceeding without auth token: $e');
+      return null;
+    }
+  }
+
+  Future<List<CommunityPost>> fetchPosts({bool forceRefresh = false}) async {
+    final page = await fetchPostsPage(forceRefresh: forceRefresh);
+    return page.posts;
+  }
+
+  Future<CommunityPostsPage> fetchPostsPage({
+    bool forceRefresh = false,
+    int? limit,
+    String? cursor,
+  }) async {
+    final isFirstPage = cursor == null || cursor.isEmpty;
+    if (isFirstPage && !forceRefresh) {
+      final cached = await getCachedPosts();
+      if (cached.isNotEmpty) {
+        return CommunityPostsPage(posts: cached, nextCursor: _nextCursor);
+      }
+    }
+
+    try {
       final headers = await _authorizedHeaders();
+      final queryParameters = <String, String>{
+        if (limit != null) 'limit': '$limit',
+        if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+      };
+      final uri = Uri.parse('$_baseUrl/posts').replace(
+        queryParameters: queryParameters.isEmpty ? null : queryParameters,
+      );
       final response = await http
-          .get(Uri.parse('$_baseUrl/posts'), headers: headers)
+          .get(uri, headers: headers)
           .timeout(const Duration(seconds: 5));
 
       List<CommunityPost> apiPosts = [];
+      final nextCursor = response.headers['x-next-cursor'];
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
@@ -115,30 +175,36 @@ class CommunityRepository {
       final sortedPosts = apiPosts
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      if (!jsonListEquals<CommunityPost>(
-        _cachedPosts,
-        sortedPosts,
-        (item) => item.toJson(),
-      )) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-          _storageKey,
-          json.encode(sortedPosts.map((e) => e.toJson()).toList()),
-        );
+      if (isFirstPage) {
+        if (!jsonListEquals<CommunityPost>(
+          _cachedPosts,
+          sortedPosts,
+          (item) => item.toJson(),
+        )) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+            _storageKey,
+            json.encode(sortedPosts.map((e) => e.toJson()).toList()),
+          );
+        }
+        _cachedPosts = sortedPosts;
+        _nextCursor = nextCursor;
+      } else {
+        _nextCursor = nextCursor;
       }
-      _cachedPosts = sortedPosts;
 
-      return _cachedPosts;
+      return CommunityPostsPage(posts: sortedPosts, nextCursor: nextCursor);
     } catch (e) {
-      if (e is StateError) {
-        rethrow;
-      }
       debugPrint("Error fetching posts: $e");
 
-      final cached = await getCachedPosts();
-      if (cached.isNotEmpty) return cached;
+      if (isFirstPage) {
+        final cached = await getCachedPosts();
+        if (cached.isNotEmpty) {
+          return CommunityPostsPage(posts: cached, nextCursor: _nextCursor);
+        }
+      }
 
-      return [];
+      return const CommunityPostsPage(posts: []);
     }
   }
 
@@ -175,7 +241,9 @@ class CommunityRepository {
     required String postId,
     required bool isLiked,
   }) async {
-    final headers = await _authorizedHeaders(includeJsonContentType: true);
+    final headers = await _requiredAuthorizedHeaders(
+      includeJsonContentType: true,
+    );
     final int? idAsInt = int.tryParse(postId);
     final List<_LikeRequest> requests = [
       _LikeRequest(uri: Uri.parse('$_baseUrl/posts/$postId/like'), body: null),
