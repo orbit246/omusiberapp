@@ -59,6 +59,8 @@ class SimpleNotifications {
   static bool _listenersRegistered = false;
   static Future<void>? _initializationFuture;
   static const String _staticPrefsKey = 'saved_notifications_v1';
+  static const String _permissionPromptedKey =
+      'notification_permission_prompted_v1';
 
   Future<void> init() async {
     try {
@@ -89,6 +91,7 @@ class SimpleNotifications {
       }
 
       await _configureRemoteRegistration();
+      await _requestPermissionIfNeeded();
 
       // Cold start: opened from terminated
       final initial = await _messaging.getInitialMessage();
@@ -121,6 +124,21 @@ class SimpleNotifications {
     final hasPermission = await checkPermission();
     if (hasPermission) return true;
     return requestPermission();
+  }
+
+  Future<void> _requestPermissionIfNeeded() async {
+    if (await checkPermission()) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyPrompted = prefs.getBool(_permissionPromptedKey) ?? false;
+    if (alreadyPrompted) {
+      return;
+    }
+
+    await requestPermission();
+    await prefs.setBool(_permissionPromptedKey, true);
   }
 
   Future<bool> requestPermission() async {

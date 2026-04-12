@@ -81,7 +81,7 @@ class _MyAppState extends State<MyApp> {
           themeMode: ThemeManager().themeMode,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          home: const _StartupShell(),
+          home: const MasterView(),
         );
       },
     );

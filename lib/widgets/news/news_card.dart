@@ -6,7 +6,6 @@ import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/news_item_page.dart';
-import 'package:omusiber/widgets/shared/app_markdown.dart';
 
 /// Presentational card. All data comes from [NewsView].
 class NewsCard extends StatelessWidget {
@@ -120,8 +119,8 @@ class NewsCard extends StatelessWidget {
                     const SizedBox(height: 12),
 
                     // Summary
-                    AppMarkdownPreview(
-                      data: view.summary,
+                    _SummaryPreview(
+                      text: view.summary,
                       maxHeight: 72,
                       backgroundColor: colorScheme.surface,
                     ),
@@ -250,6 +249,73 @@ class NewsCard extends StatelessWidget {
     }
     double millions = count / 1000000;
     return '${millions.toStringAsFixed(millions >= 10 ? 0 : 1)}M';
+  }
+}
+
+class _SummaryPreview extends StatelessWidget {
+  const _SummaryPreview({
+    required this.text,
+    required this.maxHeight,
+    required this.backgroundColor,
+  });
+
+  final String text;
+  final double maxHeight;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return SizedBox(
+      height: maxHeight,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRect(
+            child: Text(
+              _plainTextPreview(text),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.82),
+                height: 1.5,
+              ),
+              maxLines: 4,
+              overflow: TextOverflow.fade,
+              softWrap: true,
+            ),
+          ),
+          IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    backgroundColor.withValues(alpha: 0),
+                    backgroundColor,
+                  ],
+                  stops: const [0.72, 1],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _plainTextPreview(String input) {
+    final normalized = input
+        .replaceAll(RegExp(r'!\[([^\]]*)\]\([^)]+\)'), '')
+        .replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]+\)'), (match) {
+          return match.group(1) ?? '';
+        })
+        .replaceAll(RegExp(r'[`*_>#~-]'), '')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+
+    return normalized.isEmpty ? ' ' : normalized;
   }
 }
 

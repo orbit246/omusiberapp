@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
+import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
@@ -107,6 +108,39 @@ class _SettingsPageState extends State<SettingsPage> {
           const SnackBar(content: Text('Apple ile giriş tamamlanamadı.')),
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      final notifications = SimpleNotifications();
+      final alreadyGranted = await notifications.checkPermission();
+      if (!mounted) return;
+
+      if (alreadyGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bildirim izni zaten açık.')),
+        );
+        return;
+      }
+
+      final granted = await notifications.requestPermission();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            granted
+                ? 'Bildirim izni verildi.'
+                : 'Bildirim izni verilmedi. Ayarlardan daha sonra açabilirsin.',
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -284,6 +318,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     );
                   },
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.notifications_active_outlined,
+                  title: "Bildirim izni",
+                  subtitle: "Uygulama için bildirim iznini yönet",
+                  onTap: _requestNotificationPermission,
                 ),
                 _buildSettingsTile(
                   context,

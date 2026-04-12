@@ -81,6 +81,10 @@ class _SlideInEntryState extends State<SlideInEntry>
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.animate) {
+      return widget.child;
+    }
+
     return SizeTransition(
       sizeFactor: _sizeAnimation,
       axisAlignment: -1.0,
@@ -149,6 +153,17 @@ class _NewsTabViewState extends State<NewsTabView> {
       return;
     }
 
+    if (_articles.isEmpty && _isInitialLoading) {
+      _backgroundRefreshTimer?.cancel();
+      _refreshQueued = true;
+      unawaited(
+        _refreshInBackground().whenComplete(() {
+          _refreshQueued = false;
+        }),
+      );
+      return;
+    }
+
     _scheduleBackgroundRefresh();
   }
 
@@ -211,17 +226,15 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _loadInitialData() async {
     try {
-      final cachedResults = await Future.wait<dynamic>([
-        NewsFetcher().getCachedNews(),
-        MasterNewsWidgetsRepository().getCachedWidgets(),
-      ]);
-      final cachedData = cachedResults[0] as List<NewsView>;
-      final cachedSummaryWidgets = cachedResults[1] as MasterNewsWidgetsView?;
+      final cachedNewsFuture = NewsFetcher().getCachedNews();
+      final cachedWidgetsFuture = MasterNewsWidgetsRepository()
+          .getCachedWidgets();
+
+      final cachedData = await cachedNewsFuture;
       final hydratedCached = _bindNewsActions(cachedData);
 
       if (mounted) {
         setState(() {
-          _summaryWidgets = cachedSummaryWidgets ?? _summaryWidgets;
           if (hydratedCached.isNotEmpty) {
             _isInitialLoading = false;
             _errorMessage = null;
@@ -238,6 +251,14 @@ class _NewsTabViewState extends State<NewsTabView> {
         if (!mounted) return;
         _handleStartupChanged();
       });
+
+      final cachedSummaryWidgets = await cachedWidgetsFuture;
+      if (mounted && cachedSummaryWidgets != null) {
+        setState(() {
+          _summaryWidgets = cachedSummaryWidgets;
+        });
+        _logSummaryWidgets('after cached widgets load');
+      }
     } catch (e) {
       debugPrint("Failed to load initial news cache: $e");
       if (_articles.isEmpty) {
@@ -2048,22 +2069,9 @@ class _NewsTabViewState extends State<NewsTabView> {
       body: NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
           if (scrollInfo.metrics.axis == Axis.vertical) {
-            if (scrollInfo.metrics.pixels >= 500) {
-              if (!_showBackToTopButton) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && !_showBackToTopButton) {
-                    setState(() => _showBackToTopButton = true);
-                  }
-                });
-              }
-            } else {
-              if (_showBackToTopButton) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && _showBackToTopButton) {
-                    setState(() => _showBackToTopButton = false);
-                  }
-                });
-              }
+            final shouldShowBackToTop = scrollInfo.metrics.pixels >= 500;
+            if (shouldShowBackToTop != _showBackToTopButton) {
+              setState(() => _showBackToTopButton = shouldShowBackToTop);
             }
           }
           return false;
@@ -2073,7 +2081,7 @@ class _NewsTabViewState extends State<NewsTabView> {
           displacement: 20,
           edgeOffset: 0,
           child: CustomScrollView(
-            cacheExtent: 900,
+            cacheExtent: 300,
             controller: _scrollController,
             key: const PageStorageKey('news_tab'),
             physics: const AlwaysScrollableScrollPhysics(),
@@ -2172,12 +2180,14 @@ class _NewsTabViewState extends State<NewsTabView> {
                       _hasAnimatedSet.add(newsItem);
                     }
                     return Padding(
+                      key: ValueKey(newsItem),
                       padding: const EdgeInsets.only(bottom: 12.0),
-                      child: SlideInEntry(
-                        key: ValueKey(newsItem),
-                        animate: shouldAnimate,
-                        child: NewsCard(view: newsItem),
-                      ),
+                      child: shouldAnimate
+                          ? SlideInEntry(
+                              animate: true,
+                              child: NewsCard(view: newsItem),
+                            )
+                          : NewsCard(view: newsItem),
                     );
                   }, childCount: visibleArticles.length),
                 ),
