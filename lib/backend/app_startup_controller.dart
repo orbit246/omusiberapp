@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
+import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/firebase_options.dart';
 import 'package:omusiber/pages/agreement_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,6 +26,8 @@ class AppStartupController extends ChangeNotifier {
   Object? _lastError;
   Future<void>? _startFuture;
   bool _firebaseReady = false;
+  bool _backgroundMessageHandlerRegistrationScheduled = false;
+  bool _backgroundMessageHandlerRegistered = false;
 
   AppStartupStage get stage => _stage;
   Object? get lastError => _lastError;
@@ -44,6 +47,10 @@ class AppStartupController extends ChangeNotifier {
   }
 
   Future<void> start() {
+    StartupLogger.log(
+      'AppStartupController.start() called '
+      'existingFuture=${_startFuture != null} stage=${_stage.name}',
+    );
     return _startFuture ??= _performStartup();
   }
 
@@ -109,35 +116,58 @@ class AppStartupController extends ChangeNotifier {
   }
 
   Future<void> _performStartup() async {
+    StartupLogger.log('AppStartupController._performStartup() entered');
     _stage = AppStartupStage.booting;
     _lastError = null;
     notifyListeners();
 
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      await StartupLogger.logAsync('Firebase.initializeApp()', () {
+        return Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      });
       _firebaseReady = true;
+      StartupLogger.log('Firebase initialized');
+      _scheduleBackgroundMessageHandlerRegistration();
 
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = await StartupLogger.logAsync(
+        'FirebaseAuth.instance.currentUser check',
+        () async => FirebaseAuth.instance.currentUser,
+      );
+      StartupLogger.log(
+        'FirebaseAuth currentUser result=${currentUser == null ? 'null' : currentUser.uid}',
+      );
       if (currentUser != null) {
+        StartupLogger.log(
+          'Existing Firebase user found; marking startup ready',
+        );
         _stage = AppStartupStage.ready;
         notifyListeners();
         return;
       }
 
-      final hasAccepted = await _hasStoredAgreementAcceptance();
+      final hasAccepted = await StartupLogger.logAsync(
+        'SharedPreferences agreement acceptance check',
+        _hasStoredAgreementAcceptance,
+      );
+      StartupLogger.log('Agreement accepted=$hasAccepted');
       if (!hasAccepted) {
+        StartupLogger.log(
+          'No stored agreement acceptance found; waiting for agreement flow',
+        );
         _stage = AppStartupStage.waitingForAgreement;
         notifyListeners();
         return;
       }
 
+      StartupLogger.log(
+        'Stored agreement acceptance found; marking startup ready',
+      );
       _stage = AppStartupStage.ready;
       notifyListeners();
     } catch (error) {
+      StartupLogger.log('Startup failed: $error');
       _lastError = error;
       _stage = AppStartupStage.failed;
       _startFuture = null;
@@ -149,5 +179,31 @@ class AppStartupController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_agreementPrefsKey);
     return raw != null && raw.isNotEmpty;
+  }
+
+  void _scheduleBackgroundMessageHandlerRegistration() {
+    if (_backgroundMessageHandlerRegistrationScheduled ||
+        _backgroundMessageHandlerRegistered) {
+      return;
+    }
+
+    _backgroundMessageHandlerRegistrationScheduled = true;
+    final delay = startupDeferral(const Duration(seconds: 8));
+    StartupLogger.log(
+      'FirebaseMessaging.onBackgroundMessage() registration scheduled '
+      'in ${delay.inMilliseconds} ms',
+    );
+
+    Timer(delay, () {
+      StartupLogger.logSync(
+        'FirebaseMessaging.onBackgroundMessage() registration',
+        () {
+          FirebaseMessaging.onBackgroundMessage(
+            firebaseMessagingBackgroundHandler,
+          );
+        },
+      );
+      _backgroundMessageHandlerRegistered = true;
+    });
   }
 }

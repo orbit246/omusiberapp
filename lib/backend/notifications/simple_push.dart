@@ -100,6 +100,12 @@ class SimpleNotifications {
       }
     } catch (e) {
       debugPrint('SimpleNotifications init error: $e');
+    } finally {
+      try {
+        await _messaging.setAutoInitEnabled(false);
+      } catch (e) {
+        debugPrint('SimpleNotifications auto-init disable failed: $e');
+      }
     }
   }
 

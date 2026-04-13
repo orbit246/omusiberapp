@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/colors/app_theme.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
@@ -33,8 +36,15 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 }
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  StartupLogger.start();
+  StartupLogger.logSection('main()');
+  StartupLogger.logSync('WidgetsFlutterBinding.ensureInitialized()', () {
+    WidgetsFlutterBinding.ensureInitialized();
+  });
+  StartupLogger.attachFrameTimingsLogger(maxFrames: 12);
+  StartupLogger.logSync('runApp(const MyApp())', () {
+    runApp(const MyApp());
+  });
 }
 
 class MyApp extends StatefulWidget {
@@ -45,19 +55,27 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final ThemeManager _themeManager = ThemeManager();
+  late final ThemeData _lightTheme = AppTheme.light();
+  late final ThemeData _darkTheme = AppTheme.dark();
+
   @override
   void initState() {
     super.initState();
+    StartupLogger.log('MyApp.initState()');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AppStartupController.instance.start();
+      StartupLogger.log('First Flutter frame rendered; starting app bootstrap');
+      unawaited(AppStartupController.instance.start());
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    StartupLogger.log('MyApp.build()');
     return ListenableBuilder(
-      listenable: ThemeManager(),
+      listenable: _themeManager,
       builder: (context, child) {
+        StartupLogger.log('MyApp.build() -> MaterialApp');
         return MaterialApp(
           navigatorKey: navKey,
           debugShowCheckedModeBanner: false,
@@ -78,10 +96,10 @@ class _MyAppState extends State<MyApp> {
             'TR',
           ), // Varsayılan dili Türkçe yapabilirsiniz
           // -------------------------------
-          themeMode: ThemeManager().themeMode,
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          home: const MasterView(),
+          themeMode: _themeManager.themeMode,
+          theme: _lightTheme,
+          darkTheme: _darkTheme,
+          home: const _StartupShell(),
         );
       },
     );
@@ -94,13 +112,19 @@ class _StartupShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppStartupController.instance;
+    StartupLogger.log('StartupShell.build() stage=${controller.stage.name}');
 
     return AnimatedBuilder(
       animation: controller,
-      builder: (context, _) {
+      child: const MasterView(),
+      builder: (context, child) {
+        StartupLogger.log(
+          'StartupShell.rebuild() stage=${controller.stage.name} '
+          'booting=${controller.isBooting} agreement=${controller.needsAgreement}',
+        );
         return Stack(
           children: [
-            const MasterView(),
+            child!,
             if (controller.isBooting)
               const Positioned(top: 0, left: 0, right: 0, child: _BootStripe()),
             if (controller.needsAgreement)

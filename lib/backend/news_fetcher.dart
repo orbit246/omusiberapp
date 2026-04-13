@@ -43,20 +43,39 @@ class NewsFetcher {
       'https://carsambamyo.omu.edu.tr/user/themes/fakulte/assets/images/omu-default-img_tr.jpeg';
 
   static const String _storageKey = 'cached_news_list';
+  static const int _maxCachedNewsItems = 3;
   List<NewsView>? _cachedNews;
   List<NewsFaculty>? _cachedFaculties;
   DateTime? _lastFetchTime;
   static const Duration _cacheDuration = Duration(minutes: 30);
 
+  List<NewsView> _limitCachedNews(List<NewsView> items) {
+    if (items.length <= _maxCachedNewsItems) {
+      return items;
+    }
+    return items.take(_maxCachedNewsItems).toList(growable: false);
+  }
+
   Future<List<NewsView>> getCachedNews() async {
-    if (_cachedNews != null && _cachedNews!.isNotEmpty) return _cachedNews!;
+    if (_cachedNews != null && _cachedNews!.isNotEmpty) {
+      _cachedNews = _limitCachedNews(_cachedNews!);
+      return _cachedNews!;
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? jsonStr = prefs.getString(_storageKey);
       if (jsonStr != null) {
         final List<dynamic> decoded = json.decode(jsonStr);
-        _cachedNews = decoded.map((item) => NewsView.fromJson(item)).toList();
+        _cachedNews = _limitCachedNews(
+          decoded.map((item) => NewsView.fromJson(item)).toList(),
+        );
+        if (_cachedNews!.length != decoded.length) {
+          await prefs.setString(
+            _storageKey,
+            json.encode(_cachedNews!.map((e) => e.toJson()).toList()),
+          );
+        }
         _log('Loaded ${_cachedNews!.length} items from persistent cache.');
         return _cachedNews!;
       }
@@ -201,11 +220,13 @@ class NewsFetcher {
           )) {
         // Persist only the default feed so faculty-filtered results do not
         // replace the normal cached news list.
+        final limitedResult = _limitCachedNews(result);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(
           _storageKey,
-          json.encode(result.map((e) => e.toJson()).toList()),
+          json.encode(limitedResult.map((e) => e.toJson()).toList()),
         );
+        _cachedNews = limitedResult;
       }
     } catch (e) {
       if (e is StateError) {
@@ -221,7 +242,7 @@ class NewsFetcher {
     // 3. Save to Memory Cache
     if (result.isNotEmpty) {
       if (!hasFacultyFilter) {
-        _cachedNews = result;
+        _cachedNews = _limitCachedNews(result);
         _lastFetchTime = DateTime.now();
       }
       return result;

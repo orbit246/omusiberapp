@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
-import 'package:omusiber/backend/news_fetcher.dart';
-import 'package:omusiber/backend/event_repository.dart';
-import 'package:omusiber/backend/community_repository.dart';
+import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/pages/new_view/events_tab_view.dart';
 import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
@@ -41,14 +39,15 @@ class _MasterViewState extends State<MasterView>
 
   final TabBadgeService _badgeService = TabBadgeService();
   final AppStartupController _startupController = AppStartupController.instance;
-  static const Duration _notificationsInitDelay = Duration(seconds: 4);
+  static const Duration _notificationsInitDelay = Duration(seconds: 15);
+  static const Duration _permissionReminderDelay = Duration(seconds: 10);
   static const Duration _updateCheckDelay = Duration(seconds: 12);
-  static const Duration _updateCheckScheduleDelay = Duration(seconds: 4);
+  static const Duration _updateCheckScheduleDelay = Duration(seconds: 10);
   bool _notificationsInitialized = false;
   bool _notificationsInitScheduled = false;
   bool _updateCheckScheduled = false;
-  bool _badgeCheckStarted = false;
   Timer? _notificationsInitTimer;
+  Timer? _permissionReminderStartTimer;
   Timer? _permissionReminderTimer;
   Timer? _updateCheckStartTimer;
   Timer? _updateCheckTimer;
@@ -56,6 +55,9 @@ class _MasterViewState extends State<MasterView>
   @override
   void initState() {
     super.initState();
+    StartupLogger.log(
+      'MasterView.initState() initialTabIndex=${widget.initialTabIndex}',
+    );
     _appBarTitle = _titleForIndex(widget.initialTabIndex);
     _tabController = TabController(
       length: 3,
@@ -77,7 +79,11 @@ class _MasterViewState extends State<MasterView>
       if (!mounted) {
         return;
       }
-      _startPermissionReminder();
+      _permissionReminderStartTimer?.cancel();
+      _permissionReminderStartTimer = Timer(_permissionReminderDelay, () {
+        if (!mounted) return;
+        _startPermissionReminder();
+      });
       _handleStartupChanged();
       _scheduleUpdateCheckAfterStartupBreath();
     });
@@ -179,89 +185,6 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
-  Future<void> _checkBadges() async {
-    final lastViewed = await Future.wait<DateTime?>([
-      _badgeService.getLastViewedNews(),
-      _badgeService.getLastViewedEvents(),
-      _badgeService.getLastViewedNotifs(),
-      _badgeService.getLastViewedCommunity(),
-    ]);
-    final cached = await Future.wait<Object>([
-      NewsFetcher().getCachedNews(),
-      EventRepository().getCachedEvents(),
-      SimpleNotifications().loadSaved(),
-      CommunityRepository().getCachedPosts(),
-    ]);
-
-    if (!mounted) return;
-
-    final nextUnreadStates = List<bool>.from(_unreadStates);
-    var nextUnreadNotifications = _unreadNotifications;
-
-    final lastViewedNews = lastViewed[0];
-    final news = cached[0] as List;
-    if (lastViewedNews == null) {
-      nextUnreadStates[0] = true;
-    } else if (news.isNotEmpty) {
-      final latest = news.first.publishedAt ?? DateTime.now();
-      nextUnreadStates[0] = latest.isAfter(lastViewedNews);
-    }
-
-    final lastViewedEvents = lastViewed[1];
-    final events = cached[1] as List;
-    if (lastViewedEvents == null) {
-      nextUnreadStates[1] = true;
-    } else if (events.isNotEmpty) {
-      DateTime? latestEventDate;
-      for (final event in events) {
-        final createdStr = event.metadata['createdAt'];
-        if (createdStr == null) continue;
-
-        final dt = DateTime.tryParse(createdStr.toString());
-        if (dt != null &&
-            (latestEventDate == null || dt.isAfter(latestEventDate))) {
-          latestEventDate = dt;
-        }
-      }
-
-      if (latestEventDate != null) {
-        nextUnreadStates[1] = latestEventDate.isAfter(lastViewedEvents);
-      }
-    }
-
-    final lastViewedNotifs = lastViewed[2];
-    final notifs = cached[2] as List;
-    if (notifs.isNotEmpty) {
-      final latest = notifs.first.receivedAt;
-      nextUnreadNotifications =
-          lastViewedNotifs == null || latest.isAfter(lastViewedNotifs);
-    }
-
-    final lastViewedCommunity = lastViewed[3];
-    final posts = cached[3] as List;
-    if (posts.isNotEmpty) {
-      final latest = posts.first.createdAt;
-      nextUnreadStates[2] =
-          lastViewedCommunity == null || latest.isAfter(lastViewedCommunity);
-    }
-
-    setState(() {
-      _unreadStates
-        ..clear()
-        ..addAll(nextUnreadStates);
-      _unreadNotifications = nextUnreadNotifications;
-    });
-  }
-
-  void _checkBadgesAfterFirstProfileLoad() {
-    if (_badgeCheckStarted) {
-      return;
-    }
-
-    _badgeCheckStarted = true;
-    unawaited(_checkBadges());
-  }
-
   String _titleForIndex(int index) {
     switch (index) {
       case 1:
@@ -308,12 +231,9 @@ class _MasterViewState extends State<MasterView>
   }
 
   void _openSettingsPage() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) =>
-            SettingsPage(onFirstProfileLoad: _checkBadgesAfterFirstProfileLoad),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
   }
 
   void _openAcademicCalendarSheet() {
@@ -489,6 +409,7 @@ class _MasterViewState extends State<MasterView>
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
     _notificationsInitTimer?.cancel();
+    _permissionReminderStartTimer?.cancel();
     _permissionReminderTimer?.cancel();
     _updateCheckStartTimer?.cancel();
     _updateCheckTimer?.cancel();

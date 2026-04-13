@@ -7,6 +7,7 @@ import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/master_news_widgets_repository.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/share_service.dart';
+import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
@@ -108,8 +109,8 @@ class NewsTabView extends StatefulWidget {
 
 class _NewsTabViewState extends State<NewsTabView> {
   final AppStartupController _startupController = AppStartupController.instance;
-  static const Duration _backgroundRefreshDelay = Duration(seconds: 3);
-  static const int _imagePrefetchLimit = 5;
+  static const Duration _backgroundRefreshDelay = Duration(seconds: 10);
+  static const int _imagePrefetchLimit = 2;
   final List<NewsView> _articles = [];
   final Set<NewsView> _animateAllowedSet = {};
   final Set<NewsView> _hasAnimatedSet = {};
@@ -120,19 +121,26 @@ class _NewsTabViewState extends State<NewsTabView> {
   final List<NewsFaculty> _faculties = [];
   final Set<String> _selectedTags = <String>{};
 
-  bool _isInitialLoading = true;
+  bool _isSummaryLoading = true;
+  bool _isNewsLoading = true;
   bool _isFacultyNewsLoading = false;
   String? _errorMessage;
+  static const int _initialVisibleNewsCount = 5;
+  static const int _newsLoadMoreStep = 5;
+  int _visibleNewsCount = _initialVisibleNewsCount;
 
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
   bool _refreshQueued = false;
+  bool _initialCacheLoadComplete = false;
+  bool _startupRefreshComplete = false;
   Future<void>? _facultiesLoadFuture;
   Timer? _backgroundRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    StartupLogger.log('NewsTabView.initState()');
     _startupController.addListener(_handleStartupChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -149,18 +157,10 @@ class _NewsTabViewState extends State<NewsTabView> {
   }
 
   void _handleStartupChanged() {
-    if (!_startupController.canUseAuthenticatedApis || _refreshQueued) {
-      return;
-    }
-
-    if (_articles.isEmpty && _isInitialLoading) {
-      _backgroundRefreshTimer?.cancel();
-      _refreshQueued = true;
-      unawaited(
-        _refreshInBackground().whenComplete(() {
-          _refreshQueued = false;
-        }),
-      );
+    if (!_startupController.canUseAuthenticatedApis ||
+        _refreshQueued ||
+        !_initialCacheLoadComplete ||
+        _startupRefreshComplete) {
       return;
     }
 
@@ -226,48 +226,78 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _loadInitialData() async {
     try {
-      final cachedNewsFuture = NewsFetcher().getCachedNews();
-      final cachedWidgetsFuture = MasterNewsWidgetsRepository()
-          .getCachedWidgets();
-
-      final cachedData = await cachedNewsFuture;
-      final hydratedCached = _bindNewsActions(cachedData);
-
-      if (mounted) {
-        setState(() {
-          if (hydratedCached.isNotEmpty) {
-            _isInitialLoading = false;
-            _errorMessage = null;
-            _animateAllowedSet.addAll(hydratedCached);
-            _articles.clear();
-            _articles.addAll(hydratedCached);
-          }
-        });
-        _logSummaryWidgets('after cached load');
-        _precacheNewsImages(hydratedCached);
-      }
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _handleStartupChanged();
+      StartupLogger.log('NewsTabView._loadInitialData() started');
+      setState(() {
+        _isSummaryLoading = true;
+        _isNewsLoading = true;
+        _errorMessage = null;
       });
 
-      final cachedSummaryWidgets = await cachedWidgetsFuture;
-      if (mounted && cachedSummaryWidgets != null) {
-        setState(() {
-          _summaryWidgets = cachedSummaryWidgets;
+      final cachedResults = await Future.wait<dynamic>([
+        MasterNewsWidgetsRepository().getCachedWidgets(),
+        NewsFetcher().getCachedNews(),
+      ]);
+      final cachedSummaryWidgets = cachedResults[0] as MasterNewsWidgetsView?;
+      final cachedNews = _bindNewsActions(cachedResults[1] as List<NewsView>);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _summaryWidgets = cachedSummaryWidgets;
+        _articles
+          ..clear()
+          ..addAll(cachedNews);
+        _animateAllowedSet.addAll(cachedNews);
+        _resetVisibleNewsCount();
+        _isSummaryLoading = false;
+        _isNewsLoading = cachedNews.isEmpty;
+        _errorMessage = null;
+        _initialCacheLoadComplete = true;
+      });
+      _logSummaryWidgets('after cached data load');
+      _precacheNewsImages(cachedNews);
+
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _handleStartupChanged();
         });
-        _logSummaryWidgets('after cached widgets load');
       }
     } catch (e) {
       debugPrint("Failed to load initial news cache: $e");
-      if (_articles.isEmpty) {
+      StartupLogger.log('NewsTabView._loadInitialData() failed: $e');
+      if (mounted) {
+        setState(() {
+          _isSummaryLoading = false;
+          _isNewsLoading = false;
+          _errorMessage = e.toString();
+          _initialCacheLoadComplete = true;
+        });
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           _handleStartupChanged();
         });
       }
     }
+  }
+
+  void _resetVisibleNewsCount() {
+    _visibleNewsCount = _initialVisibleNewsCount;
+  }
+
+  void _loadMoreNews() {
+    final total = _filteredArticles.length;
+    if (_visibleNewsCount >= total) {
+      return;
+    }
+
+    setState(() {
+      _visibleNewsCount = (_visibleNewsCount + _newsLoadMoreStep)
+          .clamp(_initialVisibleNewsCount, total)
+          .toInt();
+    });
   }
 
   Future<void> _loadFaculties({bool forceRefresh = false}) async {
@@ -327,17 +357,18 @@ class _NewsTabViewState extends State<NewsTabView> {
           _summaryWidgets,
           resolvedWidgets,
         );
-        final shouldClearLoading = _isInitialLoading && _articles.isEmpty;
+        final shouldClearLoading = _isNewsLoading && _articles.isEmpty;
 
         if (!shouldReplaceArticles &&
             !shouldReplaceWidgets &&
             !shouldClearLoading &&
             _errorMessage == null) {
+          _startupRefreshComplete = true;
           return;
         }
 
         setState(() {
-          _isInitialLoading = false;
+          _isNewsLoading = false;
           _errorMessage = null;
           if (shouldReplaceWidgets || _summaryWidgets == null) {
             _summaryWidgets = resolvedWidgets;
@@ -347,6 +378,7 @@ class _NewsTabViewState extends State<NewsTabView> {
               ..clear()
               ..addAll(hydratedData);
             _animateAllowedSet.addAll(hydratedData);
+            _resetVisibleNewsCount();
           }
         });
         _logSummaryWidgets('after background refresh');
@@ -354,13 +386,14 @@ class _NewsTabViewState extends State<NewsTabView> {
           _precacheNewsImages(hydratedData);
         }
       }
+      _startupRefreshComplete = true;
     } catch (e) {
       if (e is StateError) {
         return;
       }
       if (mounted && _articles.isEmpty) {
         setState(() {
-          _isInitialLoading = false;
+          _isNewsLoading = false;
           _errorMessage = e.toString();
         });
       }
@@ -448,6 +481,7 @@ class _NewsTabViewState extends State<NewsTabView> {
           ..clear()
           ..addAll(fetchedData);
         _animateAllowedSet.addAll(fetchedData);
+        _resetVisibleNewsCount();
         _isFacultyNewsLoading = false;
       });
       _precacheNewsImages(fetchedData);
@@ -467,6 +501,7 @@ class _NewsTabViewState extends State<NewsTabView> {
       _selectedDatePreset = 'all';
       _selectedFacultySlug = null;
       _selectedTags.clear();
+      _resetVisibleNewsCount();
     });
 
     if (hadFacultyFilter) {
@@ -493,7 +528,11 @@ class _NewsTabViewState extends State<NewsTabView> {
   }
 
   void _precacheNewsImages(List<NewsView> items) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    final delay = _startupController.startupDeferral(
+      const Duration(seconds: 2),
+    );
+
+    void schedulePrefetch() {
       if (!mounted) return;
 
       for (final item in items.take(_imagePrefetchLimit)) {
@@ -502,6 +541,15 @@ class _NewsTabViewState extends State<NewsTabView> {
 
         unawaited(precacheImage(CachedNetworkImageProvider(url), context));
       }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (delay == Duration.zero) {
+        schedulePrefetch();
+        return;
+      }
+
+      Timer(delay, schedulePrefetch);
     });
   }
 
@@ -780,6 +828,14 @@ class _NewsTabViewState extends State<NewsTabView> {
     return items;
   }
 
+  List<NewsView> get _visibleFilteredArticles {
+    final filtered = _filteredArticles;
+    if (_visibleNewsCount >= filtered.length) {
+      return filtered;
+    }
+    return filtered.take(_visibleNewsCount).toList(growable: false);
+  }
+
   Widget _buildFilterPill(
     BuildContext context, {
     required String label,
@@ -922,8 +978,7 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Future<void> _openFilterSheet() async {
     if (_faculties.isEmpty) {
-      await _loadFaculties();
-      if (!mounted) return;
+      unawaited(_loadFaculties());
     }
 
     String tempSortKey = _selectedSortKey;
@@ -1176,6 +1231,7 @@ class _NewsTabViewState extends State<NewsTabView> {
                                   _selectedTags
                                     ..clear()
                                     ..addAll(tempTags);
+                                  _resetVisibleNewsCount();
                                 });
                                 Navigator.of(context).pop();
                                 if (facultyChanged) {
@@ -1198,19 +1254,39 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
-  Widget _buildSectionLabel(BuildContext context, String title) {
+  Widget _buildSectionLabel(
+    BuildContext context,
+    String title, {
+    bool isLoading = false,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Center(
-        child: Text(
-          title,
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w800,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (isLoading) ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1711,6 +1787,46 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  Widget _buildNewsLoadingIndicator(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.84),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+          ),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Haberler yukleniyor...',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingSection(String label) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -1736,12 +1852,23 @@ class _NewsTabViewState extends State<NewsTabView> {
   List<Widget> _buildSummarySlivers(BuildContext context) {
     final summaryWidgets = _summaryWidgets;
     if (summaryWidgets == null) {
-      debugPrint(
-        '[NewsTabView] Summary widgets are null; showing loading state.',
-      );
-      return const [
-        SliverToBoxAdapter(child: _LoadingSummaryCard()),
-        SliverToBoxAdapter(child: _LoadingSummaryCard()),
+      if (_isSummaryLoading) {
+        debugPrint(
+          '[NewsTabView] Summary widgets are null; showing loading state.',
+        );
+        return const [
+          SliverToBoxAdapter(child: _LoadingSummaryCard()),
+          SliverToBoxAdapter(child: _LoadingSummaryCard()),
+        ];
+      }
+
+      return [
+        SliverToBoxAdapter(
+          child: _buildSummaryUnavailableCard(
+            context,
+            'Ozet widget verisi su anda kullanilamiyor.',
+          ),
+        ),
       ];
     }
 
@@ -1761,9 +1888,6 @@ class _NewsTabViewState extends State<NewsTabView> {
 
     final slivers = <Widget>[];
     for (final section in summaryWidgets.sections) {
-      debugPrint(
-        '[NewsTabView] Rendering section id=${section.id} title="${section.title}" cards=${section.cards.length}',
-      );
       if (section.title.trim().isNotEmpty) {
         slivers.add(
           SliverToBoxAdapter(child: _buildSectionLabel(context, section.title)),
@@ -2037,9 +2161,9 @@ class _NewsTabViewState extends State<NewsTabView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final visibleArticles = _filteredArticles;
+    final visibleArticles = _visibleFilteredArticles;
 
-    if (_isInitialLoading) {
+    if (_isSummaryLoading && _isNewsLoading) {
       return _buildLoadingState(context);
     }
 
@@ -2060,7 +2184,7 @@ class _NewsTabViewState extends State<NewsTabView> {
       );
     } */
 
-    if (_errorMessage != null) {
+    if (_errorMessage != null && !_isNewsLoading && visibleArticles.isEmpty) {
       return Center(child: Text("Hata: $_errorMessage"));
     }
 
@@ -2119,11 +2243,17 @@ class _NewsTabViewState extends State<NewsTabView> {
               ],
               */
               SliverToBoxAdapter(
-                child: _buildSectionLabel(context, "Haberler"),
+                child: _buildSectionLabel(
+                  context,
+                  "Haberler",
+                  isLoading: _isNewsLoading,
+                ),
               ),
               SliverToBoxAdapter(child: _buildFilterBar(context)),
               // The List of News
-              if (visibleArticles.isEmpty)
+              if (_isNewsLoading && visibleArticles.isEmpty)
+                SliverToBoxAdapter(child: _buildNewsLoadingIndicator(context))
+              else if (visibleArticles.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
@@ -2190,6 +2320,21 @@ class _NewsTabViewState extends State<NewsTabView> {
                           : NewsCard(view: newsItem),
                     );
                   }, childCount: visibleArticles.length),
+                ),
+              if (!_isNewsLoading &&
+                  visibleArticles.isNotEmpty &&
+                  visibleArticles.length < _filteredArticles.length)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                    child: FilledButton.tonalIcon(
+                      onPressed: _loadMoreNews,
+                      icon: const Icon(Icons.expand_more_rounded),
+                      label: Text(
+                        'Daha fazla haber göster (${_filteredArticles.length - visibleArticles.length})',
+                      ),
+                    ),
+                  ),
                 ),
               // --- FOOTER SECTION ---
               SliverToBoxAdapter(
