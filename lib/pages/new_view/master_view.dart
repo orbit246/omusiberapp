@@ -500,10 +500,10 @@ class _MasterViewState extends State<MasterView>
         centerTitle: true,
         automaticallyImplyLeading: false,
         toolbarHeight: 64,
-        leadingWidth: 68,
+        leadingWidth: 58,
         leading: Builder(
           builder: (context) => Padding(
-            padding: const EdgeInsets.only(left: 12),
+            padding: const EdgeInsets.only(left: 10),
             child: _buildShellButton(
               context: context,
               icon: Icons.menu_rounded,

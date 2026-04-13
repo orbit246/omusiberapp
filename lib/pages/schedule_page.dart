@@ -533,7 +533,7 @@ class _SchedulePageState extends State<SchedulePage> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -559,7 +559,7 @@ class _SchedulePageState extends State<SchedulePage> {
                     curve: Curves.easeOutCubic,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 14,
+                      vertical: 16,
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
@@ -666,7 +666,7 @@ class _SchedulePageState extends State<SchedulePage> {
 
     const double timeColumnWidth = 88;
     const double dayColumnWidth = 150;
-    const double rowHeight = 110;
+    const double rowHeight = 116;
     const double cellGap = 10;
     final double gridWidth =
         timeColumnWidth +
@@ -773,6 +773,7 @@ class _SchedulePageState extends State<SchedulePage> {
                         ),
                       );
                     }),
+                    const SizedBox(height: 14),
                   ],
                 ),
               ),
@@ -879,6 +880,43 @@ class _SchedulePageState extends State<SchedulePage> {
   }) {
     final theme = Theme.of(context);
 
+    if (slot.isBreak) {
+      return Container(
+        width: width,
+        height: height,
+        margin: EdgeInsets.only(right: gap),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              slot.startLabel,
+              style: GoogleFonts.inter(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              slot.endLabel,
+              style: GoogleFonts.inter(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: width,
       height: height,
@@ -926,6 +964,32 @@ class _SchedulePageState extends State<SchedulePage> {
     required bool isToday,
   }) {
     final theme = Theme.of(context);
+
+    if (slot.isBreak) {
+      return Container(
+        width: width,
+        height: height,
+        margin: EdgeInsets.only(right: gap),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: isToday ? 0.10 : 0.06),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: isToday ? 0.20 : 0.12),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            slot.breakLabel,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: AppColors.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      );
+    }
 
     if (lesson == null) {
       return Container(
@@ -1239,6 +1303,29 @@ class _SchedulePageState extends State<SchedulePage> {
       );
     }).toList();
 
+    const lunchStartMinutes = 12 * 60;
+    const lunchEndMinutes = 13 * 60;
+    final hasMorningLesson = orderedTimes.any(
+      (minutes) => minutes < lunchStartMinutes,
+    );
+    final hasAfternoonLesson = orderedTimes.any(
+      (minutes) => minutes >= lunchEndMinutes,
+    );
+
+    if (hasMorningLesson && hasAfternoonLesson) {
+      timeSlots.add(
+        const _GridTimeSlot(
+          startMinutes: lunchStartMinutes,
+          endMinutes: lunchEndMinutes,
+          startLabel: '12:00',
+          endLabel: '13:00',
+          isBreak: true,
+          breakLabel: 'Lunch Break',
+        ),
+      );
+      timeSlots.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    }
+
     final visibleDays = _dayColumns.where((day) {
       if (day.key == 'CUMARTESI' || day.key == 'PAZAR') {
         return lessonsByDay[day.key]!.isNotEmpty;
@@ -1288,21 +1375,21 @@ class _SchedulePageState extends State<SchedulePage> {
       return 'Detay yok';
     }
 
-    return parts.join(' â€¢ ');
+    return parts.join(' / ');
   }
 
   Color _lessonAccent(ScheduleLesson lesson) {
     const palette = <Color>[
-      Color(0xFF2563EB),
-      Color(0xFF0D9488),
-      Color(0xFF7C3AED),
-      Color(0xFFF59E0B),
-      Color(0xFFEC4899),
-      Color(0xFF0EA5E9),
-      Color(0xFF10B981),
-      Color(0xFFEF4444),
-      Color(0xFF6366F1),
-      Color(0xFF14B8A6),
+      Color(0xFF5B7FA3),
+      Color(0xFF5D8C85),
+      Color(0xFF8A77A8),
+      Color(0xFFB48E63),
+      Color(0xFFAF7B93),
+      Color(0xFF6E93A8),
+      Color(0xFF6C9A84),
+      Color(0xFFB07A73),
+      Color(0xFF7886B2),
+      Color(0xFF6C9B9B),
     ];
 
     final seed =
@@ -1503,12 +1590,16 @@ class _GridTimeSlot {
     required this.endMinutes,
     required this.startLabel,
     required this.endLabel,
+    this.isBreak = false,
+    this.breakLabel = '',
   });
 
   final int startMinutes;
   final int endMinutes;
   final String startLabel;
   final String endLabel;
+  final bool isBreak;
+  final String breakLabel;
 }
 
 class _ScheduledLesson {

@@ -72,52 +72,6 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
                     ),
                   ),
                 ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "Built by ",
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                        Text(
-                          "NortixLabs",
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary, // Using Primary Color for the name
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        Text(
-                          " with ",
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                        Icon(
-                          Icons.favorite,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary, // Red heart
-                          size: 14,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
                 const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
               ],
             ),
@@ -190,52 +144,6 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
                 ),
               ),
               // --- FOOTER SECTION ---
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Built by ",
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                      Text(
-                        "NortixLabs",
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary, // Using Primary Color for the name
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      Text(
-                        " with ",
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                      Icon(
-                        Icons.favorite,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary, // Red heart
-                        size: 14,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
               const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],

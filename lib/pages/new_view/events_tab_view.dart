@@ -446,7 +446,6 @@ class _EventsTabViewState extends State<EventsTabView> {
                   child: Column(
                     children: [
                       Expanded(child: Center(child: NoEventsFoundWidget())),
-                      _buildFooter(context),
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -473,7 +472,6 @@ class _EventsTabViewState extends State<EventsTabView> {
                   }, childCount: events.length),
                 ),
 
-              SliverToBoxAdapter(child: _buildFooter(context)),
               const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
           ),
@@ -490,41 +488,6 @@ class _EventsTabViewState extends State<EventsTabView> {
     );
   }
 
-  Widget _buildFooter(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            "Built by ",
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          Text(
-            "NortixLabs",
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            " with ",
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          Icon(
-            Icons.favorite,
-            color: Theme.of(context).colorScheme.primary,
-            size: 14,
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _EventsLoadingState extends StatelessWidget {
