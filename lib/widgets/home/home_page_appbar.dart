@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
-import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/pages/new_view/edit_profile_page.dart';
 import 'package:omusiber/pages/new_view/settings_page.dart';
-import 'package:omusiber/pages/new_view/user_profile_page.dart';
 
 class HomePageAppbar extends StatelessWidget {
   HomePageAppbar({super.key});
 
   final GlobalKey _profileKey = GlobalKey();
-  final UserProfileService _profileService = UserProfileService();
   final AuthService _authService = AuthService();
 
   @override
@@ -199,20 +197,8 @@ class HomePageAppbar extends StatelessWidget {
       return;
     }
 
-    final profile = await _profileService.fetchUserProfile(user.uid);
-    if (!context.mounted) return;
-
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil bilgisi su anda yuklenemedi.')),
-      );
-      return;
-    }
-
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => UserProfilePage(profile: profile),
-      ),
+      MaterialPageRoute(builder: (context) => EditProfilePage(uid: user.uid)),
     );
   }
 }

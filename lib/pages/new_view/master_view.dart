@@ -16,7 +16,6 @@ import 'package:omusiber/pages/new_view/settings_page.dart';
 import 'package:omusiber/pages/new_view/food_menu_page.dart';
 import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/pages/new_view/academic_calendar_page.dart';
-import 'package:omusiber/pages/new_view/user_search_page.dart';
 
 class MasterView extends StatefulWidget {
   const MasterView({super.key, this.initialTabIndex = 0});
@@ -502,12 +501,15 @@ class _MasterViewState extends State<MasterView>
         toolbarHeight: 64,
         leadingWidth: 58,
         leading: Builder(
-          builder: (context) => Padding(
-            padding: const EdgeInsets.only(left: 10),
-            child: _buildShellButton(
-              context: context,
-              icon: Icons.menu_rounded,
-              onPressed: () => Scaffold.of(context).openDrawer(),
+          builder: (context) => Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: _buildShellButton(
+                context: context,
+                icon: Icons.menu_rounded,
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
             ),
           ),
         ),
@@ -526,21 +528,6 @@ class _MasterViewState extends State<MasterView>
           ),
         ),
         actions: [
-          if (_tabController.index == 2)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: _buildShellButton(
-                context: context,
-                icon: Icons.search_rounded,
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const UserSearchPage(),
-                    ),
-                  );
-                },
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: _buildShellButton(

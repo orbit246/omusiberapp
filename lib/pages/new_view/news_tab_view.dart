@@ -333,6 +333,15 @@ class _NewsTabViewState extends State<NewsTabView> {
     });
   }
 
+  Future<List<NewsFaculty>> _ensureFacultiesForFilters() async {
+    if (_faculties.isNotEmpty) {
+      return List<NewsFaculty>.unmodifiable(_faculties);
+    }
+
+    await _loadFaculties();
+    return List<NewsFaculty>.unmodifiable(_faculties);
+  }
+
   Future<void> _refreshInBackground() async {
     try {
       final refreshResults = await Future.wait<dynamic>([
@@ -977,14 +986,11 @@ class _NewsTabViewState extends State<NewsTabView> {
   }
 
   Future<void> _openFilterSheet() async {
-    if (_faculties.isEmpty) {
-      unawaited(_loadFaculties());
-    }
-
     String tempSortKey = _selectedSortKey;
     String tempDatePreset = _selectedDatePreset;
     String? tempFacultySlug = _selectedFacultySlug;
     final Set<String> tempTags = {..._selectedTags};
+    final facultiesFuture = _ensureFacultiesForFilters();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1117,35 +1123,70 @@ class _NewsTabViewState extends State<NewsTabView> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      if (_faculties.isEmpty)
-                        Text(
-                          'Fakülte listesi yükleniyor.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        )
-                      else
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            buildChoice(
-                              label: 'Tümü',
-                              selected: tempFacultySlug == null,
-                              onTap: () =>
-                                  setModalState(() => tempFacultySlug = null),
-                            ),
-                            ..._faculties.map((faculty) {
-                              return buildChoice(
-                                label: faculty.name,
-                                selected: tempFacultySlug == faculty.slug,
-                                onTap: () => setModalState(
-                                  () => tempFacultySlug = faculty.slug,
+                      FutureBuilder<List<NewsFaculty>>(
+                        future: facultiesFuture,
+                        builder: (context, snapshot) {
+                          final faculties =
+                              snapshot.data ?? const <NewsFaculty>[];
+
+                          if (snapshot.connectionState ==
+                                  ConnectionState.waiting &&
+                              faculties.isEmpty) {
+                            return Row(
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.primary,
+                                  ),
                                 ),
-                              );
-                            }),
-                          ],
-                        ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Fakülte listesi yükleniyor.',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+
+                          if (faculties.isEmpty) {
+                            return Text(
+                              'Fakülte listesi şu anda yüklenemedi.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            );
+                          }
+
+                          return Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              buildChoice(
+                                label: 'Tümü',
+                                selected: tempFacultySlug == null,
+                                onTap: () =>
+                                    setModalState(() => tempFacultySlug = null),
+                              ),
+                              ...faculties.map((faculty) {
+                                return buildChoice(
+                                  label: faculty.name,
+                                  selected: tempFacultySlug == faculty.slug,
+                                  onTap: () => setModalState(
+                                    () => tempFacultySlug = faculty.slug,
+                                  ),
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                      ),
                       const SizedBox(height: 18),
                       Text(
                         'Etiketler',
@@ -2136,6 +2177,31 @@ class _NewsTabViewState extends State<NewsTabView> {
                 iconBoxSize: 38,
                 iconSize: 18,
                 trailingColor: colorScheme.secondary,
+              );
+      case MasterNewsWidgetCardKind.lesson:
+        return isToday
+            ? _SummaryCardStyle(
+                borderRadius: 22,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.84),
+                borderColor: colorScheme.tertiary.withValues(alpha: 0.22),
+                iconBackgroundColor: colorScheme.tertiaryContainer,
+                iconColor: colorScheme.onTertiaryContainer,
+                icon: Icons.menu_book_rounded,
+                iconBoxSize: 36,
+                iconSize: 18,
+                trailingColor: colorScheme.tertiary,
+              )
+            : _SummaryCardStyle(
+                borderRadius: 22,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.88),
+                borderColor: colorScheme.outlineVariant.withValues(alpha: 0.34),
+                iconBackgroundColor: colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.72),
+                iconColor: colorScheme.primary,
+                icon: Icons.menu_book_rounded,
+                iconBoxSize: 34,
+                iconSize: 17,
+                trailingColor: colorScheme.primary,
               );
       case MasterNewsWidgetCardKind.community:
       case MasterNewsWidgetCardKind.unknown:

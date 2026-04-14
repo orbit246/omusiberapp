@@ -76,11 +76,6 @@ class CommunityPostCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.more_horiz),
-                  onPressed: () {},
-                  visualDensity: VisualDensity.compact,
-                ),
               ],
             ),
             const SizedBox(height: 12),

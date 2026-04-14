@@ -1,29 +1,31 @@
-enum MasterNewsWidgetCardKind { event, news, community, unknown }
+enum MasterNewsWidgetCardKind { event, news, community, lesson, unknown }
 
 enum MasterNewsWidgetActionType { openTab, scrollNewsList, none }
 
 class MasterNewsWidgetsView {
   final List<MasterNewsWidgetSection> sections;
 
-  const MasterNewsWidgetsView({this.sections = const <MasterNewsWidgetSection>[]});
+  const MasterNewsWidgetsView({
+    this.sections = const <MasterNewsWidgetSection>[],
+  });
 
   factory MasterNewsWidgetsView.fromJson(Map<String, dynamic> json) {
     final rawSections = _resolveSections(json);
     final sections = rawSections is List
         ? rawSections
-            .map((item) {
-              if (item is Map<String, dynamic>) {
-                return MasterNewsWidgetSection.fromJson(item);
-              }
-              if (item is Map) {
-                return MasterNewsWidgetSection.fromJson(
-                  Map<String, dynamic>.from(item),
-                );
-              }
-              return null;
-            })
-            .whereType<MasterNewsWidgetSection>()
-            .toList(growable: false)
+              .map((item) {
+                if (item is Map<String, dynamic>) {
+                  return MasterNewsWidgetSection.fromJson(item);
+                }
+                if (item is Map) {
+                  return MasterNewsWidgetSection.fromJson(
+                    Map<String, dynamic>.from(item),
+                  );
+                }
+                return null;
+              })
+              .whereType<MasterNewsWidgetSection>()
+              .toList(growable: false)
         : const <MasterNewsWidgetSection>[];
 
     return MasterNewsWidgetsView(sections: sections);
@@ -54,14 +56,19 @@ class MasterNewsWidgetsView {
         inferredSections.add({
           'id': value['id'] ?? normalizedKey,
           'title': value['title'] ?? _defaultTitleForSection(normalizedKey),
-          'cards': value['cards'] ?? value['items'] ?? value['widgets'] ?? const [],
+          'cards':
+              value['cards'] ?? value['items'] ?? value['widgets'] ?? const [],
         });
       } else if (value is Map) {
         final mapped = Map<String, dynamic>.from(value);
         inferredSections.add({
           'id': mapped['id'] ?? normalizedKey,
           'title': mapped['title'] ?? _defaultTitleForSection(normalizedKey),
-          'cards': mapped['cards'] ?? mapped['items'] ?? mapped['widgets'] ?? const [],
+          'cards':
+              mapped['cards'] ??
+              mapped['items'] ??
+              mapped['widgets'] ??
+              const [],
         });
       } else if (value is List) {
         inferredSections.add({
@@ -129,19 +136,19 @@ class MasterNewsWidgetSection {
         '';
     final cards = rawCards is List
         ? rawCards
-            .map((item) {
-              if (item is Map<String, dynamic>) {
-                return MasterNewsWidgetCard.fromJson(item);
-              }
-              if (item is Map) {
-                return MasterNewsWidgetCard.fromJson(
-                  Map<String, dynamic>.from(item),
-                );
-              }
-              return null;
-            })
-            .whereType<MasterNewsWidgetCard>()
-            .toList(growable: false)
+              .map((item) {
+                if (item is Map<String, dynamic>) {
+                  return MasterNewsWidgetCard.fromJson(item);
+                }
+                if (item is Map) {
+                  return MasterNewsWidgetCard.fromJson(
+                    Map<String, dynamic>.from(item),
+                  );
+                }
+                return null;
+              })
+              .whereType<MasterNewsWidgetCard>()
+              .toList(growable: false)
         : const <MasterNewsWidgetCard>[];
 
     return MasterNewsWidgetSection(
@@ -225,10 +232,7 @@ class MasterNewsWidgetCard {
     'subtitle': subtitle,
     'value': value,
     'trailingText': trailingText,
-    'action': {
-      'type': actionType.name,
-      'targetTabIndex': targetTabIndex,
-    },
+    'action': {'type': actionType.name, 'targetTabIndex': targetTabIndex},
   };
 
   static MasterNewsWidgetCardKind _parseCardKind(String? value) {
@@ -239,6 +243,11 @@ class MasterNewsWidgetCard {
         return MasterNewsWidgetCardKind.news;
       case 'community':
         return MasterNewsWidgetCardKind.community;
+      case 'lesson':
+      case 'lessons':
+      case 'ders':
+      case 'dersler':
+        return MasterNewsWidgetCardKind.lesson;
       default:
         return MasterNewsWidgetCardKind.unknown;
     }

@@ -4,10 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/schedule_service.dart';
-import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
 import 'package:omusiber/colors/app_colors.dart';
-import 'package:omusiber/pages/new_view/user_profile_page.dart';
+import 'package:omusiber/pages/new_view/edit_profile_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SchedulePage extends StatefulWidget {
@@ -31,7 +30,6 @@ class _SchedulePageState extends State<SchedulePage> {
   final ScrollController _horizontalController = ScrollController();
   Timer? _clockTimer;
   late Future<List<ProgramSchedule>> _schedulesFuture;
-  final UserProfileService _profileService = UserProfileService();
 
   ProgramSchedule? _selectedProgram;
   int _selectedGradeIndex = 0;
@@ -113,31 +111,8 @@ class _SchedulePageState extends State<SchedulePage> {
       return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearSnackBars();
-    messenger.showSnackBar(
-      const SnackBar(
-        duration: Duration(seconds: 10),
-        content: Text('Profil yukleniyor...'),
-      ),
-    );
-
-    final profile = await _profileService.fetchUserProfile(user.uid);
-
-    if (!mounted) return;
-    messenger.clearSnackBars();
-
-    if (profile == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Profil bilgisi su anda yuklenemedi.')),
-      );
-      return;
-    }
-
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => UserProfilePage(profile: profile),
-      ),
+      MaterialPageRoute(builder: (context) => EditProfilePage(uid: user.uid)),
     );
   }
 
