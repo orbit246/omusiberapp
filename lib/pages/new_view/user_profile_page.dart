@@ -132,13 +132,29 @@ class UserProfilePage extends StatelessWidget {
                       label: "E-posta",
                       value: profile.email!,
                     ),
+                  if (profile.facultyName != null &&
+                      profile.facultyName!.isNotEmpty)
+                    _buildInfoTile(
+                      context,
+                      icon: Icons.account_balance_outlined,
+                      label: "Fakülte",
+                      value: profile.facultyName!,
+                    ),
                   if (profile.department != null &&
                       profile.department!.isNotEmpty)
                     _buildInfoTile(
                       context,
                       icon: Icons.school_outlined,
-                      label: "Bölüm / Uzmanlık",
+                      label: "Bölüm",
                       value: profile.department!,
+                    ),
+                  if (profile.gradeName != null &&
+                      profile.gradeName!.isNotEmpty)
+                    _buildInfoTile(
+                      context,
+                      icon: Icons.format_list_numbered_outlined,
+                      label: "Sınıf",
+                      value: profile.gradeName!,
                     ),
                   if (profile.campus != null && profile.campus!.isNotEmpty)
                     _buildInfoTile(

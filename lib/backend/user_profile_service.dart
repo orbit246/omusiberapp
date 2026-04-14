@@ -3,11 +3,34 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/constants.dart';
+import 'package:omusiber/backend/view/academic_faculty_model.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/models/user_badge.dart';
 
 class UserProfileService {
   FirebaseAuth get _auth => FirebaseAuth.instance;
+
+  Exception _buildApiException(String fallbackMessage, String responseBody) {
+    try {
+      final decoded = json.decode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        final message = decoded['message'] ?? decoded['error'];
+        if (message is String && message.trim().isNotEmpty) {
+          return Exception(message.trim());
+        }
+      }
+      if (decoded is String && decoded.trim().isNotEmpty) {
+        return Exception(decoded.trim());
+      }
+    } catch (_) {
+      final trimmed = responseBody.trim();
+      if (trimmed.isNotEmpty) {
+        return Exception(trimmed);
+      }
+    }
+
+    return Exception(fallbackMessage);
+  }
 
   /// Helper to get headers with Firebase ID token
   Future<Map<String, String>> _getHeaders() async {
@@ -73,7 +96,10 @@ class UserProfileService {
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to update privacy setting: ${response.body}');
+        throw _buildApiException(
+          'Failed to update privacy setting.',
+          response.body,
+        );
       }
     } catch (e) {
       print('Error updating privacy setting: $e');
@@ -92,7 +118,9 @@ class UserProfileService {
       final updates = {
         'name': sourceProfile.name,
         'age': sourceProfile.age,
-        'department': sourceProfile.department,
+        'facultyKey': sourceProfile.facultyKey,
+        'departmentKey': sourceProfile.departmentKey,
+        'gradeKey': sourceProfile.gradeKey,
         'gender': sourceProfile.gender,
         'campus': sourceProfile.campus,
         'isPrivate': sourceProfile.isPrivate,
@@ -126,7 +154,10 @@ class UserProfileService {
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to update user profile: ${response.body}');
+        throw _buildApiException(
+          'Failed to update user profile.',
+          response.body,
+        );
       }
     } catch (e) {
       print('Error updating user profile: $e');
@@ -156,6 +187,39 @@ class UserProfileService {
     } catch (e) {
       print('Error fetching user profile: $e');
       return null;
+    }
+  }
+
+  Future<List<AcademicFaculty>> fetchAcademicFaculties() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${Constants.baseUrl}/academic-faculties'),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode != 200) {
+        throw _buildApiException(
+          'Akademik birim listesi alinamadi.',
+          response.body,
+        );
+      }
+
+      final decoded = json.decode(response.body);
+      if (decoded is! List) {
+        throw Exception('Akademik birim yaniti gecersiz.');
+      }
+
+      return decoded
+          .whereType<Map>()
+          .map(
+            (faculty) =>
+                AcademicFaculty.fromJson(faculty.cast<String, dynamic>()),
+          )
+          .where((faculty) => faculty.key.isNotEmpty && faculty.name.isNotEmpty)
+          .toList(growable: false);
+    } catch (e) {
+      print('Error fetching academic faculties: $e');
+      rethrow;
     }
   }
 }

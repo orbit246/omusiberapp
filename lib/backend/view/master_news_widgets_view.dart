@@ -1,6 +1,6 @@
 enum MasterNewsWidgetCardKind { event, news, community, lesson, unknown }
 
-enum MasterNewsWidgetActionType { openTab, scrollNewsList, none }
+enum MasterNewsWidgetActionType { openTab, openSchedule, scrollNewsList, none }
 
 class MasterNewsWidgetsView {
   final List<MasterNewsWidgetSection> sections;
@@ -257,6 +257,10 @@ class MasterNewsWidgetCard {
     switch (MasterNewsWidgetsView._normalizeToken(value)) {
       case 'opentab':
         return MasterNewsWidgetActionType.openTab;
+      case 'openschedule':
+      case 'openschedulepage':
+      case 'schedule':
+        return MasterNewsWidgetActionType.openSchedule;
       case 'scrollnewslist':
         return MasterNewsWidgetActionType.scrollNewsList;
       default:

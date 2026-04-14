@@ -12,7 +12,12 @@ class UserProfile {
   // Extended fields
   final String? gender;
   final int? age;
+  final String? facultyKey;
+  final String? facultyName;
+  final String? departmentKey;
   final String? department;
+  final String? gradeKey;
+  final String? gradeName;
   final String? campus;
 
   UserProfile({
@@ -26,7 +31,12 @@ class UserProfile {
     this.isPrivate = false,
     this.gender,
     this.age,
+    this.facultyKey,
+    this.facultyName,
+    this.departmentKey,
     this.department,
+    this.gradeKey,
+    this.gradeName,
     this.campus,
   });
 
@@ -35,21 +45,33 @@ class UserProfile {
     String uid, {
     List<UserBadge> badges = const [],
   }) {
+    String? readTrimmed(dynamic value) {
+      if (value is! String) return null;
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
     return UserProfile(
       uid: uid,
-      studentId: (data['studentId'] as String?)?.trim().isEmpty ?? true
-          ? null
-          : (data['studentId'] as String).trim(),
-      email: data['email'],
+      studentId: readTrimmed(data['studentId']),
+      email: readTrimmed(data['email']),
       name: data['name'] ?? 'Kullanıcı',
-      photoUrl: data['photoUrl'],
+      photoUrl: readTrimmed(data['photoUrl']),
       role: data['role'] ?? 'member',
       badges: badges,
       isPrivate: data['isPrivate'] ?? false,
-      gender: data['gender'],
+      gender: readTrimmed(data['gender']),
       age: data['age'],
-      department: data['department'],
-      campus: data['campus'],
+      facultyKey: readTrimmed(data['facultyKey']),
+      facultyName:
+          readTrimmed(data['facultyName']) ?? readTrimmed(data['faculty']),
+      departmentKey: readTrimmed(data['departmentKey']),
+      department:
+          readTrimmed(data['departmentName']) ??
+          readTrimmed(data['department']),
+      gradeKey: readTrimmed(data['gradeKey']),
+      gradeName: readTrimmed(data['gradeName']) ?? readTrimmed(data['grade']),
+      campus: readTrimmed(data['campus']),
     );
   }
 }
