@@ -67,15 +67,26 @@ class _EventCardState extends State<EventCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isPast = widget.isPast;
+    final cardColor = isPast
+        ? Color.alphaBlend(cs.onSurface.withValues(alpha: 0.045), cs.surface)
+        : cs.surface;
+    final primaryAccent = isPast ? cs.onSurfaceVariant : cs.primary;
+    final titleColor = isPast
+        ? cs.onSurface.withValues(alpha: 0.72)
+        : cs.onSurface;
+    final bodyColor = isPast
+        ? cs.onSurfaceVariant.withValues(alpha: 0.78)
+        : cs.onSurfaceVariant;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isPast ? 0.025 : 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -105,6 +116,10 @@ class _EventCardState extends State<EventCard> {
                         return CachedNetworkImage(
                           imageUrl: widget.imageUrl,
                           fit: BoxFit.cover,
+                          color: isPast
+                              ? cs.surface.withValues(alpha: 0.32)
+                              : null,
+                          colorBlendMode: isPast ? BlendMode.saturation : null,
                           memCacheWidth: cacheWidth,
                           memCacheHeight: cacheHeight,
                           fadeInDuration: const Duration(milliseconds: 220),
@@ -163,14 +178,14 @@ class _EventCardState extends State<EventCard> {
                           Icon(
                             Icons.calendar_today_rounded,
                             size: 14,
-                            color: cs.primary,
+                            color: primaryAccent,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             widget.datetimeText,
                             style: theme.textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
+                              color: titleColor,
                             ),
                           ),
                         ],
@@ -195,14 +210,14 @@ class _EventCardState extends State<EventCard> {
                           Icon(
                             Icons.calendar_today_rounded,
                             size: 16,
-                            color: cs.primary,
+                            color: primaryAccent,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             widget.datetimeText,
                             style: theme.textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
+                              color: titleColor,
                             ),
                           ),
                         ],
@@ -216,7 +231,7 @@ class _EventCardState extends State<EventCard> {
                       child: Text(
                         widget.publisher!,
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: cs.primary,
+                          color: primaryAccent,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -229,6 +244,7 @@ class _EventCardState extends State<EventCard> {
                       fontWeight: FontWeight.w800,
                       fontSize: 18,
                       height: 1.25,
+                      color: titleColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -239,14 +255,14 @@ class _EventCardState extends State<EventCard> {
                       Icon(
                         Icons.location_on_rounded,
                         size: 16,
-                        color: cs.onSurfaceVariant,
+                        color: bodyColor,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           widget.location,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant,
+                            color: bodyColor,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -274,7 +290,7 @@ class _EventCardState extends State<EventCard> {
                     AppMarkdownPreview(
                       data: widget.description!,
                       maxHeight: 74,
-                      backgroundColor: cs.surface,
+                      backgroundColor: cardColor,
                     ),
                   ],
 
@@ -289,6 +305,8 @@ class _EventCardState extends State<EventCard> {
                             child: _InfoItem(
                               icon: Icons.confirmation_number_outlined,
                               text: widget.ticketText!,
+                              iconColor: primaryAccent,
+                              textColor: bodyColor,
                             ),
                           ),
                         if (widget.capacityText != null)
@@ -296,6 +314,8 @@ class _EventCardState extends State<EventCard> {
                             child: _InfoItem(
                               icon: Icons.group_outlined,
                               text: widget.capacityText!,
+                              iconColor: primaryAccent,
+                              textColor: bodyColor,
                             ),
                           ),
                       ],
@@ -338,13 +358,17 @@ class _EventCardState extends State<EventCard> {
                                 (widget.isJoined ||
                                     widget.isPast ||
                                     widget.isRegistrationClosed)
-                                ? cs.primaryContainer
+                                ? (isPast
+                                      ? cs.surfaceContainerHighest
+                                      : cs.primaryContainer)
                                 : null,
                             foregroundColor:
                                 (widget.isJoined ||
                                     widget.isPast ||
                                     widget.isRegistrationClosed)
-                                ? cs.onPrimaryContainer
+                                ? (isPast
+                                      ? cs.onSurfaceVariant
+                                      : cs.onPrimaryContainer)
                                 : null,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
@@ -455,18 +479,28 @@ class _ModernTag extends StatelessWidget {
 class _InfoItem extends StatelessWidget {
   final IconData icon;
   final String text;
-  const _InfoItem({required this.icon, required this.text});
+  final Color? iconColor;
+  final Color? textColor;
+
+  const _InfoItem({
+    required this.icon,
+    required this.text,
+    this.iconColor,
+    this.textColor,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Row(
       children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+        Icon(icon, size: 18, color: iconColor ?? cs.primary),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+            style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
           ),
         ),
       ],

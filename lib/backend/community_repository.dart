@@ -118,6 +118,7 @@ class CommunityRepository {
 
   Future<CommunityPostsPage> fetchPostsPage({
     bool forceRefresh = false,
+    bool fallbackToCacheOnError = true,
     int? limit,
     String? cursor,
   }) async {
@@ -197,11 +198,15 @@ class CommunityRepository {
     } catch (e) {
       debugPrint("Error fetching posts: $e");
 
-      if (isFirstPage) {
+      if (isFirstPage && fallbackToCacheOnError) {
         final cached = await getCachedPosts();
         if (cached.isNotEmpty) {
           return CommunityPostsPage(posts: cached, nextCursor: _nextCursor);
         }
+      }
+
+      if (!fallbackToCacheOnError) {
+        rethrow;
       }
 
       return const CommunityPostsPage(posts: []);

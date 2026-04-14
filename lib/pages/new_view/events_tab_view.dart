@@ -2,29 +2,26 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:omusiber/backend/app_startup_controller.dart';
-import 'package:omusiber/backend/cache_compare.dart';
-import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
+import 'package:omusiber/pages/new_view/controllers/events_tab_controller.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
-// --- 1. ANIMATION WRAPPER (Copied from NewsTabView) ---
 class SlideInEntry extends StatefulWidget {
-  final Widget child;
-  final Duration delay;
-  final bool animate;
-
   const SlideInEntry({
     super.key,
     required this.child,
     this.delay = Duration.zero,
     this.animate = true,
   });
+
+  final Widget child;
+  final Duration delay;
+  final bool animate;
 
   @override
   State<SlideInEntry> createState() => _SlideInEntryState();
@@ -51,7 +48,6 @@ class _SlideInEntryState extends State<SlideInEntry>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
 
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-
     _sizeAnimation = CurvedAnimation(
       parent: _controller,
       curve: Curves.fastOutSlowIn,
@@ -64,7 +60,7 @@ class _SlideInEntryState extends State<SlideInEntry>
     }
   }
 
-  void _runAnimation() async {
+  Future<void> _runAnimation() async {
     if (widget.delay > Duration.zero) {
       await Future.delayed(widget.delay);
     }
@@ -81,6 +77,10 @@ class _SlideInEntryState extends State<SlideInEntry>
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.animate) {
+      return widget.child;
+    }
+
     return SizeTransition(
       sizeFactor: _sizeAnimation,
       axisAlignment: -1.0,
@@ -92,7 +92,6 @@ class _SlideInEntryState extends State<SlideInEntry>
   }
 }
 
-// --- 2. MAIN VIEW ---
 class EventsTabView extends StatefulWidget {
   const EventsTabView({super.key});
 
@@ -101,146 +100,31 @@ class EventsTabView extends StatefulWidget {
 }
 
 class _EventsTabViewState extends State<EventsTabView> {
-  final AppStartupController _startupController = AppStartupController.instance;
-  static const Duration _backgroundRefreshDelay = Duration(seconds: 4);
   static const int _imagePrefetchLimit = 5;
-  final EventRepository _repo = EventRepository();
+
+  late final EventsTabController _controller;
   final Set<String> _hasAnimatedIds = {};
-
   bool _showBackToTopButton = false;
-
-  final List<PostView> _events = [];
-  bool _isInitialLoading = true;
-  String? _errorMessage;
-  bool _refreshQueued = false;
-  Timer? _backgroundRefreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _startupController.addListener(_handleStartupChanged);
+    _controller = EventsTabController()..addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _loadInitialData();
+      unawaited(_controller.loadInitialData());
     });
-  }
-
-  Future<void> _loadInitialData() async {
-    try {
-      // 1. Load from cache first (no network)
-      final cached = await _repo.getCachedEvents();
-      if (mounted) {
-        final cachedEvents = freshWithMocks(cached);
-        setState(() {
-          if (cached.isNotEmpty) {
-            _isInitialLoading = false;
-            _errorMessage = null;
-            _events.clear();
-            _events.addAll(cachedEvents);
-          }
-        });
-        _precacheEventImages(cachedEvents);
-      }
-
-      // 2. Schedule refresh AFTER render
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scheduleBackgroundRefresh();
-      });
-    } catch (e) {
-      debugPrint("Failed to load initial events cache: $e");
-      if (_events.isEmpty) {
-        _scheduleBackgroundRefresh();
-      }
-    }
-  }
-
-  Future<void> _refreshInBackground() async {
-    try {
-      final fresh = await _repo.fetchEvents(forceRefresh: true);
-      if (mounted) {
-        final freshEvents = freshWithMocks(fresh);
-        final shouldReplaceEvents = !jsonListEquals<PostView>(
-          _events,
-          freshEvents,
-          (item) => item.toJson(),
-        );
-        final shouldClearLoading = _isInitialLoading && _events.isEmpty;
-
-        if (!shouldReplaceEvents &&
-            !shouldClearLoading &&
-            _errorMessage == null) {
-          return;
-        }
-
-        setState(() {
-          _isInitialLoading = false;
-          _errorMessage = null;
-          if (shouldReplaceEvents) {
-            _events
-              ..clear()
-              ..addAll(freshEvents);
-          }
-        });
-        if (shouldReplaceEvents) {
-          _precacheEventImages(freshEvents);
-        }
-      }
-    } catch (e) {
-      debugPrint("Background refresh failed: $e");
-      if (mounted && _events.isEmpty) {
-        setState(() {
-          _isInitialLoading = false;
-          _errorMessage = e.toString();
-        });
-      }
-    }
-  }
-
-  List<PostView> freshWithMocks(List<PostView> fresh) {
-    return [...fresh];
   }
 
   @override
   void dispose() {
-    _startupController.removeListener(_handleStartupChanged);
-    _backgroundRefreshTimer?.cancel();
+    _controller.removeListener(_handleControllerChanged);
+    _controller.dispose();
     super.dispose();
   }
 
-  void _handleStartupChanged() {
-    if (!_startupController.canUseAuthenticatedApis || _refreshQueued) {
-      return;
-    }
-
-    _scheduleBackgroundRefresh();
-  }
-
-  void _scheduleBackgroundRefresh() {
-    final delay = _startupController.startupDeferral(_backgroundRefreshDelay);
-    _backgroundRefreshTimer?.cancel();
-    if (delay == Duration.zero) {
-      if (_refreshQueued) {
-        return;
-      }
-      _refreshQueued = true;
-      unawaited(
-        _refreshInBackground().whenComplete(() {
-          _refreshQueued = false;
-        }),
-      );
-      return;
-    }
-    _backgroundRefreshTimer = Timer(delay, () {
-      if (!mounted || _refreshQueued) {
-        return;
-      }
-      _refreshQueued = true;
-      unawaited(
-        _refreshInBackground().whenComplete(() {
-          _refreshQueued = false;
-        }),
-      );
-    });
+  void _handleControllerChanged() {
+    _precacheEventImages(_controller.events);
   }
 
   void _scrollToTop() {
@@ -259,7 +143,7 @@ class _EventsTabViewState extends State<EventsTabView> {
       if (!mounted) return;
 
       for (final event in items.take(_imagePrefetchLimit)) {
-        final url = _eventImageUrl(event);
+        final url = eventImageUrl(event);
         if (url.isEmpty) continue;
 
         unawaited(precacheImage(CachedNetworkImageProvider(url), context));
@@ -267,170 +151,102 @@ class _EventsTabViewState extends State<EventsTabView> {
     });
   }
 
-  String _eventImageUrl(PostView e) {
-    return e.thubnailUrl.trim().isNotEmpty
-        ? e.thubnailUrl.trim()
-        : (e.imageLinks.isNotEmpty ? e.imageLinks.first.trim() : '');
-  }
-
-  Widget _eventToCard(BuildContext context, PostView? e) {
-    if (e == null) return const SizedBox.shrink();
-
-    final imageUrl = _eventImageUrl(e);
-
-    final tags = e.tags.map((t) => EventTag(t, Icons.tag)).toList();
-
-    final duration = _stringFromMeta(e, 'durationText');
-
-    // Human readable date (No year)
-    String datetime = 'Tarih yok';
-    bool isPast = false;
-
-    if (e.eventDate != null) {
-      final date = e.eventDate!;
-      isPast = date.isBefore(DateTime.now());
-
-      final months = [
-        '',
-        'Ocak',
-        'Şubat',
-        'Mart',
-        'Nisan',
-        'Mayıs',
-        'Haziran',
-        'Temmuz',
-        'Ağustos',
-        'Eylül',
-        'Ekim',
-        'Kasım',
-        'Aralık',
-      ];
-      final days = [
-        '',
-        'Pazartesi',
-        'Salı',
-        'Çarşamba',
-        'Perşembe',
-        'Cuma',
-        'Cumartesi',
-        'Pazar',
-      ];
-
-      final dayName = days[date.weekday];
-      final monthName = months[date.month];
-      final timeStr =
-          '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-
-      datetime = '${date.day} $monthName $dayName, $timeStr';
+  void _handleScrollNotification(ScrollNotification scrollInfo) {
+    if (scrollInfo.metrics.axis != Axis.vertical) {
+      return;
     }
 
-    final ticket =
-        _stringFromMeta(e, 'ticketText') ??
-        (e.ticketPrice <= 0
-            ? 'Bilet: Ücretsiz'
-            : 'Bilet: ₺${e.ticketPrice.toStringAsFixed(0)}');
-    final capacity = (e.maxContributors > 0)
-        ? 'Katılımcı: ${e.remainingContributors}/${e.maxContributors}'
-        : null;
+    final shouldShow = scrollInfo.metrics.pixels >= 500;
+    if (shouldShow == _showBackToTopButton) {
+      return;
+    }
 
-    final bool likedState = e.isLiked == true;
-    final bool joinedState = e.isJoined == true;
-
-    return EventCard(
-      title: e.title,
-      datetimeText: datetime,
-      location: e.location,
-      imageUrl: imageUrl,
-      durationText: duration,
-      ticketText: ticket,
-      capacityText: capacity,
-      description: e.description,
-      tags: tags,
-      publisher: e.publisher,
-      isLiked: likedState,
-      isJoined: joinedState,
-      isPast: isPast,
-      isRegistrationClosed: e.isRegistrationClosed,
-      onJoin: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => EventDetailsPage(event: e)),
-        );
-      },
-      onBookmark: (isBookmarked) {
-        if (!isBookmarked) return;
-        unawaited(_repo.trackEventLike(e.id, isLiked: true));
-      },
-      onShare: () => unawaited(ShareService.shareEvent(context, e)),
-    );
-  }
-
-  String? _stringFromMeta(PostView e, String key) {
-    final v = e.metadata[key];
-    if (v == null) return null;
-    if (v is String && v.trim().isNotEmpty) return v.trim();
-    return v.toString();
-  }
-
-  Future<void> _handleRefresh() async {
-    await _refreshInBackground();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _showBackToTopButton != shouldShow) {
+        setState(() => _showBackToTopButton = shouldShow);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isInitialLoading && _events.isEmpty) {
-      return const _EventsLoadingState();
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return EventsTabContent(
+          events: _controller.events,
+          isInitialLoading: _controller.isInitialLoading,
+          errorMessage: _controller.errorMessage,
+          hasAnimatedIds: _hasAnimatedIds,
+          showBackToTopButton: _showBackToTopButton,
+          onRefresh: _controller.refresh,
+          onScrollNotification: _handleScrollNotification,
+          onBackToTop: _scrollToTop,
+          onBookmark: (event, isBookmarked) {
+            if (!isBookmarked) return;
+            unawaited(_controller.trackEventLike(event.id, isLiked: true));
+          },
+          onShare: (event) =>
+              unawaited(ShareService.shareEvent(context, event)),
+          onOpenEvent: (event) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => EventDetailsPage(event: event)),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class EventsTabContent extends StatelessWidget {
+  const EventsTabContent({
+    super.key,
+    required this.events,
+    required this.isInitialLoading,
+    required this.errorMessage,
+    required this.hasAnimatedIds,
+    required this.showBackToTopButton,
+    required this.onRefresh,
+    required this.onScrollNotification,
+    required this.onBackToTop,
+    required this.onBookmark,
+    required this.onShare,
+    required this.onOpenEvent,
+  });
+
+  final List<PostView> events;
+  final bool isInitialLoading;
+  final String? errorMessage;
+  final Set<String> hasAnimatedIds;
+  final bool showBackToTopButton;
+  final Future<void> Function() onRefresh;
+  final ValueChanged<ScrollNotification> onScrollNotification;
+  final VoidCallback onBackToTop;
+  final void Function(PostView event, bool isBookmarked) onBookmark;
+  final ValueChanged<PostView> onShare;
+  final ValueChanged<PostView> onOpenEvent;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isInitialLoading && events.isEmpty) {
+      return const EventsLoadingState();
     }
 
-    /* if (false && _isInitialLoading && _events.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              "Etkinlikler yükleniyor",
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
-        ),
-      );
-    } */
-
-    if (_errorMessage != null && _events.isEmpty) {
-      return Center(child: Text('Bir hata oluştu: $_errorMessage'));
+    if (errorMessage != null && events.isEmpty) {
+      return Center(child: Text('Bir hata oluştu: $errorMessage'));
     }
-
-    final events = _events;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: NotificationListener<ScrollNotification>(
-        onNotification: (ScrollNotification scrollInfo) {
-          if (scrollInfo.metrics.axis == Axis.vertical) {
-            if (scrollInfo.metrics.pixels >= 500) {
-              if (!_showBackToTopButton) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && !_showBackToTopButton) {
-                    setState(() => _showBackToTopButton = true);
-                  }
-                });
-              }
-            } else {
-              if (_showBackToTopButton) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && _showBackToTopButton) {
-                    setState(() => _showBackToTopButton = false);
-                  }
-                });
-              }
-            }
-          }
+        onNotification: (scrollInfo) {
+          onScrollNotification(scrollInfo);
           return false;
         },
         child: RefreshIndicator(
-          onRefresh: _handleRefresh,
+          onRefresh: onRefresh,
           displacement: 20,
           edgeOffset: 0,
           child: CustomScrollView(
@@ -439,14 +255,13 @@ class _EventsTabViewState extends State<EventsTabView> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
               if (events.isEmpty)
-                SliverFillRemaining(
+                const SliverFillRemaining(
                   hasScrollBody: false,
                   child: Column(
                     children: [
                       Expanded(child: Center(child: NoEventsFoundWidget())),
-                      const SizedBox(height: 80),
+                      SizedBox(height: 80),
                     ],
                   ),
                 )
@@ -454,11 +269,11 @@ class _EventsTabViewState extends State<EventsTabView> {
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final event = events[index];
-                    final bool hasAnimated = _hasAnimatedIds.contains(event.id);
-                    final bool shouldAnimate = !hasAnimated;
+                    final hasAnimated = hasAnimatedIds.contains(event.id);
+                    final shouldAnimate = !hasAnimated;
 
                     if (shouldAnimate) {
-                      _hasAnimatedIds.add(event.id);
+                      hasAnimatedIds.add(event.id);
                     }
 
                     return Padding(
@@ -466,32 +281,138 @@ class _EventsTabViewState extends State<EventsTabView> {
                       child: SlideInEntry(
                         key: ValueKey(event.id),
                         animate: shouldAnimate,
-                        child: _eventToCard(context, event),
+                        child: EventListCard(
+                          event: event,
+                          onBookmark: (isBookmarked) =>
+                              onBookmark(event, isBookmarked),
+                          onShare: () => onShare(event),
+                          onOpen: () => onOpenEvent(event),
+                        ),
                       ),
                     );
                   }, childCount: events.length),
                 ),
-
               const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
           ),
         ),
       ),
-      floatingActionButton: _showBackToTopButton
+      floatingActionButton: showBackToTopButton
           ? FloatingActionButton(
               heroTag: 'backToTop',
-              onPressed: _scrollToTop,
+              onPressed: onBackToTop,
               mini: true,
               child: const Icon(Icons.arrow_upward),
             )
           : null,
     );
   }
-
 }
 
-class _EventsLoadingState extends StatelessWidget {
-  const _EventsLoadingState();
+class EventListCard extends StatelessWidget {
+  const EventListCard({
+    super.key,
+    required this.event,
+    required this.onBookmark,
+    required this.onShare,
+    required this.onOpen,
+  });
+
+  final PostView event;
+  final ValueChanged<bool> onBookmark;
+  final VoidCallback onShare;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = eventImageUrl(event);
+    final tags = event.tags.map((tag) => EventTag(tag, Icons.tag)).toList();
+    final duration = stringFromMeta(event, 'durationText');
+    final eventDate = event.eventDate;
+    final isPast = eventDate?.isBefore(DateTime.now()) ?? false;
+
+    final ticket =
+        stringFromMeta(event, 'ticketText') ??
+        (event.ticketPrice <= 0
+            ? 'Bilet: Ücretsiz'
+            : 'Bilet: ₺${event.ticketPrice.toStringAsFixed(0)}');
+    final capacity = (event.maxContributors > 0)
+        ? 'Katılımcı: ${event.remainingContributors}/${event.maxContributors}'
+        : null;
+
+    return EventCard(
+      title: event.title,
+      datetimeText: eventDateText(eventDate),
+      location: event.location,
+      imageUrl: imageUrl,
+      durationText: duration,
+      ticketText: ticket,
+      capacityText: capacity,
+      description: event.description,
+      tags: tags,
+      publisher: event.publisher,
+      isLiked: event.isLiked == true,
+      isJoined: event.isJoined == true,
+      isPast: isPast,
+      isRegistrationClosed: event.isRegistrationClosed,
+      onJoin: onOpen,
+      onBookmark: onBookmark,
+      onShare: onShare,
+    );
+  }
+}
+
+String eventImageUrl(PostView event) {
+  return event.thubnailUrl.trim().isNotEmpty
+      ? event.thubnailUrl.trim()
+      : (event.imageLinks.isNotEmpty ? event.imageLinks.first.trim() : '');
+}
+
+String? stringFromMeta(PostView event, String key) {
+  final value = event.metadata[key];
+  if (value == null) return null;
+  if (value is String && value.trim().isNotEmpty) return value.trim();
+  return value.toString();
+}
+
+String eventDateText(DateTime? date) {
+  if (date == null) {
+    return 'Tarih yok';
+  }
+
+  const months = [
+    '',
+    'Ocak',
+    'Şubat',
+    'Mart',
+    'Nisan',
+    'Mayıs',
+    'Haziran',
+    'Temmuz',
+    'Ağustos',
+    'Eylül',
+    'Ekim',
+    'Kasım',
+    'Aralık',
+  ];
+  const days = [
+    '',
+    'Pazartesi',
+    'Salı',
+    'Çarşamba',
+    'Perşembe',
+    'Cuma',
+    'Cumartesi',
+    'Pazar',
+  ];
+
+  final time =
+      '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  return '${date.day} ${months[date.month]} ${days[date.weekday]}, $time';
+}
+
+class EventsLoadingState extends StatelessWidget {
+  const EventsLoadingState({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -86,7 +86,10 @@ class EventRepository {
     };
   }
 
-  Future<List<PostView>> fetchEvents({bool forceRefresh = false}) async {
+  Future<List<PostView>> fetchEvents({
+    bool forceRefresh = false,
+    bool fallbackToCacheOnError = true,
+  }) async {
     // 1. Return cached events if available and not forcing refresh
     if (!forceRefresh) {
       final cached = await getCachedEvents();
@@ -127,8 +130,12 @@ class EventRepository {
       debugPrint('Error fetching events from API: $e');
 
       // Try fallback to cache
-      final cached = await getCachedEvents();
-      if (cached.isNotEmpty) return cached;
+      if (fallbackToCacheOnError) {
+        final cached = await getCachedEvents();
+        if (cached.isNotEmpty) return cached;
+      } else {
+        rethrow;
+      }
 
       return [];
     }

@@ -604,12 +604,158 @@ class _MasterViewState extends State<MasterView>
           ),
         ),
       ),
-      body: IndexedStack(
-        index: _tabController.index,
-        children: List<Widget>.generate(3, (index) {
-          return _tabBodies[index] ?? const SizedBox.expand();
-        }),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _MasterBackgroundBlobs(),
+          IndexedStack(
+            index: _tabController.index,
+            children: List<Widget>.generate(3, (index) {
+              return _tabBodies[index] ?? const SizedBox.expand();
+            }),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _MasterBackgroundBlobs extends StatelessWidget {
+  const _MasterBackgroundBlobs();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _MasterBackgroundBlobPainter(
+          primary: colorScheme.primary,
+          secondary: colorScheme.secondary,
+          tertiary: colorScheme.tertiary,
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _MasterBackgroundBlobPainter extends CustomPainter {
+  const _MasterBackgroundBlobPainter({
+    required this.primary,
+    required this.secondary,
+    required this.tertiary,
+  });
+
+  final Color primary;
+  final Color secondary;
+  final Color tertiary;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    paint.color = primary.withValues(alpha: 0.11);
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.04, size.height * 0.06)
+        ..cubicTo(
+          size.width * 0.28,
+          size.height * -0.02,
+          size.width * 0.48,
+          size.height * 0.08,
+          size.width * 0.43,
+          size.height * 0.24,
+        )
+        ..cubicTo(
+          size.width * 0.37,
+          size.height * 0.42,
+          size.width * 0.10,
+          size.height * 0.34,
+          size.width * 0.02,
+          size.height * 0.22,
+        )
+        ..cubicTo(
+          size.width * -0.04,
+          size.height * 0.14,
+          size.width * -0.02,
+          size.height * 0.09,
+          size.width * 0.04,
+          size.height * 0.06,
+        )
+        ..close(),
+      paint,
+    );
+
+    paint.color = secondary.withValues(alpha: 0.095);
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.78, size.height * 0.22)
+        ..cubicTo(
+          size.width * 1.02,
+          size.height * 0.12,
+          size.width * 1.10,
+          size.height * 0.42,
+          size.width * 0.94,
+          size.height * 0.58,
+        )
+        ..cubicTo(
+          size.width * 0.78,
+          size.height * 0.74,
+          size.width * 0.58,
+          size.height * 0.58,
+          size.width * 0.62,
+          size.height * 0.40,
+        )
+        ..cubicTo(
+          size.width * 0.65,
+          size.height * 0.30,
+          size.width * 0.70,
+          size.height * 0.25,
+          size.width * 0.78,
+          size.height * 0.22,
+        )
+        ..close(),
+      paint,
+    );
+
+    paint.color = tertiary.withValues(alpha: 0.085);
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.22, size.height * 0.78)
+        ..cubicTo(
+          size.width * 0.44,
+          size.height * 0.66,
+          size.width * 0.70,
+          size.height * 0.80,
+          size.width * 0.62,
+          size.height * 0.98,
+        )
+        ..cubicTo(
+          size.width * 0.55,
+          size.height * 1.14,
+          size.width * 0.20,
+          size.height * 1.08,
+          size.width * 0.10,
+          size.height * 0.94,
+        )
+        ..cubicTo(
+          size.width * 0.04,
+          size.height * 0.86,
+          size.width * 0.10,
+          size.height * 0.81,
+          size.width * 0.22,
+          size.height * 0.78,
+        )
+        ..close(),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MasterBackgroundBlobPainter oldDelegate) {
+    return primary != oldDelegate.primary ||
+        secondary != oldDelegate.secondary ||
+        tertiary != oldDelegate.tertiary;
   }
 }

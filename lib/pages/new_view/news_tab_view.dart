@@ -2,104 +2,17 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:omusiber/backend/app_startup_controller.dart';
-import 'package:omusiber/backend/cache_compare.dart';
-import 'package:omusiber/backend/master_news_widgets_repository.dart';
-import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:omusiber/backend/view/news_view.dart';
+import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/pages/news_item_page.dart';
+import 'package:omusiber/pages/new_view/controllers/news_tab_controller.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
-// --- 1. ANIMATION WRAPPER ---
-class SlideInEntry extends StatefulWidget {
-  final Widget child;
-  final Duration delay;
-  final bool animate;
-
-  const SlideInEntry({
-    super.key,
-    required this.child,
-    this.delay = Duration.zero,
-    this.animate = true,
-  });
-
-  @override
-  State<SlideInEntry> createState() => _SlideInEntryState();
-}
-
-class _SlideInEntryState extends State<SlideInEntry>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _sizeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _offsetAnimation = Tween<Offset>(
-      begin: const Offset(-0.5, 0.0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
-
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-
-    _sizeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.fastOutSlowIn,
-    );
-
-    if (!widget.animate) {
-      _controller.value = 1.0;
-    } else {
-      _runAnimation();
-    }
-  }
-
-  void _runAnimation() async {
-    if (widget.delay > Duration.zero) {
-      await Future.delayed(widget.delay);
-    }
-    if (mounted) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.animate) {
-      return widget.child;
-    }
-
-    return SizeTransition(
-      sizeFactor: _sizeAnimation,
-      axisAlignment: -1.0,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(position: _offsetAnimation, child: widget.child),
-      ),
-    );
-  }
-}
-
-// --- 2. CUSTOM PHYSICS (Removed to fix overscroll error) ---
-
-// --- 3. MAIN VIEW ---
 class NewsTabView extends StatefulWidget {
   const NewsTabView({super.key});
 
@@ -108,63 +21,51 @@ class NewsTabView extends StatefulWidget {
 }
 
 class _NewsTabViewState extends State<NewsTabView> {
-  final AppStartupController _startupController = AppStartupController.instance;
-  static const Duration _backgroundRefreshDelay = Duration(seconds: 10);
   static const int _imagePrefetchLimit = 2;
-  final List<NewsView> _articles = [];
-  final Set<NewsView> _animateAllowedSet = {};
-  final Set<NewsView> _hasAnimatedSet = {};
-  MasterNewsWidgetsView? _summaryWidgets;
-  String _selectedSortKey = 'newest';
-  String _selectedDatePreset = 'all';
-  String? _selectedFacultySlug;
-  final List<NewsFaculty> _faculties = [];
-  final Set<String> _selectedTags = <String>{};
-
-  bool _isSummaryLoading = true;
-  bool _isNewsLoading = true;
-  bool _isFacultyNewsLoading = false;
-  String? _errorMessage;
-  static const int _initialVisibleNewsCount = 5;
-  static const int _newsLoadMoreStep = 5;
-  int _visibleNewsCount = _initialVisibleNewsCount;
+  late final NewsTabController _controller;
 
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
-  bool _refreshQueued = false;
-  bool _initialCacheLoadComplete = false;
-  bool _startupRefreshComplete = false;
-  Future<void>? _facultiesLoadFuture;
-  Timer? _backgroundRefreshTimer;
+
+  MasterNewsWidgetsView? get _summaryWidgets => _controller.summaryWidgets;
+  String get _selectedSortKey => _controller.selectedSortKey;
+  String get _selectedDatePreset => _controller.selectedDatePreset;
+  String? get _selectedFacultySlug => _controller.selectedFacultySlug;
+  Set<String> get _selectedTags => _controller.selectedTags;
+  bool get _isSummaryLoading => _controller.isSummaryLoading;
+  bool get _isNewsLoading => _controller.isNewsLoading;
+  bool get _isFacultyNewsLoading => _controller.isFacultyNewsLoading;
+  String? get _errorMessage => _controller.errorMessage;
+  List<NewsView> get _filteredArticles => _controller.filteredArticles;
+  List<NewsView> get _visibleFilteredArticles =>
+      _controller.visibleFilteredArticles;
+  List<String> get _availableTags => _controller.availableTags;
+  String get _sortLabel => _controller.sortLabel;
+  String get _filterSummary => _controller.filterSummary;
 
   @override
   void initState() {
     super.initState();
     StartupLogger.log('NewsTabView.initState()');
-    _startupController.addListener(_handleStartupChanged);
+    _controller = NewsTabController()..addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _loadInitialData();
+      unawaited(_controller.loadInitialData());
     });
   }
 
   @override
   void dispose() {
-    _startupController.removeListener(_handleStartupChanged);
-    _backgroundRefreshTimer?.cancel();
+    _controller.removeListener(_handleControllerChanged);
+    _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _handleStartupChanged() {
-    if (!_startupController.canUseAuthenticatedApis ||
-        _refreshQueued ||
-        !_initialCacheLoadComplete ||
-        _startupRefreshComplete) {
-      return;
-    }
-
-    _scheduleBackgroundRefresh();
+  void _handleControllerChanged() {
+    if (!mounted) return;
+    _precacheNewsImages(_controller.articles);
+    setState(() {});
   }
 
   void _scrollToTop() {
@@ -175,35 +76,6 @@ class _NewsTabViewState extends State<NewsTabView> {
         curve: Curves.easeOutQuart,
       );
     }
-  }
-
-  void _scheduleBackgroundRefresh() {
-    if (_refreshQueued) {
-      return;
-    }
-
-    final delay = _startupController.startupDeferral(_backgroundRefreshDelay);
-    _backgroundRefreshTimer?.cancel();
-    if (delay == Duration.zero) {
-      _refreshQueued = true;
-      unawaited(
-        _refreshInBackground().whenComplete(() {
-          _refreshQueued = false;
-        }),
-      );
-      return;
-    }
-    _backgroundRefreshTimer = Timer(delay, () {
-      if (!mounted || _refreshQueued) {
-        return;
-      }
-      _refreshQueued = true;
-      unawaited(
-        _refreshInBackground().whenComplete(() {
-          _refreshQueued = false;
-        }),
-      );
-    });
   }
 
   void _scrollToNewsSection() {
@@ -224,324 +96,45 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
-  Future<void> _loadInitialData() async {
-    try {
-      StartupLogger.log('NewsTabView._loadInitialData() started');
-      setState(() {
-        _isSummaryLoading = true;
-        _isNewsLoading = true;
-        _errorMessage = null;
-      });
-
-      final cachedResults = await Future.wait<dynamic>([
-        MasterNewsWidgetsRepository().getCachedWidgets(),
-        NewsFetcher().getCachedNews(),
-      ]);
-      final cachedSummaryWidgets = cachedResults[0] as MasterNewsWidgetsView?;
-      final cachedNews = _bindNewsActions(cachedResults[1] as List<NewsView>);
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _summaryWidgets = cachedSummaryWidgets;
-        _articles
-          ..clear()
-          ..addAll(cachedNews);
-        _animateAllowedSet.addAll(cachedNews);
-        _resetVisibleNewsCount();
-        _isSummaryLoading = false;
-        _isNewsLoading = cachedNews.isEmpty;
-        _errorMessage = null;
-        _initialCacheLoadComplete = true;
-      });
-      _logSummaryWidgets('after cached data load');
-      _precacheNewsImages(cachedNews);
-
-      if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _handleStartupChanged();
-        });
-      }
-    } catch (e) {
-      debugPrint("Failed to load initial news cache: $e");
-      StartupLogger.log('NewsTabView._loadInitialData() failed: $e');
-      if (mounted) {
-        setState(() {
-          _isSummaryLoading = false;
-          _isNewsLoading = false;
-          _errorMessage = e.toString();
-          _initialCacheLoadComplete = true;
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _handleStartupChanged();
-        });
-      }
-    }
-  }
-
-  void _resetVisibleNewsCount() {
-    _visibleNewsCount = _initialVisibleNewsCount;
-  }
-
   void _loadMoreNews() {
-    final total = _filteredArticles.length;
-    if (_visibleNewsCount >= total) {
-      return;
-    }
-
-    setState(() {
-      _visibleNewsCount = (_visibleNewsCount + _newsLoadMoreStep)
-          .clamp(_initialVisibleNewsCount, total)
-          .toInt();
-    });
-  }
-
-  Future<void> _loadFaculties({bool forceRefresh = false}) async {
-    if (!forceRefresh && _facultiesLoadFuture != null) {
-      return _facultiesLoadFuture;
-    }
-
-    final loadFuture = _loadFacultiesNow(forceRefresh: forceRefresh);
-    if (!forceRefresh) {
-      _facultiesLoadFuture = loadFuture.whenComplete(() {
-        _facultiesLoadFuture = null;
-      });
-      return _facultiesLoadFuture!;
-    }
-    return loadFuture;
-  }
-
-  Future<void> _loadFacultiesNow({bool forceRefresh = false}) async {
-    final faculties = await NewsFetcher().fetchFaculties(
-      forceRefresh: forceRefresh,
-    );
-    if (!mounted) return;
-
-    setState(() {
-      _faculties
-        ..clear()
-        ..addAll(faculties);
-      if (faculties.isNotEmpty &&
-          _selectedFacultySlug != null &&
-          !_faculties.any((faculty) => faculty.slug == _selectedFacultySlug)) {
-        _selectedFacultySlug = null;
-      }
-    });
+    _controller.loadMoreNews();
   }
 
   Future<List<NewsFaculty>> _ensureFacultiesForFilters() async {
-    if (_faculties.isNotEmpty) {
-      return List<NewsFaculty>.unmodifiable(_faculties);
-    }
-
-    await _loadFaculties();
-    return List<NewsFaculty>.unmodifiable(_faculties);
-  }
-
-  Future<void> _refreshInBackground() async {
-    try {
-      final refreshResults = await Future.wait<dynamic>([
-        NewsFetcher().fetchLatestNews(
-          forceRefresh: true,
-          facultySlug: _selectedFacultySlug,
-        ),
-        MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true),
-      ]);
-      final newData = refreshResults[0] as List<NewsView>;
-      final widgets = refreshResults[1] as MasterNewsWidgetsView?;
-      final hydratedData = _bindNewsActions(newData);
-      if (mounted) {
-        final resolvedWidgets =
-            widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
-        final shouldReplaceArticles = !jsonListEquals<NewsView>(
-          _articles,
-          hydratedData,
-          (item) => item.toJson(),
-        );
-        final shouldReplaceWidgets = !_summaryWidgetsMatch(
-          _summaryWidgets,
-          resolvedWidgets,
-        );
-        final shouldClearLoading = _isNewsLoading && _articles.isEmpty;
-
-        if (!shouldReplaceArticles &&
-            !shouldReplaceWidgets &&
-            !shouldClearLoading &&
-            _errorMessage == null) {
-          _startupRefreshComplete = true;
-          return;
-        }
-
-        setState(() {
-          _isNewsLoading = false;
-          _errorMessage = null;
-          if (shouldReplaceWidgets || _summaryWidgets == null) {
-            _summaryWidgets = resolvedWidgets;
-          }
-          if (shouldReplaceArticles) {
-            _articles
-              ..clear()
-              ..addAll(hydratedData);
-            _animateAllowedSet.addAll(hydratedData);
-            _resetVisibleNewsCount();
-          }
-        });
-        _logSummaryWidgets('after background refresh');
-        if (shouldReplaceArticles) {
-          _precacheNewsImages(hydratedData);
-        }
-      }
-      _startupRefreshComplete = true;
-    } catch (e) {
-      if (e is StateError) {
-        return;
-      }
-      if (mounted && _articles.isEmpty) {
-        setState(() {
-          _isNewsLoading = false;
-          _errorMessage = e.toString();
-        });
-      }
-    }
+    return _controller.ensureFacultiesForFilters();
   }
 
   Future<void> _handleRefresh() async {
-    try {
-      final refreshResults = await Future.wait<dynamic>([
-        MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true),
-        NewsFetcher().fetchLatestNews(
-          forceRefresh: true,
-          facultySlug: _selectedFacultySlug,
-        ),
-        _loadFaculties(forceRefresh: true),
-      ]);
-      final widgets = refreshResults[0] as MasterNewsWidgetsView?;
-      final fetchedData = _bindNewsActions(refreshResults[1] as List<NewsView>);
-      if (!mounted) return;
-
-      if (_selectedFacultySlug != null) {
-        setState(() {
-          _summaryWidgets =
-              widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
-          _articles
-            ..clear()
-            ..addAll(fetchedData);
-          _animateAllowedSet.addAll(fetchedData);
-        });
-        _logSummaryWidgets('after faculty pull-to-refresh');
-        _precacheNewsImages(fetchedData);
-        _showToast("Haberler yenilendi", Icons.check_circle_rounded, true);
-        return;
-      }
-
-      final List<NewsView> newItems = fetchedData.where((newItem) {
-        return !_articles.contains(newItem);
-      }).toList();
-
-      setState(() {
-        _summaryWidgets =
-            widgets ?? _summaryWidgets ?? const MasterNewsWidgetsView();
-      });
-      _logSummaryWidgets('after pull-to-refresh');
-
-      if (newItems.isNotEmpty) {
-        setState(() {
-          _articles.insertAll(0, newItems);
-        });
-        _precacheNewsImages(newItems);
-
-        if (mounted) {
-          _showToast(
-            "Yeni ${newItems.length} haber yüklendi",
-            Icons.check_circle_rounded,
-            true,
-          );
-        }
-      } else {
-        if (mounted) {
-          _showToast("Yeni haber bulunamadı", Icons.info_rounded, false);
-        }
-      }
-    } catch (e) {
-      debugPrint("Refresh failed: $e");
+    final feedback = await _controller.refreshFromUser();
+    if (!mounted || feedback == null) {
+      return;
     }
-  }
-
-  Future<void> _reloadNewsForFacultyFilter() async {
-    setState(() {
-      _isFacultyNewsLoading = true;
-    });
-
-    try {
-      final fetchedData = _bindNewsActions(
-        await NewsFetcher().fetchLatestNews(
-          forceRefresh: true,
-          facultySlug: _selectedFacultySlug,
-        ),
-      );
-      if (!mounted) return;
-
-      setState(() {
-        _articles
-          ..clear()
-          ..addAll(fetchedData);
-        _animateAllowedSet.addAll(fetchedData);
-        _resetVisibleNewsCount();
-        _isFacultyNewsLoading = false;
-      });
-      _precacheNewsImages(fetchedData);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isFacultyNewsLoading = false;
-      });
-      _showToast("Haberler yüklenemedi", Icons.error_outline_rounded, false);
-    }
+    _showToast(
+      feedback.message,
+      feedback.isSuccess ? Icons.check_circle_rounded : Icons.info_rounded,
+      feedback.isSuccess,
+    );
   }
 
   void _clearActiveFilters() {
-    final hadFacultyFilter = _selectedFacultySlug != null;
-
-    setState(() {
-      _selectedDatePreset = 'all';
-      _selectedFacultySlug = null;
-      _selectedTags.clear();
-      _resetVisibleNewsCount();
-    });
-
-    if (hadFacultyFilter) {
-      unawaited(_reloadNewsForFacultyFilter());
-    }
-  }
-
-  List<NewsView> _bindNewsActions(List<NewsView> items) {
-    return items.map(_bindNewsActionsForItem).toList(growable: false);
-  }
-
-  bool _summaryWidgetsMatch(
-    MasterNewsWidgetsView? current,
-    MasterNewsWidgetsView next,
-  ) {
-    return jsonPayloadEquals(current?.toJson(), next.toJson());
+    unawaited(_controller.clearActiveFilters());
   }
 
   NewsView _bindNewsActionsForItem(NewsView item) {
     return item.copyWith(
       onToggleFavorite: (isLiked) => _handleNewsLikeToggle(item.id, isLiked),
       onShare: () => unawaited(ShareService.shareNews(context, item)),
+      onOpen: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => NewsItemPage(view: item)),
+        );
+      },
     );
   }
 
   void _precacheNewsImages(List<NewsView> items) {
-    final delay = _startupController.startupDeferral(
-      const Duration(seconds: 2),
-    );
-
-    void schedulePrefetch() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
       for (final item in items.take(_imagePrefetchLimit)) {
@@ -550,34 +143,11 @@ class _NewsTabViewState extends State<NewsTabView> {
 
         unawaited(precacheImage(CachedNetworkImageProvider(url), context));
       }
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (delay == Duration.zero) {
-        schedulePrefetch();
-        return;
-      }
-
-      Timer(delay, schedulePrefetch);
     });
   }
 
   void _handleNewsLikeToggle(int newsId, bool isLiked) {
-    final index = _articles.indexWhere((item) => item.id == newsId);
-    if (index == -1) return;
-
-    final current = _articles[index];
-    final nextLikeCount = isLiked
-        ? current.likeCount + 1
-        : (current.likeCount > 0 ? current.likeCount - 1 : 0);
-
-    setState(() {
-      _articles[index] = _bindNewsActionsForItem(
-        current.copyWith(isFavorited: isLiked, likeCount: nextLikeCount),
-      );
-    });
-
-    unawaited(NewsFetcher().trackNewsLike(newsId, isLiked: isLiked));
+    unawaited(_controller.toggleNewsLike(newsId, isLiked));
   }
 
   void _showToast(String msg, IconData icon, bool isSuccess) {
@@ -619,230 +189,6 @@ class _NewsTabViewState extends State<NewsTabView> {
         duration: const Duration(seconds: 2),
       ),
     );
-  }
-
-  List<String> get _availableTags {
-    final tags =
-        _articles
-            .expand((item) => item.tags)
-            .where((tag) => tag.trim().isNotEmpty)
-            .map((tag) => tag.trim())
-            .toSet()
-            .toList()
-          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return tags;
-  }
-
-  String get _sortLabel {
-    switch (_selectedSortKey) {
-      case 'oldest':
-        return 'En Eski';
-      case 'popular':
-        return 'En Çok Okunan';
-      case 'today':
-        return 'Bugün';
-      case 'newest':
-      default:
-        return 'En Yeni';
-    }
-  }
-
-  String get _filterSummary {
-    final parts = <String>[];
-
-    switch (_selectedDatePreset) {
-      case 'today':
-        parts.add('Bugün');
-        break;
-      case 'week':
-        parts.add('Bu Hafta');
-        break;
-    }
-
-    if (_selectedTags.isNotEmpty) {
-      if (_selectedTags.length == 1) {
-        parts.add(_selectedTags.first);
-      } else {
-        parts.add('${_selectedTags.length} etiket');
-      }
-    }
-
-    final facultyName = _selectedFacultyName;
-    if (facultyName != null) {
-      parts.add(facultyName);
-    }
-
-    if (parts.isEmpty) {
-      return 'Tümü';
-    }
-
-    return parts.join(' • ');
-  }
-
-  String? get _selectedFacultyName {
-    final selectedSlug = _selectedFacultySlug;
-    if (selectedSlug == null) {
-      return null;
-    }
-
-    for (final faculty in _faculties) {
-      if (faculty.slug == selectedSlug) {
-        return faculty.name;
-      }
-    }
-
-    return selectedSlug;
-  }
-
-  bool _isToday(DateTime? date) {
-    if (date == null) {
-      return false;
-    }
-
-    final now = DateTime.now();
-    return date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
-  }
-
-  bool _isThisWeek(DateTime? date) {
-    if (date == null) {
-      return false;
-    }
-
-    final now = DateTime.now();
-    final startOfWeek = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 7));
-    return !date.isBefore(startOfWeek) && date.isBefore(endOfWeek);
-  }
-
-  /*
-  MasterNewsWidgetsView _buildLocalSummaryWidgets() {
-    final todayNewsCount = _articles.where((item) => _isToday(item.publishedAt)).length;
-    final weekNewsCount = _articles.where((item) => _isThisWeek(item.publishedAt)).length;
-
-    return MasterNewsWidgetsView(
-      sections: [
-        MasterNewsWidgetSection(
-          id: 'today',
-          title: 'Bugün',
-          cards: [
-            MasterNewsWidgetCard(
-              id: 'fallback-today-event',
-              kind: MasterNewsWidgetCardKind.event,
-              subtitle: 'Etkinlik sekmesini aç',
-              value: 'Bugünkü etkinlikleri incele',
-              actionType: MasterNewsWidgetActionType.openTab,
-              targetTabIndex: 1,
-            ),
-            MasterNewsWidgetCard(
-              id: 'fallback-today-news',
-              kind: MasterNewsWidgetCardKind.news,
-              subtitle: 'Bugün yayımlanan haber',
-              value: '$todayNewsCount haber',
-              actionType: MasterNewsWidgetActionType.scrollNewsList,
-            ),
-            MasterNewsWidgetCard(
-              id: 'fallback-today-community',
-              kind: MasterNewsWidgetCardKind.community,
-              subtitle: 'Topluluk sekmesini aç',
-              value: 'Bugünkü gönderileri incele',
-              actionType: MasterNewsWidgetActionType.openTab,
-              targetTabIndex: 2,
-            ),
-          ],
-        ),
-        MasterNewsWidgetSection(
-          id: 'week',
-          title: 'Bu Hafta',
-          cards: [
-            MasterNewsWidgetCard(
-              id: 'fallback-week-event',
-              kind: MasterNewsWidgetCardKind.event,
-              subtitle: 'Etkinlik sekmesini aç',
-              value: 'Bu haftaki etkinlikleri incele',
-              actionType: MasterNewsWidgetActionType.openTab,
-              targetTabIndex: 1,
-            ),
-            MasterNewsWidgetCard(
-              id: 'fallback-week-news',
-              kind: MasterNewsWidgetCardKind.news,
-              subtitle: 'Bu hafta yayımlanan haber',
-              value: '$weekNewsCount haber',
-              actionType: MasterNewsWidgetActionType.scrollNewsList,
-            ),
-            MasterNewsWidgetCard(
-              id: 'fallback-week-community',
-              kind: MasterNewsWidgetCardKind.community,
-              subtitle: 'Topluluk sekmesini aç',
-              value: 'Bu haftaki gönderileri incele',
-              actionType: MasterNewsWidgetActionType.openTab,
-              targetTabIndex: 2,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  */
-  List<NewsView> get _filteredArticles {
-    final items = _articles.where((item) {
-      final matchesDate = switch (_selectedDatePreset) {
-        'today' => _isToday(item.publishedAt),
-        'week' => _isThisWeek(item.publishedAt),
-        _ => true,
-      };
-
-      if (!matchesDate) {
-        return false;
-      }
-
-      if (_selectedTags.isEmpty) {
-        return true;
-      }
-
-      return item.tags.any(_selectedTags.contains);
-    }).toList();
-
-    items.sort((a, b) {
-      switch (_selectedSortKey) {
-        case 'oldest':
-          final aDate = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bDate = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          return aDate.compareTo(bDate);
-        case 'popular':
-          return b.viewCount.compareTo(a.viewCount);
-        case 'today':
-          final aToday = _isToday(a.publishedAt) ? 1 : 0;
-          final bToday = _isToday(b.publishedAt) ? 1 : 0;
-          if (aToday != bToday) {
-            return bToday.compareTo(aToday);
-          }
-          final aDate = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bDate = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          return bDate.compareTo(aDate);
-        case 'newest':
-        default:
-          final aDate = a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bDate = b.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          return bDate.compareTo(aDate);
-      }
-    });
-
-    return items;
-  }
-
-  List<NewsView> get _visibleFilteredArticles {
-    final filtered = _filteredArticles;
-    if (_visibleNewsCount >= filtered.length) {
-      return filtered;
-    }
-    return filtered.take(_visibleNewsCount).toList(growable: false);
   }
 
   Widget _buildFilterPill(
@@ -1263,21 +609,15 @@ class _NewsTabViewState extends State<NewsTabView> {
                           Expanded(
                             child: FilledButton(
                               onPressed: () {
-                                final facultyChanged =
-                                    _selectedFacultySlug != tempFacultySlug;
-                                setState(() {
-                                  _selectedSortKey = tempSortKey;
-                                  _selectedDatePreset = tempDatePreset;
-                                  _selectedFacultySlug = tempFacultySlug;
-                                  _selectedTags
-                                    ..clear()
-                                    ..addAll(tempTags);
-                                  _resetVisibleNewsCount();
-                                });
                                 Navigator.of(context).pop();
-                                if (facultyChanged) {
-                                  unawaited(_reloadNewsForFacultyFilter());
-                                }
+                                unawaited(
+                                  _controller.applyFilters(
+                                    sortKey: tempSortKey,
+                                    datePreset: tempDatePreset,
+                                    facultySlug: tempFacultySlug,
+                                    tags: tempTags,
+                                  ),
+                                );
                               },
                               child: const Text('Uygula'),
                             ),
@@ -1964,19 +1304,6 @@ class _NewsTabViewState extends State<NewsTabView> {
     return slivers;
   }
 
-  void _logSummaryWidgets(String stage) {
-    final summaryWidgets = _summaryWidgets;
-    if (summaryWidgets == null) {
-      debugPrint('[NewsTabView] $stage: summary widgets are null.');
-      return;
-    }
-
-    debugPrint(
-      '[NewsTabView] $stage: sections=${summaryWidgets.sections.length} '
-      '${summaryWidgets.sections.map((s) => '${s.id}:${s.cards.length}').join(', ')}',
-    );
-  }
-
   Widget _buildSummaryUnavailableCard(BuildContext context, String message) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -2366,24 +1693,13 @@ class _NewsTabViewState extends State<NewsTabView> {
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final newsItem = visibleArticles[index];
-                    final bool isAllowed = _animateAllowedSet.contains(
-                      newsItem,
+                    final newsItem = _bindNewsActionsForItem(
+                      visibleArticles[index],
                     );
-                    final bool hasAnimated = _hasAnimatedSet.contains(newsItem);
-                    final bool shouldAnimate = isAllowed && !hasAnimated;
-                    if (shouldAnimate) {
-                      _hasAnimatedSet.add(newsItem);
-                    }
                     return Padding(
                       key: ValueKey(newsItem),
                       padding: const EdgeInsets.only(bottom: 12.0),
-                      child: shouldAnimate
-                          ? SlideInEntry(
-                              animate: true,
-                              child: NewsCard(view: newsItem),
-                            )
-                          : NewsCard(view: newsItem),
+                      child: NewsCard(view: newsItem),
                     );
                   }, childCount: visibleArticles.length),
                 ),

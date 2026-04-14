@@ -108,6 +108,7 @@ class MasterNewsWidgetsRepository {
 
   Future<MasterNewsWidgetsView?> fetchWidgets({
     bool forceRefresh = false,
+    bool fallbackToCacheOnError = true,
   }) async {
     _log(
       'fetchWidgets(forceRefresh: $forceRefresh) cacheSections=${_cachedWidgets?.sections.length ?? 0} lastFetch=$_lastFetchTime',
@@ -166,6 +167,9 @@ class MasterNewsWidgetsRepository {
       }
 
       debugPrint('Failed to fetch master news widgets: $e');
+      if (!fallbackToCacheOnError) {
+        rethrow;
+      }
       _log('Falling back to cached widgets after failure.');
       return _cachedWidgets ?? await getCachedWidgets();
     }

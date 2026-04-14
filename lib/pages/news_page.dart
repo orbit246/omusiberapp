@@ -7,73 +7,7 @@ import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 
-// --- 1. ANIMATION WRAPPER ---
-class SlideInEntry extends StatefulWidget {
-  final Widget child;
-  final Duration delay;
-
-  const SlideInEntry({
-    super.key,
-    required this.child,
-    this.delay = Duration.zero,
-  });
-
-  @override
-  State<SlideInEntry> createState() => _SlideInEntryState();
-}
-
-class _SlideInEntryState extends State<SlideInEntry>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _offsetAnimation = Tween<Offset>(
-      begin: const Offset(-0.5, 0.0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
-
-    // Opacity starts at 0, so it's invisible while waiting for delay
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-
-    _runAnimation();
-  }
-
-  void _runAnimation() async {
-    // If there is a stagger delay, wait first
-    if (widget.delay > Duration.zero) {
-      await Future.delayed(widget.delay);
-    }
-    // Check mounted again in case user scrolled away during delay
-    if (mounted) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(position: _offsetAnimation, child: widget.child),
-    );
-  }
-}
-
-// --- 2. CUSTOM PHYSICS ---
+// --- 1. CUSTOM PHYSICS ---
 class RefreshSafeScrollPhysics extends BouncingScrollPhysics {
   const RefreshSafeScrollPhysics({super.parent});
 
@@ -94,7 +28,7 @@ class RefreshSafeScrollPhysics extends BouncingScrollPhysics {
   }
 }
 
-// --- 3. MAIN VIEW ---
+// --- 2. MAIN VIEW ---
 class NewsTabView extends StatefulWidget {
   const NewsTabView({super.key});
 
@@ -104,10 +38,6 @@ class NewsTabView extends StatefulWidget {
 
 class _NewsTabViewState extends State<NewsTabView> {
   final List<dynamic> _articles = [];
-
-  // Stores temporary delays for the "current" batch of new items.
-  // We use this to tell Item A to wait 0ms, Item B to wait 150ms, etc.
-  final Map<dynamic, Duration> _staggerDelays = {};
 
   bool _isInitialLoading = true;
   String? _errorMessage;
@@ -176,22 +106,8 @@ class _NewsTabViewState extends State<NewsTabView> {
     }
   }
 
-  // --- NEW: Insert All + Calculate Delays ---
   void _insertNewsBatch(List<dynamic> items, {required bool insertAtTop}) {
     if (items.isEmpty) return;
-
-    // Clear old delays so we don't hold onto memory references
-    _staggerDelays.clear();
-
-    // If inserting at top (Refresh), we want the NEWEST item at index 0.
-    // Usually APIs return [Newest, 2nd Newest...].
-    // So we just iterate through them and assign increasing delays.
-    for (int i = 0; i < items.length; i++) {
-      final item = items[i];
-      // Item 0 waits 0ms. Item 1 waits 150ms. Item 2 waits 300ms.
-      // This creates the visual cascade without the physical list jitter.
-      _staggerDelays[item] = Duration(milliseconds: i * 150);
-    }
 
     setState(() {
       if (insertAtTop) {
@@ -289,23 +205,14 @@ class _NewsTabViewState extends State<NewsTabView> {
           delegate: SliverChildBuilderDelegate((context, index) {
             final newsItem = _articles[index];
 
-            // Check if we have a specific delay assigned for this item (from the recent fetch)
-            // If not found, delay is 0 (it's an old item or just scrolled into view).
-            final animationDelay = _staggerDelays[newsItem] ?? Duration.zero;
-
             return Padding(
+              key: ValueKey(newsItem),
               padding: const EdgeInsets.only(
                 bottom: 12.0,
                 left: 16.0,
                 right: 16.0,
               ),
-              child: SlideInEntry(
-                // KEY IS CRITICAL: Ensures the animation state is tied to the DATA,
-                // not the index. Prevents re-animating old items when they shift down.
-                key: ValueKey(newsItem),
-                delay: animationDelay,
-                child: NewsCard(view: newsItem),
-              ),
+              child: NewsCard(view: newsItem),
             );
           }, childCount: _articles.length),
         ),

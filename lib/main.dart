@@ -128,8 +128,13 @@ class _StartupShell extends StatelessWidget {
             if (controller.isBooting)
               const Positioned(top: 0, left: 0, right: 0, child: _BootStripe()),
             if (controller.needsAgreement)
-              Positioned.fill(
-                child: AgreementsPage(onContinue: controller.acceptAgreements),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: AgreementConsentBanner(
+                  onContinue: controller.acceptAgreements,
+                ),
               ),
             if (controller.stage == AppStartupStage.failed)
               Positioned.fill(

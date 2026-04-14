@@ -33,6 +33,9 @@ class _SchedulePageState extends State<SchedulePage> {
 
   ProgramSchedule? _selectedProgram;
   int _selectedGradeIndex = 0;
+  ProgramSchedule? _cachedGridProgram;
+  int? _cachedGridGradeIndex;
+  _GridScheduleData? _cachedGridData;
 
   @override
   void initState() {
@@ -95,6 +98,9 @@ class _SchedulePageState extends State<SchedulePage> {
 
   Future<void> _refreshSchedules() async {
     setState(() {
+      _cachedGridData = null;
+      _cachedGridProgram = null;
+      _cachedGridGradeIndex = null;
       _schedulesFuture = _loadSchedules();
     });
   }
@@ -148,16 +154,12 @@ class _SchedulePageState extends State<SchedulePage> {
           }
 
           final selectedProgram = _resolveSelectedProgram(schedules);
-          final gridData = _buildGridData(selectedProgram);
+          final gridData = _gridDataFor(selectedProgram);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               _buildTodayLessonCard(context, gridData),
-              const SizedBox(height: 12),
-              _buildProgramSelector(context, schedules),
-              const SizedBox(height: 12),
-              _buildGradeSwitcher(context),
               const SizedBox(height: 18),
               _buildGridCard(context, gridData),
             ],
@@ -436,171 +438,6 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  Widget _buildProgramSelector(
-    BuildContext context,
-    List<ProgramSchedule> schedules,
-  ) {
-    final theme = Theme.of(context);
-    final selectedProgram = _selectedProgram ?? schedules.first;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Sınıfını Seç',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: theme.textTheme.bodyLarge?.color,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: 0.80),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<ProgramSchedule>(
-                value: selectedProgram,
-                isExpanded: true,
-                borderRadius: BorderRadius.circular(16),
-                icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                items: schedules.map((schedule) {
-                  return DropdownMenuItem<ProgramSchedule>(
-                    value: schedule,
-                    child: Text(
-                      schedule.programName,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) async {
-                  if (value == null) return;
-
-                  setState(() {
-                    _selectedProgram = value;
-                  });
-
-                  await _savePreferences();
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGradeSwitcher(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(2, (index) {
-              final isSelected = index == _selectedGradeIndex;
-              final title = index == 0 ? '1. Sinif' : '2. Sinif';
-
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () async {
-                    setState(() {
-                      _selectedGradeIndex = index;
-                    });
-                    await _savePreferences();
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        color: isSelected
-                            ? Colors.white
-                            : theme.textTheme.bodyLarge?.color,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 6),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _openProfilePage,
-              borderRadius: BorderRadius.circular(16),
-              child: Ink(
-                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withValues(alpha: 0.78),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.coolGray.withValues(alpha: 0.10),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Sinif ve sube bilgisini profilinden degistirebilirsin.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.coolGray,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildGridCard(BuildContext context, _GridScheduleData gridData) {
     final theme = Theme.of(context);
     final visibleDays = gridData.visibleDays;
@@ -622,7 +459,7 @@ class _SchedulePageState extends State<SchedulePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              '${_gradeLabel()} icin ders bulunamadi',
+              'Seçili sınıf için ders bulunamadı',
               style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -639,14 +476,21 @@ class _SchedulePageState extends State<SchedulePage> {
       );
     }
 
-    const double timeColumnWidth = 88;
-    const double dayColumnWidth = 150;
-    const double rowHeight = 116;
+    const double dayHeaderWidth = 108;
+    const double timeSlotColumnWidth = 150;
+    const double breakColumnWidth = 28;
+    const double rowHeight = 98;
+    const double headerHeight = 48;
     const double cellGap = 10;
+    final todayKey = _todayDayKey();
     final double gridWidth =
-        timeColumnWidth +
-        (visibleDays.length * dayColumnWidth) +
-        ((visibleDays.length + 1) * cellGap);
+        dayHeaderWidth +
+        _gridSlotsWidth(
+          gridData.timeSlots,
+          cellWidth: timeSlotColumnWidth,
+          breakWidth: breakColumnWidth,
+        ) +
+        ((gridData.timeSlots.length + 1) * cellGap);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
@@ -670,17 +514,44 @@ class _SchedulePageState extends State<SchedulePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Haftalik Grid',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: theme.textTheme.titleLarge?.color,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Haftalik Grid',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: theme.textTheme.titleLarge?.color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: _openProfilePage,
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Sınıf Değiştir',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Ayni saate denk gelen dersi kendi gununun kutusunda gorursun. Bugun mavi ile vurgulanir.',
+                  'Haftalık takvim, sınıf ve bölüm profilden değiştirilebilir',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: AppColors.coolGray,
@@ -698,58 +569,78 @@ class _SchedulePageState extends State<SchedulePage> {
             child: SingleChildScrollView(
               controller: _horizontalController,
               scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: gridWidth,
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _buildCornerHeader(timeColumnWidth, cellGap),
-                        ...visibleDays.map((day) {
-                          return _buildDayHeader(
-                            context,
-                            day: day,
-                            width: dayColumnWidth,
-                            gap: cellGap,
-                            isToday: day.key == _todayDayKey(),
-                          );
-                        }),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ...gridData.timeSlots.map((slot) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+              child: RepaintBoundary(
+                child: SizedBox(
+                  width: gridWidth,
+                  child: Column(
+                    children: [
+                      RepaintBoundary(
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildTimeCell(
-                              context,
-                              slot: slot,
-                              width: timeColumnWidth,
-                              height: rowHeight,
+                            _buildCornerHeader(
+                              dayHeaderWidth,
+                              height: headerHeight,
                               gap: cellGap,
                             ),
-                            ...visibleDays.map((day) {
-                              final lesson = gridData
-                                  .lessonsByDay[day.key]?[slot.startMinutes];
-                              return _buildLessonCell(
+                            ...gridData.timeSlots.map((slot) {
+                              return _buildTimeCell(
                                 context,
-                                lesson: lesson,
-                                dayLabel: day.label,
                                 slot: slot,
-                                width: dayColumnWidth,
-                                height: rowHeight,
+                                width: _gridSlotWidth(
+                                  slot,
+                                  cellWidth: timeSlotColumnWidth,
+                                  breakWidth: breakColumnWidth,
+                                ),
+                                height: headerHeight,
                                 gap: cellGap,
-                                isToday: day.key == _todayDayKey(),
                               );
                             }),
                           ],
                         ),
-                      );
-                    }),
-                    const SizedBox(height: 14),
-                  ],
+                      ),
+                      const SizedBox(height: 10),
+                      ...visibleDays.map((day) {
+                        final isToday = day.key == todayKey;
+                        final row = Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDayHeader(
+                              context,
+                              day: day,
+                              width: dayHeaderWidth,
+                              height: rowHeight,
+                              gap: cellGap,
+                              isToday: isToday,
+                            ),
+                            ..._buildLessonRowCells(
+                              context,
+                              day: day,
+                              gridData: gridData,
+                              cellWidth: timeSlotColumnWidth,
+                              breakWidth: breakColumnWidth,
+                              cellHeight: rowHeight,
+                              gap: cellGap,
+                              isToday: isToday,
+                            ),
+                          ],
+                        );
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: RepaintBoundary(
+                            child: isToday
+                                ? _TodayScheduleRowHighlight(
+                                    width: gridWidth,
+                                    height: rowHeight,
+                                    child: row,
+                                  )
+                                : row,
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 14),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -759,12 +650,16 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  Widget _buildCornerHeader(double width, double gap) {
+  Widget _buildCornerHeader(
+    double width, {
+    required double height,
+    required double gap,
+  }) {
     return Container(
       width: width,
-      height: 74,
+      height: height,
       margin: EdgeInsets.only(right: gap),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
@@ -774,20 +669,13 @@ class _SchedulePageState extends State<SchedulePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            'Saat',
+            'Gun / Saat',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
               color: AppColors.primary,
               fontSize: 12,
               fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Gun',
-            style: GoogleFonts.inter(
-              color: AppColors.coolGray,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -799,6 +687,7 @@ class _SchedulePageState extends State<SchedulePage> {
     BuildContext context, {
     required _DayColumn day,
     required double width,
+    double height = 74,
     required double gap,
     required bool isToday,
   }) {
@@ -806,9 +695,9 @@ class _SchedulePageState extends State<SchedulePage> {
 
     return Container(
       width: width,
-      height: 74,
+      height: height,
       margin: EdgeInsets.only(right: gap),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: isToday
             ? AppColors.primary.withValues(alpha: 0.12)
@@ -856,74 +745,163 @@ class _SchedulePageState extends State<SchedulePage> {
     final theme = Theme.of(context);
 
     if (slot.isBreak) {
-      return Container(
-        width: width,
-        height: height,
-        margin: EdgeInsets.only(right: gap),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              slot.startLabel,
-              style: GoogleFonts.inter(
-                color: theme.textTheme.bodyLarge?.color,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              slot.endLabel,
-              style: GoogleFonts.inter(
-                color: AppColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildBreakDivider(width: width, height: height, gap: gap);
     }
 
     return Container(
       width: width,
       height: height,
       margin: EdgeInsets.only(right: gap),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.70),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.10)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            slot.startLabel,
-            style: GoogleFonts.inter(
-              color: theme.textTheme.bodyLarge?.color,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
+      child: Center(
+        child: Text(
+          '${slot.startLabel} - ${slot.endLabel}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            color: theme.textTheme.bodyLarge?.color,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 4),
-          Text(
-            slot.endLabel,
-            style: GoogleFonts.inter(
-              color: AppColors.coolGray,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+        ),
+      ),
+    );
+  }
+
+  double _gridSlotWidth(
+    _GridTimeSlot slot, {
+    required double cellWidth,
+    required double breakWidth,
+  }) {
+    return slot.isBreak ? breakWidth : cellWidth;
+  }
+
+  double _gridSlotsWidth(
+    List<_GridTimeSlot> slots, {
+    required double cellWidth,
+    required double breakWidth,
+  }) {
+    return slots.fold<double>(
+      0,
+      (width, slot) =>
+          width +
+          _gridSlotWidth(slot, cellWidth: cellWidth, breakWidth: breakWidth),
+    );
+  }
+
+  Widget _buildBreakDivider({
+    required double width,
+    required double height,
+    required double gap,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      margin: EdgeInsets.only(right: gap),
+      child: Center(
+        child: CustomPaint(
+          size: Size(1.5, height),
+          painter: _VerticalDashPainter(
+            color: AppColors.coolGray.withValues(alpha: 0.42),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildLessonRowCells(
+    BuildContext context, {
+    required _DayColumn day,
+    required _GridScheduleData gridData,
+    required double cellWidth,
+    required double breakWidth,
+    required double cellHeight,
+    required double gap,
+    required bool isToday,
+  }) {
+    final cells = <Widget>[];
+    final dayLessons = gridData.lessonsByDay[day.key] ?? const {};
+
+    var index = 0;
+    while (index < gridData.timeSlots.length) {
+      final slot = gridData.timeSlots[index];
+      final lesson = dayLessons[slot.startMinutes];
+
+      if (!slot.isBreak && lesson == null) {
+        var emptySlotCount = 1;
+        while (index + emptySlotCount < gridData.timeSlots.length) {
+          final nextSlot = gridData.timeSlots[index + emptySlotCount];
+          final nextLesson = dayLessons[nextSlot.startMinutes];
+          if (nextSlot.isBreak || nextLesson != null) {
+            break;
+          }
+          emptySlotCount++;
+        }
+
+        cells.add(
+          _buildEmptyLessonCell(
+            context,
+            width: (cellWidth * emptySlotCount) + (gap * (emptySlotCount - 1)),
+            height: cellHeight,
+            gap: gap,
+            isToday: isToday,
+          ),
+        );
+        index += emptySlotCount;
+        continue;
+      }
+
+      cells.add(
+        _buildLessonCell(
+          context,
+          lesson: lesson,
+          dayLabel: day.label,
+          slot: slot,
+          width: _gridSlotWidth(
+            slot,
+            cellWidth: cellWidth,
+            breakWidth: breakWidth,
+          ),
+          height: cellHeight,
+          gap: gap,
+          isToday: isToday,
+        ),
+      );
+      index++;
+    }
+
+    return cells;
+  }
+
+  Widget _buildEmptyLessonCell(
+    BuildContext context, {
+    required double width,
+    required double height,
+    required double gap,
+    required bool isToday,
+  }) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: width,
+      height: height,
+      margin: EdgeInsets.only(right: gap),
+      decoration: BoxDecoration(
+        color: isToday
+            ? AppColors.primary.withValues(alpha: 0.04)
+            : theme.colorScheme.surface.withValues(alpha: 0.40),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isToday
+              ? AppColors.primary.withValues(alpha: 0.10)
+              : AppColors.coolGray.withValues(alpha: 0.08),
+        ),
       ),
     );
   }
@@ -941,57 +919,16 @@ class _SchedulePageState extends State<SchedulePage> {
     final theme = Theme.of(context);
 
     if (slot.isBreak) {
-      return Container(
-        width: width,
-        height: height,
-        margin: EdgeInsets.only(right: gap),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: isToday ? 0.10 : 0.06),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: isToday ? 0.20 : 0.12),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            slot.breakLabel,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              color: AppColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      );
+      return _buildBreakDivider(width: width, height: height, gap: gap);
     }
 
     if (lesson == null) {
-      return Container(
+      return _buildEmptyLessonCell(
+        context,
         width: width,
         height: height,
-        margin: EdgeInsets.only(right: gap),
-        decoration: BoxDecoration(
-          color: isToday
-              ? AppColors.primary.withValues(alpha: 0.04)
-              : theme.colorScheme.surface.withValues(alpha: 0.40),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isToday
-                ? AppColors.primary.withValues(alpha: 0.10)
-                : AppColors.coolGray.withValues(alpha: 0.08),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            'Bos',
-            style: GoogleFonts.inter(
-              color: AppColors.coolGray.withValues(alpha: 0.72),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
+        gap: gap,
+        isToday: isToday,
       );
     }
 
@@ -1006,7 +943,7 @@ class _SchedulePageState extends State<SchedulePage> {
         width: width,
         height: height,
         margin: EdgeInsets.only(right: gap),
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
         decoration: BoxDecoration(
           color: lesson.accent.withValues(
             alpha: theme.brightness == Brightness.dark ? 0.24 : 0.12,
@@ -1021,47 +958,45 @@ class _SchedulePageState extends State<SchedulePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: lesson.accent.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                lesson.badge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  color: lesson.accent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
             Text(
               lesson.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
                 color: theme.textTheme.bodyLarge?.color,
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w800,
                 height: 1.2,
               ),
             ),
-            const Spacer(),
-            Text(
-              lesson.subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: AppColors.coolGray,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                height: 1.3,
+            const SizedBox(height: 6),
+            if (lesson.classroom.isNotEmpty) ...[
+              Text(
+                lesson.classroom,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: lesson.accent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
               ),
-            ),
+              const SizedBox(height: 3),
+            ],
+            if (lesson.instructor.isNotEmpty)
+              Text(
+                lesson.instructor,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: GoogleFonts.inter(
+                  color: AppColors.coolGray,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
           ],
         ),
       ),
@@ -1234,6 +1169,21 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
+  _GridScheduleData _gridDataFor(ProgramSchedule program) {
+    final cachedGridData = _cachedGridData;
+    if (cachedGridData != null &&
+        identical(_cachedGridProgram, program) &&
+        _cachedGridGradeIndex == _selectedGradeIndex) {
+      return cachedGridData;
+    }
+
+    final gridData = _buildGridData(program);
+    _cachedGridProgram = program;
+    _cachedGridGradeIndex = _selectedGradeIndex;
+    _cachedGridData = gridData;
+    return gridData;
+  }
+
   _GridScheduleData _buildGridData(ProgramSchedule program) {
     final Map<String, List<ScheduleLesson>> rawData = _selectedGradeIndex == 0
         ? program.grade1
@@ -1295,7 +1245,6 @@ class _SchedulePageState extends State<SchedulePage> {
           startLabel: '12:00',
           endLabel: '13:00',
           isBreak: true,
-          breakLabel: 'Lunch Break',
         ),
       );
       timeSlots.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
@@ -1371,10 +1320,6 @@ class _SchedulePageState extends State<SchedulePage> {
         '${lesson.courseCode}|${lesson.courseName}|${lesson.classroom}';
     final index = seed.hashCode.abs() % palette.length;
     return palette[index];
-  }
-
-  String _gradeLabel() {
-    return _selectedGradeIndex == 0 ? '1. Sinif' : '2. Sinif';
   }
 
   _TodayLessonStatus _resolveTodayLessonStatus(_GridScheduleData gridData) {
@@ -1539,6 +1484,71 @@ class _GridScheduleData {
   final int lessonCount;
 }
 
+class _TodayScheduleRowHighlight extends StatelessWidget {
+  const _TodayScheduleRowHighlight({
+    required this.width,
+    required this.height,
+    required this.child,
+  });
+
+  final double width;
+  final double height;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.025),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.34),
+                width: 1.4,
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _VerticalDashPainter extends CustomPainter {
+  const _VerticalDashPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dashHeight = 7.0;
+    const dashGap = 5.0;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = size.width
+      ..strokeCap = StrokeCap.round;
+
+    final centerX = size.width / 2;
+    var startY = 0.0;
+    while (startY < size.height) {
+      final endY = (startY + dashHeight).clamp(0.0, size.height);
+      canvas.drawLine(Offset(centerX, startY), Offset(centerX, endY), paint);
+      startY += dashHeight + dashGap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VerticalDashPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
 class _GridLesson {
   const _GridLesson({
     required this.title,
@@ -1566,7 +1576,6 @@ class _GridTimeSlot {
     required this.startLabel,
     required this.endLabel,
     this.isBreak = false,
-    this.breakLabel = '',
   });
 
   final int startMinutes;
@@ -1574,7 +1583,6 @@ class _GridTimeSlot {
   final String startLabel;
   final String endLabel;
   final bool isBreak;
-  final String breakLabel;
 }
 
 class _ScheduledLesson {

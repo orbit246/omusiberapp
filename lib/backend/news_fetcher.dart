@@ -162,6 +162,7 @@ class NewsFetcher {
   Future<List<NewsView>> fetchLatestNews({
     bool forceRefresh = false,
     String? facultySlug,
+    bool fallbackToCacheOnError = true,
   }) async {
     final normalizedFacultySlug = facultySlug?.trim();
     final hasFacultyFilter =
@@ -233,8 +234,14 @@ class NewsFetcher {
         rethrow;
       }
       _logError('CRITICAL FAILURE in fetchLatestNews', e);
-      if (!hasFacultyFilter && _cachedNews != null && _cachedNews!.isNotEmpty) {
+      if (!hasFacultyFilter &&
+          fallbackToCacheOnError &&
+          _cachedNews != null &&
+          _cachedNews!.isNotEmpty) {
         return _cachedNews!;
+      }
+      if (!fallbackToCacheOnError) {
+        rethrow;
       }
       return [];
     }
@@ -248,7 +255,10 @@ class NewsFetcher {
       return result;
     }
 
-    if (!hasFacultyFilter && _cachedNews != null && _cachedNews!.isNotEmpty) {
+    if (!hasFacultyFilter &&
+        fallbackToCacheOnError &&
+        _cachedNews != null &&
+        _cachedNews!.isNotEmpty) {
       return _cachedNews!;
     }
 

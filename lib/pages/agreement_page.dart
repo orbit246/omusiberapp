@@ -3,6 +3,159 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+class AgreementConsentBanner extends StatefulWidget {
+  const AgreementConsentBanner({
+    super.key,
+    required this.onContinue,
+    this.termsAssetPath = 'assets/agreements/terms_tr.md',
+    this.privacyAssetPath = 'assets/agreements/privacy_tr.md',
+    this.consentAssetPath = 'assets/agreements/consent_tr.md',
+  });
+
+  final Future<void> Function(AgreementsAcceptance acceptance) onContinue;
+  final String termsAssetPath;
+  final String privacyAssetPath;
+  final String consentAssetPath;
+
+  @override
+  State<AgreementConsentBanner> createState() => _AgreementConsentBannerState();
+}
+
+class _AgreementConsentBannerState extends State<AgreementConsentBanner> {
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return SafeArea(
+      top: false,
+      child: Material(
+        elevation: 10,
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.96),
+        shadowColor: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.verified_user_outlined,
+                  color: cs.onPrimaryContainer,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Onay Gerekli',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Tüm fonksiyonlardan yararlanabilmek için onay gerekli.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton(
+                onPressed: _loading ? null : _openQuickConsent,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 38),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _loading
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.onPrimary,
+                        ),
+                      )
+                    : const Text('Onayla'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openQuickConsent() async {
+    setState(() => _loading = true);
+
+    try {
+      final results = await Future.wait<String>([
+        rootBundle.loadString(widget.termsAssetPath),
+        rootBundle.loadString(widget.privacyAssetPath),
+        rootBundle.loadString(widget.consentAssetPath),
+      ]);
+      if (!mounted) return;
+
+      final accepted = await _openQuickAgreementSheet(
+        context,
+        termsText: results[0],
+        privacyText: results[1],
+        consentText: results[2],
+      );
+      if (!mounted || accepted != true) return;
+
+      await widget.onContinue(
+        AgreementsAcceptance(
+          terms: AgreementAcceptance(
+            accepted: true,
+            version: _extractVersion(results[0]) ?? 'unknown',
+          ),
+          privacy: AgreementAcceptance(
+            accepted: true,
+            version: _extractVersion(results[1]) ?? 'unknown',
+          ),
+          consent: AgreementAcceptance(
+            accepted: true,
+            version: _extractVersion(results[2]) ?? 'unknown',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Onay metinleri açılamadı: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
+
 class AgreementsPage extends StatefulWidget {
   const AgreementsPage({
     super.key,
@@ -503,6 +656,195 @@ Future<bool?> _openAgreementSheet(
       );
     },
   );
+}
+
+Future<bool?> _openQuickAgreementSheet(
+  BuildContext context, {
+  required String termsText,
+  required String privacyText,
+  required String consentText,
+}) {
+  final theme = Theme.of(context);
+  final cs = theme.colorScheme;
+
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+    ),
+    builder: (ctx) {
+      var termsOk = false;
+      var privacyOk = false;
+      var consentOk = false;
+
+      return StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final allOk = termsOk && privacyOk && consentOk;
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              4,
+              16,
+              16 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.verified_user_outlined,
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Onay Gerekli',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tüm fonksiyonları kullanabilmek için kısa bir onay gerekiyor. Metinleri buradan açıp okuyabilirsin.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _QuickAgreementCheckTile(
+                  title: 'Kullanım Şartları',
+                  accepted: termsOk,
+                  body: termsText,
+                  onChanged: (value) => setSheetState(() => termsOk = value),
+                ),
+                const SizedBox(height: 10),
+                _QuickAgreementCheckTile(
+                  title: 'Gizlilik Politikası',
+                  accepted: privacyOk,
+                  body: privacyText,
+                  onChanged: (value) => setSheetState(() => privacyOk = value),
+                ),
+                const SizedBox(height: 10),
+                _QuickAgreementCheckTile(
+                  title: 'Açık Rıza Metni',
+                  accepted: consentOk,
+                  body: consentText,
+                  onChanged: (value) => setSheetState(() => consentOk = value),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: allOk ? () => Navigator.of(ctx).pop(true) : null,
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('Onayla ve Devam Et'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Sonra'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _QuickAgreementCheckTile extends StatelessWidget {
+  const _QuickAgreementCheckTile({
+    required this.title,
+    required this.accepted,
+    required this.body,
+    required this.onChanged,
+  });
+
+  final String title;
+  final bool accepted;
+  final String body;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Material(
+      color: cs.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => onChanged(!accepted),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+          child: Row(
+            children: [
+              Checkbox(
+                value: accepted,
+                onChanged: (v) => onChanged(v ?? false),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  _openAgreementSheet(
+                    context,
+                    title: title,
+                    body: body,
+                    initiallyAccepted: accepted,
+                  ).then((value) {
+                    if (value != null) {
+                      onChanged(value);
+                    }
+                  });
+                },
+                child: const Text('Oku'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> _openAgreementLink(BuildContext context, String href) async {
