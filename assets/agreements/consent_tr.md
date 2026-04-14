@@ -1,6 +1,6 @@
 # AKADEMİZ AÇIK RIZA METNİ (YURT DIŞINA AKTARIM)
-Sürüm: 2026-02-12  
-Tarih: 12.02.2026
+Sürüm: 2026-04-14  
+Tarih: 14.04.2026
 
 Bu metin, AkademiZ Uygulaması kapsamında kişisel verilerin **yurt dışına aktarımı** ve yurt dışında işlenmesine ilişkin açık rızayı içerir.
 
@@ -12,9 +12,9 @@ NortixLabs (AkademiZ)
 Uygulama; Google Firebase gibi bulut altyapıları kullanır. Bu kapsamda kimlik doğrulama, veritabanı (Firestore) ve anlık bildirim (FCM) işlemleri Türkiye dışındaki sunucularda gerçekleştirilebilir.
 
 ## 3) Aktarıma konu veriler
-- Google hesabı ile girişte: e-posta, UID, ad-soyad, profil fotoğrafı.
-- Uygulama içi etkileşimler: beğeniler, anket oyları.
-- Teknik veriler: cihaz bilgileri ve bildirim belirteçleri.
+- Google veya Apple hesabı ile girişte: e-posta, UID, ad-soyad, profil fotoğrafı.
+- Profil ve uygulama içi etkileşimler: öğrenci numarası (varsa), bölüm, kampüs, etkinlik katılımları/kayıtları, beğeniler, anket oyları ve geri bildirimler.
+- Teknik veriler: cihaz bilgileri, Firebase kimlik doğrulama belirteçleri ve bildirim belirteçleri.
 
 ## 4) Açık rıza beyanı
 AkademiZ Uygulaması kapsamında kişisel verilerimin, hizmetin sunulması amacıyla Google Firebase ve ilgili altyapılar aracılığıyla **Türkiye dışında bulunan sunucularda işlenmesine ve yurt dışına aktarılmasına** açıkça rıza gösteriyorum.

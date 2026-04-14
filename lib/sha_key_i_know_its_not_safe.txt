@@ -1,2 +1,0 @@
-ssh root@88.209.248.62
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF8d8VYLrjgDJnUYG+2XJmWvCN+Jv4RkdrzYY02xGOxA windows-client

@@ -1,6 +1,6 @@
 # AKADEMİZ KULLANIM ŞARTLARI VE KULLANICI SÖZLEŞMESİ
-Sürüm: 2026-02-12  
-Son Güncelleme: 12.02.2026
+Sürüm: 2026-04-14  
+Son Güncelleme: 14.04.2026
 
 Bu Kullanım Şartları (“Sözleşme”), AkademiZ mobil uygulamasını (“Uygulama”) kullanan kullanıcı (“Kullanıcı”) ile NortixLabs (“Hizmet Sağlayıcı”) arasında geçerlidir. Uygulamayı kullanarak bu Sözleşme’yi kabul etmiş olursunuz.
 
@@ -12,7 +12,7 @@ AkademiZ, Ondokuz Mayıs Üniversitesi'nin resmi bir uygulaması değildir. Uygu
 
 ## 3) Kullanıcı Erişimi
 - **Ziyaretçiler:** Haberleri ve etkinlikleri görüntüleyebilir.
-- **Kayıtlı Öğrenciler:** @stu.omu.edu.tr uzantılı e-posta ile giriş yaparak oylamalara ve diğer etkileşimli özelliklere erişebilir.
+- **Kayıtlı Kullanıcılar:** Google veya Apple hesabı ile giriş yaparak oylamalara ve diğer etkileşimli özelliklere erişebilir. E-posta adresinden sayısal öğrenci numarası anlaşılabiliyorsa bu bilgi profil alanını doldurmak için kullanılabilir; belirli bir e-posta alan adıyla giriş zorunlu değildir.
 - **Yöneticiler:** Sadece yetkili kullanıcılar içerik oluşturma ve düzenleme paneline erişebilir.
 
 ## 4) Kullanıcı Sorumluluğu

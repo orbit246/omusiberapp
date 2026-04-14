@@ -15,6 +15,7 @@ import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/about_page.dart';
 import 'package:omusiber/pages/new_view/feedback_page.dart';
 import 'package:omusiber/backend/update_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 
 // SettingsPage must be a StatefulWidget to hold the initial random state for the easter egg
@@ -149,6 +150,19 @@ class _SettingsPageState extends State<SettingsPage> {
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS);
+
+  Future<void> _openLegalDocument(String documentType) async {
+    final uri = Uri.https('nortixlabs.com', '/akademiz/$documentType');
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (opened || !mounted) return;
+
+    messenger.showSnackBar(
+      SnackBar(content: Text('Belge açılamadı: ${uri.toString()}')),
+    );
+  }
 
   Future<void> _openCurrentProfile() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -447,6 +461,32 @@ class _SettingsPageState extends State<SettingsPage> {
                       },
                     ),
                   ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // --- Legal Documents Section ---
+                _buildSectionHeader(context, "Legal Belgeler"),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.privacy_tip_outlined,
+                  title: "Gizlilik Politikası",
+                  subtitle: "nortixlabs.com/akademiz/privacy",
+                  onTap: () => _openLegalDocument('privacy'),
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.description_outlined,
+                  title: "Kullanım Şartları",
+                  subtitle: "nortixlabs.com/akademiz/terms",
+                  onTap: () => _openLegalDocument('terms'),
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.public_outlined,
+                  title: "Açık Rıza Metni",
+                  subtitle: "nortixlabs.com/akademiz/consent",
+                  onTap: () => _openLegalDocument('consent'),
                 ),
 
                 const SizedBox(height: 24),
