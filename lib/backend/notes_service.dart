@@ -79,7 +79,9 @@ class NotesService {
         return "Genel";
       }
 
-      final faculties = await _profileService.fetchAcademicFaculties();
+      final faculties = await _profileService.fetchAcademicFaculties(
+        includeTree: true,
+      );
       AcademicDepartment? selectedDepartment;
       AcademicGrade? selectedGrade;
       for (final faculty in faculties) {

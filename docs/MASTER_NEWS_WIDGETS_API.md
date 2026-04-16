@@ -57,6 +57,32 @@ The endpoint must return a JSON object with a top-level `sections` array.
 
 ```json
 {
+  "academicContext": {
+    "scheduleId": 12,
+    "programName": "Siber Guvenlik Teknolojileri",
+    "classKey": "engineering-computer-science-grade1",
+    "selectedClassIndex": 0,
+    "availableClassKeys": [
+      "engineering-computer-science-grade1",
+      "engineering-computer-science-grade2"
+    ],
+    "inferredGrade": 1,
+    "matchedBy": "random",
+    "faculty": {
+      "key": "engineering",
+      "name": "Engineering Faculty"
+    },
+    "department": {
+      "key": "engineering-computer-science",
+      "name": "Computer Science"
+    },
+    "grade": {
+      "key": "engineering-computer-science-grade1",
+      "name": "1. Grade",
+      "level": 1
+    },
+    "isRandomFallback": true
+  },
   "sections": [
     {
       "id": "today",
@@ -150,6 +176,17 @@ The endpoint must return a JSON object with a top-level `sections` array.
 - `value`: the main text shown by the card.
 - `trailingText`: optional short value shown at the right side of the card.
 - `action`: navigation behavior.
+
+### `academicContext`
+
+Optional metadata describing the schedule/class context used by lesson cards.
+When the user has no usable academic profile fields and no request hints are
+sent, the backend may choose a random schedule/class fallback and return
+`isRandomFallback: true`.
+
+The frontend preserves this object in cache and shows a small note above the
+summary widgets when `isRandomFallback` is true. The frontend still renders the
+card strings exactly as the backend sends them.
 
 ### `action`
 

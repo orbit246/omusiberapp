@@ -19,7 +19,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class SimpleNotifications {
-  static const _topic = 'events_all';
+  static const List<String> _publicTopics = <String>['news', 'events_all'];
   static const String _defaultChannelId = 'akademiz_general';
 
   static const AndroidNotificationChannel _generalChannel =
@@ -217,7 +217,10 @@ class SimpleNotifications {
       debugPrint('APNs token received.');
     }
 
-    await _messaging.subscribeToTopic(_topic);
+    for (final topic in _publicTopics) {
+      await _messaging.subscribeToTopic(topic);
+      debugPrint('Subscribed to FCM topic: $topic');
+    }
 
     final token = await _messaging.getToken();
     debugPrint('FCM token: $token');
