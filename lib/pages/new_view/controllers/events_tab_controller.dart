@@ -34,6 +34,27 @@ class EventsTabController extends ChangeNotifier {
   bool get isInitialLoading => _isInitialLoading;
   String? get errorMessage => _errorMessage;
 
+  String _mapErrorMessage(Object error) {
+    final raw = error.toString();
+    final normalized = raw.toLowerCase();
+
+    if (normalized.contains('502') || normalized.contains('bad gateway')) {
+      return 'Etkinlikler Yüklenemedi, Sonra Tekrardan Deneyin';
+    }
+
+    if (normalized.contains('socketexception') ||
+        normalized.contains('failed host lookup') ||
+        normalized.contains('network is unreachable') ||
+        normalized.contains('connection refused') ||
+        normalized.contains('connection closed') ||
+        normalized.contains('connection reset') ||
+        normalized.contains('timed out')) {
+      return 'Etkinlikler Yüklenemedi, İnternet Bağlantınızı Kontrol Edin';
+    }
+
+    return raw.replaceFirst('Exception: ', '');
+  }
+
   Future<void> loadInitialData() async {
     try {
       final cached = await _repository.getCachedEvents();
@@ -87,7 +108,7 @@ class EventsTabController extends ChangeNotifier {
       debugPrint("Background refresh failed: $error");
       if (_events.isEmpty) {
         _isInitialLoading = false;
-        _errorMessage = error.toString();
+        _errorMessage = _mapErrorMessage(error);
         notifyListeners();
       }
     }

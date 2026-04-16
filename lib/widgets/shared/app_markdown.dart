@@ -41,39 +41,47 @@ class AppMarkdownPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SizedBox(
-      height: maxHeight,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ClipRect(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              child: MarkdownBody(
-                data: data,
-                styleSheet: _markdownStyleSheet(theme),
-                onTapLink: (text, href, title) =>
-                    _openMarkdownLink(context, href),
-              ),
-            ),
-          ),
-          IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    backgroundColor.withValues(alpha: 0),
-                    backgroundColor,
-                  ],
-                  stops: const [0.72, 1],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          height: maxHeight,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.topLeft,
+                  minWidth: constraints.maxWidth,
+                  maxWidth: constraints.maxWidth,
+                  minHeight: 0,
+                  maxHeight: double.infinity,
+                  child: MarkdownBody(
+                    data: data,
+                    styleSheet: _markdownStyleSheet(theme),
+                    onTapLink: (text, href, title) =>
+                        _openMarkdownLink(context, href),
+                  ),
                 ),
               ),
-            ),
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        backgroundColor.withValues(alpha: 0),
+                        backgroundColor,
+                      ],
+                      stops: const [0.72, 1],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

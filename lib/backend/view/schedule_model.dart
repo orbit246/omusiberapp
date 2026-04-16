@@ -3,8 +3,7 @@ class ProgramSchedule {
   final String programName;
   final String academicYear;
   final String semester;
-  final Map<String, List<ScheduleLesson>> grade1;
-  final Map<String, List<ScheduleLesson>> grade2;
+  final Map<int, Map<String, List<ScheduleLesson>>> gradesByLevel;
   final String updatedAt;
 
   ProgramSchedule({
@@ -12,8 +11,7 @@ class ProgramSchedule {
     required this.programName,
     required this.academicYear,
     required this.semester,
-    required this.grade1,
-    required this.grade2,
+    required this.gradesByLevel,
     required this.updatedAt,
   });
 
@@ -52,15 +50,33 @@ class ProgramSchedule {
       return map;
     }
 
+    final gradesByLevel = <int, Map<String, List<ScheduleLesson>>>{};
+    if (scheduleData is Map) {
+      scheduleData.forEach((key, value) {
+        final match = RegExp(r'^grade(\d+)$').firstMatch(key.toString());
+        if (match == null) {
+          return;
+        }
+        final level = int.tryParse(match.group(1) ?? '');
+        if (level == null) {
+          return;
+        }
+        gradesByLevel[level] = parseGrade(value);
+      });
+    }
+
     return ProgramSchedule(
       id: json['id'] ?? 0,
       programName: json['programName'] ?? '',
       academicYear: json['academicYear'] ?? '',
       semester: json['semester'] ?? '',
-      grade1: parseGrade(scheduleData['grade1']),
-      grade2: parseGrade(scheduleData['grade2']),
+      gradesByLevel: gradesByLevel,
       updatedAt: json['updatedAt'] ?? '',
     );
+  }
+
+  Map<String, List<ScheduleLesson>> gradeForLevel(int level) {
+    return gradesByLevel[level] ?? const <String, List<ScheduleLesson>>{};
   }
 }
 

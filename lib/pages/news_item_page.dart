@@ -308,7 +308,7 @@ class _NewsItemPageState extends State<NewsItemPage> {
                         // Body Content
                         AppMarkdownBody(
                           data: view.fullText ?? view.summary,
-                          selectable: true,
+                          selectable: false,
                         ),
 
                         if (view.excelAttachments.isNotEmpty) ...[

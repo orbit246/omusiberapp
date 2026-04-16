@@ -12,8 +12,14 @@ class ScheduleService {
   ScheduleService._privateConstructor();
   factory ScheduleService() => _instance;
 
-  Future<List<ProgramSchedule>> fetchSchedules() async {
-    final uri = Uri.parse('${Constants.baseUrl}/schedules');
+  Future<List<ProgramSchedule>> fetchSchedules({String? departmentKey}) async {
+    final normalizedDepartmentKey = departmentKey?.trim();
+    final uri = Uri.parse('${Constants.baseUrl}/schedules').replace(
+      queryParameters:
+          normalizedDepartmentKey != null && normalizedDepartmentKey.isNotEmpty
+          ? <String, String>{'departmentKey': normalizedDepartmentKey}
+          : null,
+    );
     try {
       final token = await AuthService().getIdToken();
       final response = await http.get(

@@ -235,7 +235,7 @@ class EventsTabContent extends StatelessWidget {
     }
 
     if (errorMessage != null && events.isEmpty) {
-      return Center(child: Text('Bir hata oluştu: $errorMessage'));
+      return Center(child: Text(errorMessage!));
     }
 
     return Scaffold(

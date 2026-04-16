@@ -157,7 +157,7 @@ class _AcademicCalendarPageState extends State<AcademicCalendarPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Akademik takvim yuklenemedi. Lutfen tekrar deneyin.',
+                      'Akademik takvim yüklenemedi. Lütfen tekrar deneyin.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium,
                     ),
@@ -184,7 +184,7 @@ class _AcademicCalendarPageState extends State<AcademicCalendarPage> {
                   return Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'Akademik takvim gorseli acilamadi.',
+                      'Akademik takvim görseli açılamadı.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium,
                     ),

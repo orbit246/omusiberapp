@@ -1,13 +1,16 @@
 class AcademicGrade {
   final String key;
   final String name;
+  final int? level;
 
-  const AcademicGrade({required this.key, required this.name});
+  const AcademicGrade({required this.key, required this.name, this.level});
 
   factory AcademicGrade.fromJson(Map<String, dynamic> json) {
+    final rawLevel = json['level'];
     return AcademicGrade(
       key: (json['key'] as String? ?? '').trim(),
       name: (json['name'] as String? ?? '').trim(),
+      level: rawLevel is num ? rawLevel.toInt() : int.tryParse('$rawLevel'),
     );
   }
 }

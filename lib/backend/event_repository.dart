@@ -189,7 +189,7 @@ class EventRepository {
       );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Katilma basarisiz: ${response.statusCode}');
+        throw Exception('Katılma başarısız: ${response.statusCode}');
       }
       _locallyJoinedEventIds.add(eventId);
     } catch (e) {

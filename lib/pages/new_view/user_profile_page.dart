@@ -156,13 +156,6 @@ class UserProfilePage extends StatelessWidget {
                       label: "Sınıf",
                       value: profile.gradeName!,
                     ),
-                  if (profile.campus != null && profile.campus!.isNotEmpty)
-                    _buildInfoTile(
-                      context,
-                      icon: Icons.map_outlined,
-                      label: "Yerleşke",
-                      value: profile.campus!,
-                    ),
                   if (profile.gender != null && profile.gender!.isNotEmpty)
                     _buildInfoTile(
                       context,

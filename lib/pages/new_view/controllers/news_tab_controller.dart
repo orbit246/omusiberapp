@@ -73,6 +73,27 @@ class NewsTabController extends ChangeNotifier {
   bool get hasMoreVisibleNews =>
       visibleFilteredArticles.length < filteredArticles.length;
 
+  String _mapErrorMessage(Object error) {
+    final raw = error.toString();
+    final normalized = raw.toLowerCase();
+
+    if (normalized.contains('502') || normalized.contains('bad gateway')) {
+      return 'Haberler Yüklenemedi, Sonra Tekrardan Deneyin';
+    }
+
+    if (normalized.contains('socketexception') ||
+        normalized.contains('failed host lookup') ||
+        normalized.contains('network is unreachable') ||
+        normalized.contains('connection refused') ||
+        normalized.contains('connection closed') ||
+        normalized.contains('connection reset') ||
+        normalized.contains('timed out')) {
+      return 'Haberler Yüklenemedi, İnternet Bağlantınızı Kontrol Edin';
+    }
+
+    return raw.replaceFirst('Exception: ', '');
+  }
+
   List<String> get availableTags {
     final tags =
         _articles
@@ -232,7 +253,7 @@ class NewsTabController extends ChangeNotifier {
       StartupLogger.log('NewsTabController.loadInitialData() failed: $error');
       _isSummaryLoading = false;
       _isNewsLoading = false;
-      _errorMessage = error.toString();
+      _errorMessage = _mapErrorMessage(error);
       _initialCacheLoadComplete = true;
       notifyListeners();
       _handleStartupChanged();
@@ -308,7 +329,7 @@ class NewsTabController extends ChangeNotifier {
       }
       if (_articles.isEmpty) {
         _isNewsLoading = false;
-        _errorMessage = error.toString();
+        _errorMessage = _mapErrorMessage(error);
         notifyListeners();
       }
     }

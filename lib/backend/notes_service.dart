@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/backend/view/academic_faculty_model.dart';
 import 'package:omusiber/backend/view/note_model.dart';
 import 'package:omusiber/backend/schedule_service.dart';
-import 'package:omusiber/backend/view/schedule_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotesService {
   static const String _storageKey = 'local_notes';
@@ -12,6 +14,8 @@ class NotesService {
   static final NotesService _instance = NotesService._internal();
   factory NotesService() => _instance;
   NotesService._internal();
+
+  final UserProfileService _profileService = UserProfileService();
 
   // Helper to generate IDs
   String get _generateId =>
@@ -63,25 +67,53 @@ class NotesService {
 
   Future<String> suggestContext() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final int? progId = prefs.getInt('selected_program_id');
-      final int gradeIndex = prefs.getInt('selected_grade_index') ?? 0;
-
-      if (progId == null) return "Genel";
-
-      // Ideally cache schedules but fetching is okay for now if not too frequent
-      final schedules = await ScheduleService().fetchSchedules();
-
-      ProgramSchedule program;
-      try {
-        program = schedules.firstWhere((s) => s.id == progId);
-      } catch (e) {
-        // Fallback if ID changed or not found
-        if (schedules.isNotEmpty)
-          program = schedules.first;
-        else
-          return "Genel";
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return "Genel";
       }
+
+      final profile = await _profileService.fetchUserProfile(user.uid);
+      if (profile == null ||
+          profile.departmentKey == null ||
+          profile.gradeKey == null) {
+        return "Genel";
+      }
+
+      final faculties = await _profileService.fetchAcademicFaculties();
+      AcademicDepartment? selectedDepartment;
+      AcademicGrade? selectedGrade;
+      for (final faculty in faculties) {
+        for (final department in faculty.departments) {
+          if (department.key != profile.departmentKey) {
+            continue;
+          }
+          selectedDepartment = department;
+          for (final grade in department.grades) {
+            if (grade.key == profile.gradeKey) {
+              selectedGrade = grade;
+              break;
+            }
+          }
+          break;
+        }
+        if (selectedDepartment != null) {
+          break;
+        }
+      }
+
+      final gradeLevel = selectedGrade?.level;
+      if (selectedDepartment == null || gradeLevel == null) {
+        return "Genel";
+      }
+
+      final schedules = await ScheduleService().fetchSchedules(
+        departmentKey: selectedDepartment.key,
+      );
+      if (schedules.isEmpty) {
+        return "Genel";
+      }
+
+      final program = schedules.first;
 
       // Determine day
       final now = DateTime.now();
@@ -102,12 +134,7 @@ class NotesService {
       if (weekday < 1 || weekday > 7) return "Genel";
       final todayStr = days[weekday - 1];
 
-      Map<String, List<ScheduleLesson>> targetGrade;
-      if (gradeIndex == 0) {
-        targetGrade = program.grade1;
-      } else {
-        targetGrade = program.grade2;
-      }
+      final targetGrade = program.gradeForLevel(gradeLevel);
 
       final lessons = targetGrade[todayStr];
       if (lessons == null || lessons.isEmpty) return "Genel";

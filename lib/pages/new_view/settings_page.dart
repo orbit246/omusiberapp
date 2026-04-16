@@ -248,7 +248,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       style: theme.textTheme.titleMedium,
                     ),
                     subtitle: const Text(
-                      "Baglanti kurulurken ayarlar yukleniyor.",
+                      "Bağlantı kurulurken ayarlar yükleniyor.",
                     ),
                   ),
                 ] else if (isLoggedIn) ...[
@@ -257,8 +257,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: Text(
                       user.isAnonymous
-                          ? "Misafir Kullanici"
-                          : (user.displayName ?? "Kullanici"),
+                          ? "Misafir Kullanıcı"
+                          : (user.displayName ?? "Kullanıcı"),
                       style: theme.textTheme.titleMedium,
                     ),
                     subtitle: Text(
@@ -272,7 +272,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     context,
                     icon: Icons.person_outline,
                     title: "Profilim",
-                    subtitle: "Sinif ve sube bilgilerini profilde gor",
+                    subtitle: "Sınıf ve şube bilgilerini profilde gör",
                     onTap: _openCurrentProfile,
                   ),
                   if (_loadingBadges)

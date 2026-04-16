@@ -10,6 +10,7 @@ import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/pages/news_item_page.dart';
 import 'package:omusiber/pages/new_view/controllers/news_tab_controller.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
+import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
@@ -94,6 +95,12 @@ class _NewsTabViewState extends State<NewsTabView> {
         builder: (context) => MasterView(initialTabIndex: index),
       ),
     );
+  }
+
+  void _openSchedulePage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const SchedulePage()));
   }
 
   void _loadMoreNews() {
@@ -1439,6 +1446,9 @@ class _NewsTabViewState extends State<NewsTabView> {
         if (tabIndex == null) return;
         _openMasterTab(tabIndex);
         break;
+      case MasterNewsWidgetActionType.openSchedule:
+        _openSchedulePage();
+        break;
       case MasterNewsWidgetActionType.scrollNewsList:
         _scrollToNewsSection();
         break;
@@ -1578,7 +1588,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     } */
 
     if (_errorMessage != null && !_isNewsLoading && visibleArticles.isEmpty) {
-      return Center(child: Text("Hata: $_errorMessage"));
+      return Center(child: Text(_errorMessage!));
     }
 
     return Scaffold(

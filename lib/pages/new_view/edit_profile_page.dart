@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:omusiber/backend/master_news_widgets_repository.dart';
 import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/academic_faculty_model.dart';
@@ -28,30 +31,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   UserProfile? _profile;
   List<AcademicFaculty> _academicFaculties = const [];
+  List<AcademicDepartment> _availableDepartments = const [];
+  List<AcademicGrade> _availableGrades = const [];
   String? _selectedGender;
-  String? _selectedCampus;
   String? _selectedFacultyKey;
   String? _selectedDepartmentKey;
   String? _selectedGradeKey;
   String? _resolvedUid;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isDepartmentsLoading = false;
+  bool _isGradesLoading = false;
+  bool _isAcademicSyncing = false;
   String? _loadError;
   String? _academicSelectionNotice;
+  int _departmentRequestToken = 0;
+  int _gradeRequestToken = 0;
 
   final List<String> _genders = ["Erkek", "Kadın", "Belirtmek İstemiyorum"];
-  final List<String> _campuses = [
-    "Kurupelit Yerleşkesi",
-    "Güzel Sanatlar Yerleşkesi",
-    "Ballıca Yerleşkesi",
-    "Çarşamba Yerleşkesi",
-    "Bafra Yerleşkesi",
-    "Havza Yerleşkesi",
-    "Vezirköprü Yerleşkesi",
-    "Kavak Yerleşkesi",
-    "Ladik Yerleşkesi",
-    "Alaçam Yerleşkesi",
-  ];
 
   @override
   void initState() {
@@ -90,9 +87,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return null;
   }
 
-  List<AcademicDepartment> get _availableDepartments =>
-      _selectedFaculty?.departments ?? const <AcademicDepartment>[];
-
   AcademicDepartment? get _selectedDepartment {
     final departmentKey = _selectedDepartmentKey;
     if (departmentKey == null) return null;
@@ -104,16 +98,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return null;
   }
 
-  List<AcademicGrade> get _availableGrades =>
-      _selectedDepartment?.grades ?? const <AcademicGrade>[];
-
   Future<void> _loadInitialData() async {
     final uid = _resolvedUid;
     if (uid == null) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _loadError = 'Profil bilgisi icin aktif kullanici bulunamadi.';
+        _loadError = 'Profil bilgisi için aktif kullanıcı bulunamadı.';
       });
       return;
     }
@@ -126,29 +117,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
     });
 
     try {
-      final results = await Future.wait<Object?>([
-        _profileService.fetchUserProfile(uid),
-        _profileService.fetchAcademicFaculties(),
-      ]);
+      final profile = await _profileService.fetchUserProfile(uid);
 
       if (!mounted) return;
 
-      final profile = results[0] as UserProfile?;
-      final academicFaculties = results[1] as List<AcademicFaculty>;
-
       if (profile == null) {
         setState(() {
-          _academicFaculties = academicFaculties;
           _isLoading = false;
-          _loadError = 'Profil bilgisi su anda yuklenemedi.';
+          _loadError = 'Profil bilgisi şu anda yüklenemedi.';
         });
         return;
       }
 
+      _applyProfile(profile);
+      await _loadAcademicOptions();
+
+      if (!mounted) return;
       setState(() {
-        _academicFaculties = academicFaculties;
-        _applyProfile(profile);
-        _reconcileAcademicSelection();
         _isLoading = false;
       });
     } catch (e) {
@@ -156,6 +141,138 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() {
         _isLoading = false;
         _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _loadAcademicOptions() async {
+    final faculties = await _profileService.fetchAcademicFaculties();
+    if (!mounted) return;
+
+    setState(() {
+      _academicFaculties = faculties;
+    });
+
+    if (_selectedFacultyKey == null) {
+      setState(() {
+        _availableDepartments = const [];
+        _availableGrades = const [];
+      });
+      return;
+    }
+
+    final selectedFacultyExists = _academicFaculties.any(
+      (faculty) => faculty.key == _selectedFacultyKey,
+    );
+    if (!selectedFacultyExists) {
+      setState(() {
+        _selectedFacultyKey = null;
+        _selectedDepartmentKey = null;
+        _selectedGradeKey = null;
+        _availableDepartments = const [];
+        _availableGrades = const [];
+        _academicSelectionNotice =
+            'Kayıtlı fakülte bilgisi güncel listede bulunamadı. Lütfen yeniden seçin.';
+      });
+      return;
+    }
+
+    await _loadDepartmentsForFaculty(
+      _selectedFacultyKey!,
+      preserveSelection: true,
+    );
+
+    if (_selectedDepartmentKey != null) {
+      await _loadGradesForDepartment(
+        _selectedDepartmentKey!,
+        preserveSelection: true,
+      );
+    }
+
+    if (mounted) {
+      setState(_reconcileAcademicSelection);
+    }
+  }
+
+  Future<void> _loadDepartmentsForFaculty(
+    String facultyKey, {
+    bool preserveSelection = false,
+  }) async {
+    final requestToken = ++_departmentRequestToken;
+    if (mounted) {
+      setState(() {
+        _isDepartmentsLoading = true;
+        _availableDepartments = const [];
+        _availableGrades = const [];
+        if (!preserveSelection) {
+          _selectedDepartmentKey = null;
+          _selectedGradeKey = null;
+        }
+      });
+    }
+
+    try {
+      final departments = await _profileService.fetchAcademicDepartments(
+        facultyKey,
+      );
+      if (!mounted || requestToken != _departmentRequestToken) return;
+
+      setState(() {
+        _availableDepartments = departments;
+        _isDepartmentsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || requestToken != _departmentRequestToken) return;
+      setState(() {
+        _isDepartmentsLoading = false;
+        _academicSelectionNotice = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _loadGradesForDepartment(
+    String departmentKey, {
+    bool preserveSelection = false,
+  }) async {
+    final facultyKey = _selectedFacultyKey;
+    if (facultyKey == null) {
+      if (!mounted) return;
+      setState(() {
+        _availableGrades = const [];
+        if (!preserveSelection) {
+          _selectedGradeKey = null;
+        }
+      });
+      return;
+    }
+
+    final requestToken = ++_gradeRequestToken;
+    if (mounted) {
+      setState(() {
+        _isGradesLoading = true;
+        _availableGrades = const [];
+        if (!preserveSelection) {
+          _selectedGradeKey = null;
+        }
+      });
+    }
+
+    try {
+      final grades = await _profileService.fetchAcademicGrades(
+        departmentKey,
+        facultyKey: facultyKey,
+      );
+      if (!mounted || requestToken != _gradeRequestToken) return;
+
+      setState(() {
+        _availableGrades = grades;
+        _isGradesLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || requestToken != _gradeRequestToken) return;
+      setState(() {
+        _isGradesLoading = false;
+        _academicSelectionNotice = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -168,16 +285,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _selectedFacultyKey = null;
       _selectedDepartmentKey = null;
       _selectedGradeKey = null;
+      _availableDepartments = const [];
+      _availableGrades = const [];
       notice =
-          'Kayitli fakulte bilgisi guncel listede bulunamadi. Lutfen yeniden secin.';
+          'Kayıtlı fakülte bilgisi güncel listede bulunamadı. Lütfen yeniden seçin.';
     }
 
     final selectedDepartment = _selectedDepartment;
     if (_selectedDepartmentKey != null && selectedDepartment == null) {
       _selectedDepartmentKey = null;
       _selectedGradeKey = null;
+      _availableGrades = const [];
       notice =
-          'Kayitli bolum bilgisi guncel listede bulunamadi. Lutfen yeniden secin.';
+          'Kayıtlı bölüm bilgisi güncel listede bulunamadı. Lütfen yeniden seçin.';
     }
 
     final hasSelectedGrade = _selectedGradeKey != null;
@@ -187,35 +307,99 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (hasSelectedGrade && !gradeStillExists) {
       _selectedGradeKey = null;
       notice =
-          'Kayitli sinif bilgisi guncel listede bulunamadi. Lutfen yeniden secin.';
+          'Kayıtlı sınıf bilgisi güncel listede bulunamadı. Lütfen yeniden seçin.';
     }
 
     _academicSelectionNotice = notice;
   }
 
-  void _onFacultyChanged(String? facultyKey) {
+  Future<void> _persistAcademicSelection() async {
+    final uid = _resolvedUid;
+    if (uid == null) return;
+
+    final facultyKey = _selectedFacultyKey;
+    final departmentKey = facultyKey == null ? null : _selectedDepartmentKey;
+    final gradeKey = departmentKey == null ? null : _selectedGradeKey;
+
+    if (mounted) {
+      setState(() {
+        _isAcademicSyncing = true;
+      });
+    }
+
+    try {
+      await _profileService.updateUserProfile(uid, {
+        'facultyKey': facultyKey,
+        'departmentKey': departmentKey,
+        'gradeKey': gradeKey,
+      });
+      final refreshedProfile = await _profileService.fetchUserProfile(uid);
+      if (mounted && refreshedProfile != null) {
+        setState(() {
+          _applyProfile(refreshedProfile);
+        });
+      }
+      unawaited(
+        MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _academicSelectionNotice = e.toString().replaceFirst('Exception: ', '');
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Akademik bilgiler kaydedilemedi: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAcademicSyncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _onFacultyChanged(String? facultyKey) async {
     setState(() {
       _selectedFacultyKey = facultyKey;
       _selectedDepartmentKey = null;
       _selectedGradeKey = null;
+      _availableDepartments = const [];
+      _availableGrades = const [];
       _academicSelectionNotice = null;
     });
+
+    await _persistAcademicSelection();
+    if (facultyKey != null) {
+      await _loadDepartmentsForFaculty(facultyKey);
+    }
   }
 
-  void _onDepartmentChanged(String? departmentKey) {
+  Future<void> _onDepartmentChanged(String? departmentKey) async {
     setState(() {
       _selectedDepartmentKey = departmentKey;
       _selectedGradeKey = null;
+      _availableGrades = const [];
       _academicSelectionNotice = null;
     });
+
+    await _persistAcademicSelection();
+    if (departmentKey != null) {
+      await _loadGradesForDepartment(departmentKey);
+    }
   }
 
-  void _onGradeChanged(String? gradeKey) {
+  Future<void> _onGradeChanged(String? gradeKey) async {
     if (!mounted) return;
     setState(() {
       _selectedGradeKey = gradeKey;
       _academicSelectionNotice = null;
     });
+    await _persistAcademicSelection();
   }
 
   void _applyProfile(UserProfile profile) {
@@ -225,7 +409,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _studentIdController.text = profile.studentId ?? derivedStudentId ?? "";
     _ageController.text = profile.age?.toString() ?? "";
     _selectedGender = profile.gender;
-    _selectedCampus = profile.campus;
     _selectedFacultyKey = profile.facultyKey;
     _selectedDepartmentKey = profile.departmentKey;
     _selectedGradeKey = profile.gradeKey;
@@ -250,7 +433,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'departmentKey': departmentKey,
         'gradeKey': gradeKey,
         'gender': _selectedGender,
-        'campus': _selectedCampus,
       };
 
       await _profileService.updateUserProfile(uid, updates);
@@ -334,8 +516,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'AkademiZ hesabimin ve hesabima bagli verilerin silinmesini talep ediyorum.',
       )
       ..writeln()
-      ..writeln('UID: ${uid.isEmpty ? "(bulunamadi)" : uid}')
-      ..writeln('E-posta: ${email.isEmpty ? "(bulunamadi)" : email}')
+      ..writeln('UID: ${uid.isEmpty ? "(bulunamadı)" : uid}')
+      ..writeln('E-posta: ${email.isEmpty ? "(bulunamadı)" : email}')
       ..writeln()
       ..writeln(
         'Bu talebin geri alinamayacagini ve hesap verilerimin kalici olarak silinecegini anliyorum.',
@@ -435,7 +617,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Expanded(
             child: Text(
               _academicSelectionNotice ??
-                  "Profil bilgilerinizi doldurarak topluluktaki etkileşiminizi artırabilirsiniz.",
+                  (_isAcademicSyncing
+                      ? "Akademik seçiminiz kaydediliyor."
+                      : "Profil bilgilerinizi doldurarak topluluktaki etkileşiminizi artırabilirsiniz."),
               style: const TextStyle(fontSize: 13),
             ),
           ),
@@ -631,7 +815,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       )
                       .toList(),
-                  onChanged: _onFacultyChanged,
+                  onChanged: _isAcademicSyncing ? null : _onFacultyChanged,
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -643,7 +827,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   decoration: InputDecoration(
                     labelText: "Bölüm",
                     helperText: _selectedFacultyKey == null
-                        ? "Once fakulte secin."
+                        ? "Önce fakülte seçin."
+                        : _isDepartmentsLoading
+                        ? "Bölümler getiriliyor."
                         : null,
                     prefixIcon: const Icon(Icons.apartment_outlined),
                     border: OutlineInputBorder(
@@ -651,6 +837,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                     filled: true,
                     fillColor: colorScheme.surface,
+                    suffixIcon: _isDepartmentsLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
                   ),
                   items: _availableDepartments
                       .map(
@@ -663,7 +859,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       )
                       .toList(),
-                  onChanged: _selectedFacultyKey == null
+                  onChanged: _selectedFacultyKey == null ||
+                          _isDepartmentsLoading ||
+                          _isAcademicSyncing
                       ? null
                       : _onDepartmentChanged,
                 ),
@@ -677,7 +875,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   decoration: InputDecoration(
                     labelText: "Sınıf",
                     helperText: _selectedDepartmentKey == null
-                        ? "Once bolum secin."
+                        ? "Önce bölüm seçin."
+                        : _isGradesLoading
+                        ? "Sınıflar getiriliyor."
                         : null,
                     prefixIcon: const Icon(Icons.format_list_numbered_outlined),
                     border: OutlineInputBorder(
@@ -685,6 +885,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                     filled: true,
                     fillColor: colorScheme.surface,
+                    suffixIcon: _isGradesLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
                   ),
                   items: _availableGrades
                       .map(
@@ -697,34 +907,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       )
                       .toList(),
-                  onChanged: _selectedDepartmentKey == null
+                  onChanged: _selectedDepartmentKey == null ||
+                          _isGradesLoading ||
+                          _isAcademicSyncing
                       ? null
                       : _onGradeChanged,
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: ValueKey('campus-$_selectedCampus'),
-                  isExpanded: true,
-                  initialValue: _selectedCampus,
-                  decoration: InputDecoration(
-                    labelText: "Yerleşke / Kampüs",
-                    prefixIcon: const Icon(Icons.map_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                  ),
-                  items: _campuses
-                      .map(
-                        (c) => DropdownMenuItem(
-                          value: c,
-                          child: Text(c, overflow: TextOverflow.ellipsis),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) => setState(() => _selectedCampus = val),
-                ),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,

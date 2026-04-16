@@ -217,7 +217,7 @@ class CommunityRepository {
     final ready = await AppStartupController.instance
         .ensureAuthenticatedSession();
     if (!ready) {
-      throw Exception('Giris hazir degil');
+      throw Exception('Giriş hazır değil');
     }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Giriş yapmalısınız");

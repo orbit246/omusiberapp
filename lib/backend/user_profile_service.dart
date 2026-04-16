@@ -9,6 +9,11 @@ import 'package:omusiber/models/user_badge.dart';
 
 class UserProfileService {
   FirebaseAuth get _auth => FirebaseAuth.instance;
+  static List<AcademicFaculty>? _facultyCache;
+  static final Map<String, List<AcademicDepartment>> _departmentCache =
+      <String, List<AcademicDepartment>>{};
+  static final Map<String, List<AcademicGrade>> _gradeCache =
+      <String, List<AcademicGrade>>{};
 
   Exception _buildApiException(String fallbackMessage, String responseBody) {
     try {
@@ -190,35 +195,200 @@ class UserProfileService {
     }
   }
 
-  Future<List<AcademicFaculty>> fetchAcademicFaculties() async {
+  Uri _buildAcademicUri(String path, [Map<String, String?> query = const {}]) {
+    final params = <String, String>{};
+    for (final entry in query.entries) {
+      final value = entry.value?.trim();
+      if (value != null && value.isNotEmpty) {
+        params[entry.key] = value;
+      }
+    }
+    return Uri.parse(
+      '${Constants.baseUrl}$path',
+    ).replace(queryParameters: params.isEmpty ? null : params);
+  }
+
+  List<Map<String, dynamic>> _decodeObjectList(dynamic decoded) {
+    if (decoded is List) {
+      return decoded
+          .whereType<Map>()
+          .map((item) => item.cast<String, dynamic>())
+          .toList(growable: false);
+    }
+
+    if (decoded is Map<String, dynamic>) {
+      final nestedList = decoded['data'] ?? decoded['items'] ?? decoded['result'];
+      if (nestedList is List) {
+        return nestedList
+            .whereType<Map>()
+            .map((item) => item.cast<String, dynamic>())
+            .toList(growable: false);
+      }
+
+      return <Map<String, dynamic>>[decoded];
+    }
+
+    if (decoded is Map) {
+      return _decodeObjectList(decoded.cast<String, dynamic>());
+    }
+
+    return const <Map<String, dynamic>>[];
+  }
+
+  List<AcademicFaculty> _parseAcademicFaculties(dynamic decoded) {
+    return _decodeObjectList(decoded)
+        .map(AcademicFaculty.fromJson)
+        .where((faculty) => faculty.key.isNotEmpty && faculty.name.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  List<AcademicGrade> _normalizeGrades(List<AcademicGrade> grades) {
+    final sorted = List<AcademicGrade>.of(grades);
+    sorted.sort((a, b) {
+      final left = a.level ?? 999;
+      final right = b.level ?? 999;
+      if (left != right) {
+        return left.compareTo(right);
+      }
+      return a.name.compareTo(b.name);
+    });
+    return List<AcademicGrade>.unmodifiable(sorted);
+  }
+
+  Future<List<AcademicFaculty>> _fetchAcademicFacultyTree({
+    String? facultyKey,
+  }) async {
+    final response = await http.get(
+      _buildAcademicUri('/academic-faculties', {'facultyKey': facultyKey}),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(
+        'Akademik birim listesi alinamadi.',
+        response.body,
+      );
+    }
+
+    return _parseAcademicFaculties(json.decode(response.body));
+  }
+
+  Future<List<AcademicFaculty>> fetchAcademicFaculties({
+    bool forceRefresh = false,
+  }) async {
     try {
-      final response = await http.get(
-        Uri.parse('${Constants.baseUrl}/academic-faculties'),
+      if (!forceRefresh && _facultyCache != null) {
+        return _facultyCache!;
+      }
+
+      final faculties = await _fetchAcademicFacultyTree();
+      _facultyCache = List<AcademicFaculty>.unmodifiable(
+        faculties
+            .map(
+              (faculty) => AcademicFaculty(
+                key: faculty.key,
+                name: faculty.name,
+                departments: const <AcademicDepartment>[],
+              ),
+            )
+            .toList(growable: false),
+      );
+      return _facultyCache!;
+    } catch (e) {
+      print('Error fetching academic faculties: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<AcademicDepartment>> fetchAcademicDepartments(
+    String facultyKey, {
+    bool forceRefresh = false,
+  }) async {
+    final normalizedKey = facultyKey.trim();
+    if (normalizedKey.isEmpty) {
+      return const <AcademicDepartment>[];
+    }
+
+    if (!forceRefresh && _departmentCache.containsKey(normalizedKey)) {
+      return _departmentCache[normalizedKey]!;
+    }
+
+    try {
+      final faculties = await _fetchAcademicFacultyTree(facultyKey: normalizedKey);
+      AcademicFaculty? faculty;
+      for (final item in faculties) {
+        if (item.key == normalizedKey) {
+          faculty = item;
+          break;
+        }
+      }
+      faculty ??= faculties.isNotEmpty ? faculties.first : null;
+
+      final departments = faculty == null || faculty.key.isEmpty
+          ? const <AcademicDepartment>[]
+          : List<AcademicDepartment>.unmodifiable(faculty.departments);
+      _departmentCache[normalizedKey] = departments;
+      return departments;
+    } catch (e) {
+      print('Error fetching academic departments for $normalizedKey: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<AcademicGrade>> fetchAcademicGrades(
+    String departmentKey, {
+    String? facultyKey,
+    bool forceRefresh = false,
+  }) async {
+    final normalizedDepartmentKey = departmentKey.trim();
+    if (normalizedDepartmentKey.isEmpty) {
+      return const <AcademicGrade>[];
+    }
+
+    if (!forceRefresh && _gradeCache.containsKey(normalizedDepartmentKey)) {
+      return _gradeCache[normalizedDepartmentKey]!;
+    }
+
+    try {
+      final departments = facultyKey != null && facultyKey.trim().isNotEmpty
+          ? await fetchAcademicDepartments(facultyKey, forceRefresh: forceRefresh)
+          : <AcademicDepartment>[];
+      AcademicDepartment? department;
+      for (final item in departments) {
+        if (item.key == normalizedDepartmentKey) {
+          department = item;
+          break;
+        }
+      }
+
+      if (department != null && department.key.isNotEmpty) {
+        final grades = _normalizeGrades(department.grades);
+        _gradeCache[normalizedDepartmentKey] = grades;
+        return grades;
+      }
+
+      final classResponse = await http.get(
+        _buildAcademicUri('/classes', {'departmentKey': normalizedDepartmentKey}),
         headers: await _getHeaders(),
       );
 
-      if (response.statusCode != 200) {
+      if (classResponse.statusCode != 200) {
         throw _buildApiException(
-          'Akademik birim listesi alinamadi.',
-          response.body,
+          'Sınıf listesi alınamadı.',
+          classResponse.body,
         );
       }
 
-      final decoded = json.decode(response.body);
-      if (decoded is! List) {
-        throw Exception('Akademik birim yaniti gecersiz.');
-      }
-
-      return decoded
-          .whereType<Map>()
-          .map(
-            (faculty) =>
-                AcademicFaculty.fromJson(faculty.cast<String, dynamic>()),
-          )
-          .where((faculty) => faculty.key.isNotEmpty && faculty.name.isNotEmpty)
-          .toList(growable: false);
+      final grades = _normalizeGrades(
+        _decodeObjectList(json.decode(classResponse.body))
+            .map(AcademicGrade.fromJson)
+            .where((grade) => grade.key.isNotEmpty && grade.name.isNotEmpty)
+            .toList(growable: false),
+      );
+      _gradeCache[normalizedDepartmentKey] = grades;
+      return grades;
     } catch (e) {
-      print('Error fetching academic faculties: $e');
+      print('Error fetching academic grades for $normalizedDepartmentKey: $e');
       rethrow;
     }
   }
