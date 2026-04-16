@@ -100,6 +100,35 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _triggerTestNotification() async {
+    try {
+      final notifications = SimpleNotifications();
+      final hasPermission = await notifications.ensurePermissionForDisplay();
+      if (!mounted) return;
+
+      if (!hasPermission) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Test bildirimi icin once bildirim izni gerekli.'),
+          ),
+        );
+        return;
+      }
+
+      await notifications.showTestNotification();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Test bildirimi gonderildi.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   bool get _canUseAppleSignIn =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
@@ -293,6 +322,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: "Bildirim izni",
                   subtitle: "Uygulama için bildirim iznini yönet",
                   onTap: _requestNotificationPermission,
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.notification_add_outlined,
+                  title: "Test bildirimi gonder",
+                  subtitle: "Gecici olarak yerel test bildirimi tetikle",
+                  onTap: _triggerTestNotification,
                 ),
                 _buildSettingsTile(
                   context,

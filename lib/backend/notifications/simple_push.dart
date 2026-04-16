@@ -132,6 +132,26 @@ class SimpleNotifications {
     return requestPermission();
   }
 
+  Future<void> showTestNotification() async {
+    await ensureInitialized();
+
+    final item = SavedNotification(
+      title: 'Test Bildirimi',
+      body: 'Bu bildirim test amaciyla uygulama icinden gonderildi.',
+      receivedAt: DateTime.now(),
+      data: <String, dynamic>{'type': 'test', 'source': 'local_debug_button'},
+    );
+
+    await _saveNotificationItem(item);
+    await _showNotificationContent(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: item.title,
+      body: item.body,
+      channel: _generalChannel,
+      payload: jsonEncode(item.data),
+    );
+  }
+
   Future<void> _requestPermissionIfNeeded() async {
     if (await checkPermission()) {
       return;
@@ -275,10 +295,28 @@ class SimpleNotifications {
 
     final channel = _resolveChannel(msg);
 
+    await _showNotificationContent(
+      id:
+          msg.messageId?.hashCode ??
+          DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: content.title,
+      body: content.body,
+      channel: channel,
+      payload: jsonEncode(msg.data),
+    );
+  }
+
+  static Future<void> _showNotificationContent({
+    required int id,
+    required String title,
+    required String body,
+    required AndroidNotificationChannel channel,
+    String? payload,
+  }) async {
     await _localNotifications.show(
-      msg.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      content.title,
-      content.body,
+      id,
+      title,
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           channel.id,
@@ -299,7 +337,7 @@ class SimpleNotifications {
           presentSound: true,
         ),
       ),
-      payload: jsonEncode(msg.data),
+      payload: payload,
     );
   }
 
@@ -327,22 +365,25 @@ class SimpleNotifications {
       data: msg.data,
     );
 
+    await _saveNotificationItem(item, messageId: msg.messageId);
+  }
+
+  static Future<void> _saveNotificationItem(
+    SavedNotification item, {
+    String? messageId,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final current = prefs.getStringList(_staticPrefsKey) ?? <String>[];
 
       // Prevent duplicate saving of the same message ID
-      if (msg.messageId != null &&
-          current.any((s) => s.contains(msg.messageId!))) {
+      if (messageId != null && current.any((s) => s.contains(messageId))) {
         return;
       }
 
       // Keep it bounded to avoid infinite growth
       const maxItems = 50;
-      current.insert(
-        0,
-        jsonEncode(item.toJson()..['messageId'] = msg.messageId),
-      );
+      current.insert(0, jsonEncode(item.toJson()..['messageId'] = messageId));
       if (current.length > maxItems) {
         current.removeRange(maxItems, current.length);
       }
