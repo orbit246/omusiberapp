@@ -6,10 +6,7 @@ import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
-import 'package:omusiber/backend/user_profile_service.dart';
-import 'package:omusiber/models/user_badge.dart';
 import 'package:omusiber/pages/new_view/edit_profile_page.dart';
-import 'package:omusiber/widgets/badge_widget.dart';
 
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/about_page.dart';
@@ -29,53 +26,10 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final themeManager = ThemeManager();
   final AuthService _authService = AuthService();
-  final UserProfileService _profileService = UserProfileService();
   final AppStartupController _startupController = AppStartupController.instance;
 
   // State to hold the result of the 1/1000 random chance
   bool _isEasterEggMode = false;
-  List<UserBadge> _userBadges = [];
-  bool _loadingBadges = false;
-  bool _badgeLoadStarted = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startupController.addListener(_handleStartupChanged);
-    _handleStartupChanged();
-  }
-
-  @override
-  void dispose() {
-    _startupController.removeListener(_handleStartupChanged);
-    super.dispose();
-  }
-
-  void _handleStartupChanged() {
-    if (_badgeLoadStarted || !_startupController.isFirebaseReady) {
-      return;
-    }
-    _badgeLoadStarted = true;
-    _loadUserBadges();
-  }
-
-  Future<void> _loadUserBadges() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    setState(() => _loadingBadges = true);
-    try {
-      final badges = await _profileService.fetchUserBadges(user.uid);
-      if (!mounted) return;
-      setState(() {
-        _userBadges = badges;
-        _loadingBadges = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingBadges = false);
-    }
-  }
 
   Future<void> _handleGoogleSignIn() async {
     try {
@@ -275,20 +229,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     subtitle: "Sınıf ve şube bilgilerini profilde gör",
                     onTap: _openCurrentProfile,
                   ),
-                  if (_loadingBadges)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else if (_userBadges.isNotEmpty)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: BadgeList(badges: _userBadges),
-                    ),
                   if (user.isAnonymous)
                     Column(
                       children: [

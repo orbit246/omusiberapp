@@ -8,6 +8,7 @@ import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/academic_faculty_model.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
+import 'package:omusiber/widgets/badge_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -339,9 +340,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _applyProfile(refreshedProfile);
         });
       }
-      unawaited(
-        MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true),
-      );
+      unawaited(MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -628,6 +627,44 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
+  Widget _buildBadgesSection(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    final badges = _profile?.badges ?? const [];
+
+    if (badges.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.workspace_premium_outlined, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Henüz madalyanız yok.",
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: BadgeList(badges: badges),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -859,7 +896,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       )
                       .toList(),
-                  onChanged: _selectedFacultyKey == null ||
+                  onChanged:
+                      _selectedFacultyKey == null ||
                           _isDepartmentsLoading ||
                           _isAcademicSyncing
                       ? null
@@ -907,13 +945,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       )
                       .toList(),
-                  onChanged: _selectedDepartmentKey == null ||
+                  onChanged:
+                      _selectedDepartmentKey == null ||
                           _isGradesLoading ||
                           _isAcademicSyncing
                       ? null
                       : _onGradeChanged,
                 ),
                 const SizedBox(height: 16),
+                const SizedBox(height: 32),
+                Text(
+                  "Madalyalar",
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildBadgesSection(theme),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,

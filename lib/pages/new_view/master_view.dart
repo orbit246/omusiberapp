@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
@@ -16,6 +17,7 @@ import 'package:omusiber/pages/new_view/settings_page.dart';
 import 'package:omusiber/pages/new_view/food_menu_page.dart';
 import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/pages/new_view/academic_calendar_page.dart';
+import 'package:omusiber/pages/new_view/edit_profile_page.dart';
 
 class MasterView extends StatefulWidget {
   const MasterView({super.key, this.initialTabIndex = 0});
@@ -235,6 +237,22 @@ class _MasterViewState extends State<MasterView>
     ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
   }
 
+  void _openCurrentProfile() {
+    if (!_startupController.isFirebaseReady) {
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      _openSettingsPage();
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => EditProfilePage(uid: user.uid)),
+    );
+  }
+
   void _openAcademicCalendarSheet() {
     showModalBottomSheet(
       context: context,
@@ -312,37 +330,207 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
-  Widget _buildDrawerSectionTitle(BuildContext context, String title) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildDrawerHeader(
+    BuildContext context, {
+    required User? user,
+    required bool isAuthLoading,
+  }) {
+    const drawerText = Color(0xFFE5EAF4);
+    const drawerMuted = Color(0xFFB6C0D0);
+    const drawerAccent = Color(0xFF4385F5);
+    final isGuest = user == null || user.isAnonymous;
+    final displayName = isAuthLoading
+        ? "Hoş Geldiniz"
+        : isGuest
+        ? "Hoş Geldiniz"
+        : ((user.displayName?.trim().isNotEmpty ?? false)
+              ? user.displayName!.trim()
+              : "Hoş Geldiniz");
+    final subtitle = isAuthLoading
+        ? "Hesap hazırlanıyor"
+        : isGuest
+        ? "Misafir Hesabı"
+        : (user.email ?? "Kullanıcı");
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: const BoxDecoration(
+                  color: drawerAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Colors.white,
+                  size: 29,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: drawerText,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: drawerMuted,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 58,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: drawerAccent,
+                foregroundColor: Colors.white,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+              onPressed: () {
+                if (isAuthLoading) {
+                  return;
+                }
+
+                Navigator.of(context).pop();
+                if (isGuest) {
+                  _openSettingsPage();
+                } else {
+                  _openCurrentProfile();
+                }
+              },
+              icon: Icon(
+                isAuthLoading
+                    ? Icons.hourglass_top_rounded
+                    : isGuest
+                    ? Icons.login_rounded
+                    : Icons.person_outline_rounded,
+                size: 21,
+              ),
+              label: Text(
+                isAuthLoading
+                    ? "Yükleniyor"
+                    : isGuest
+                    ? "Giriş Yap /\nKaydol"
+                    : "Profilim",
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerContent(
+    BuildContext context, {
+    required User? user,
+    required bool isAuthLoading,
+  }) {
+    return SafeArea(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          _buildDrawerHeader(context, user: user, isAuthLoading: isAuthLoading),
+          _buildDrawerDivider(),
+          _buildDrawerSectionTitle(context, "Akademik"),
+          _buildDrawerTile(
+            context: context,
+            icon: Icons.calendar_month_outlined,
+            title: "Ders Programı",
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SchedulePage()),
+              );
+            },
+          ),
+          _buildDrawerTile(
+            context: context,
+            icon: Icons.description_rounded,
+            title: "Akademik\nTakvim",
+            onTap: () {
+              Navigator.of(context).pop();
+              _openAcademicCalendarSheet();
+            },
+          ),
+          _buildDrawerDivider(),
+          _buildDrawerSectionTitle(context, "Kampüs"),
+          _buildDrawerTile(
+            context: context,
+            icon: Icons.restaurant_menu_rounded,
+            title: "Yemek Menüsü",
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const FoodMenuPage()),
+              );
+            },
+          ),
+          _buildDrawerTile(
+            context: context,
+            icon: Icons.edit_note_rounded,
+            title: "Notlarım",
+            onTap: () {
+              Navigator.of(context).pop();
+              _openNotesPage();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerSectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 24, 24, 16),
       child: Text(
         title,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: colorScheme.primary,
+          color: const Color(0xFF4385F5),
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.4,
+          letterSpacing: 0,
         ),
       ),
     );
   }
 
-  Widget _buildDrawerPanel({
-    required BuildContext context,
-    required List<Widget> children,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer.withValues(alpha: 0.46),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Column(children: children),
+  Widget _buildDrawerDivider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 28),
+      child: Divider(height: 1, color: Color(0xFF31415D), thickness: 1),
     );
   }
 
@@ -352,31 +540,29 @@ class _MasterViewState extends State<MasterView>
     required String title,
     required VoidCallback onTap,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer.withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.only(right: 22),
+      child: ListTile(
+        contentPadding: const EdgeInsets.only(left: 31, right: 4),
+        minLeadingWidth: 28,
+        horizontalTitleGap: 15,
+        minVerticalPadding: 12,
+        leading: Icon(icon, size: 23, color: const Color(0xFFAEB8C8)),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: const Color(0xFFD8DEE9),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
         ),
-        child: Icon(icon, size: 18, color: colorScheme.onPrimaryContainer),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          size: 22,
+          color: Color(0xFF63718A),
+        ),
+        onTap: onTap,
       ),
-      title: Text(
-        title,
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      trailing: Icon(
-        Icons.arrow_forward_ios_rounded,
-        size: 14,
-        color: colorScheme.onSurfaceVariant,
-      ),
-      onTap: onTap,
     );
   }
 
@@ -424,72 +610,32 @@ class _MasterViewState extends State<MasterView>
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       drawer: Drawer(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.horizontal(right: Radius.circular(32)),
-        ),
-        backgroundColor: colorScheme.surface,
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
-            children: [
-              _buildDrawerSectionTitle(context, "Kisisel"),
-              _buildDrawerPanel(
-                context: context,
-                children: [
-                  _buildDrawerTile(
-                    context: context,
-                    icon: Icons.edit_note_rounded,
-                    title: "Notlar",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _openNotesPage();
-                    },
-                  ),
-                ],
-              ),
-              _buildDrawerSectionTitle(context, "Araclar"),
-              _buildDrawerPanel(
-                context: context,
-                children: [
-                  _buildDrawerTile(
-                    context: context,
-                    icon: Icons.restaurant_menu,
-                    title: "Yemek Menusu",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const FoodMenuPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildDrawerTile(
-                    context: context,
-                    icon: Icons.calendar_month,
-                    title: "Ders Programi",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SchedulePage(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildDrawerTile(
-                    context: context,
-                    icon: Icons.description_outlined,
-                    title: "Akademik Takvim",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _openAcademicCalendarSheet();
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
+        width: MediaQuery.of(context).size.width.clamp(0, 258).toDouble(),
+        shape: const RoundedRectangleBorder(),
+        backgroundColor: const Color(0xFF1F2D46),
+        child: AnimatedBuilder(
+          animation: _startupController,
+          builder: (context, _) {
+            if (!_startupController.isFirebaseReady) {
+              return _buildDrawerContent(
+                context,
+                user: null,
+                isAuthLoading: true,
+              );
+            }
+
+            return StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                return _buildDrawerContent(
+                  context,
+                  user: snapshot.data,
+                  isAuthLoading:
+                      snapshot.connectionState == ConnectionState.waiting,
+                );
+              },
+            );
+          },
         ),
       ),
       appBar: AppBar(
