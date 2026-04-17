@@ -44,12 +44,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isDepartmentsLoading = false;
   bool _isGradesLoading = false;
   bool _isAcademicSyncing = false;
+  int _profileStep = 0;
   String? _loadError;
   String? _academicSelectionNotice;
   int _departmentRequestToken = 0;
   int _gradeRequestToken = 0;
-
-  final List<String> _genders = ["Erkek", "Kadın", "Belirtmek İstemiyorum"];
 
   @override
   void initState() {
@@ -98,6 +97,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
     return null;
   }
+
+  bool get _isAcademicStepComplete =>
+      _selectedFacultyKey != null &&
+      _selectedDepartmentKey != null &&
+      _selectedGradeKey != null;
 
   Future<void> _loadInitialData() async {
     final uid = _resolvedUid;
@@ -454,6 +458,55 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  Future<void> _handleBackAction() async {
+    if (_profileStep == 0) {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+
+    setState(() {
+      _profileStep = 0;
+    });
+  }
+
+  Future<void> _handleSkipAction() async {
+    if (!_isAcademicStepComplete) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Devam etmek için fakülte, bölüm ve sınıf seçin.'),
+        ),
+      );
+      return;
+    }
+
+    _nameController.text = _nameController.text.trim();
+    _studentIdController.text = _studentIdController.text.trim();
+    await _saveProfile();
+  }
+
+  void _handleNextAction() {
+    if (_profileStep == 0) {
+      if (!_isAcademicStepComplete) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Devam etmek için fakülte, bölüm ve sınıf seçin.'),
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _profileStep = 1;
+      });
+      return;
+    }
+
+    _saveProfile();
+  }
+
   Future<void> _showDeleteAccountDialog() async {
     final profile = _profile;
     final user = _auth.currentUser;
@@ -665,6 +718,310 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
+  Widget _buildStickyCard({
+    required ThemeData theme,
+    required String title,
+    required Widget child,
+    String? subtitle,
+    IconData? icon,
+  }) {
+    final colorScheme = theme.colorScheme;
+    final bodyColor = colorScheme.surfaceContainerHighest.withValues(
+      alpha: 0.55,
+    );
+    final headerColor = Color.alphaBlend(
+      colorScheme.primary.withValues(alpha: 0.12),
+      bodyColor,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bodyColor,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(26),
+          topRight: Radius.circular(26),
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: headerColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(26),
+                topRight: Radius.circular(26),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, color: colorScheme.primary),
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Padding(padding: const EdgeInsets.all(20), child: child),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _buildCardFieldDecoration({
+    required ThemeData theme,
+    required String labelText,
+    required IconData icon,
+    String? helperText,
+    Widget? suffixIcon,
+  }) {
+    final colorScheme = theme.colorScheme;
+    return InputDecoration(
+      labelText: labelText,
+      helperText: helperText,
+      prefixIcon: Icon(icon),
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      filled: true,
+      fillColor: colorScheme.surface.withValues(alpha: 0.92),
+    );
+  }
+
+  Widget _buildAcademicCard(ThemeData theme) {
+    return _buildStickyCard(
+      theme: theme,
+      title: 'School Cards',
+      subtitle:
+          'Önce fakülte, bölüm ve sınıf seçin. Diğer bilgiler daha sonra eklenebilir.',
+      icon: Icons.school_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String>(
+            key: ValueKey(
+              'faculty-${_selectedFacultyKey ?? 'empty'}-${_academicFaculties.length}',
+            ),
+            isExpanded: true,
+            decoration: _buildCardFieldDecoration(
+              theme: theme,
+              labelText: 'Fakülte',
+              icon: Icons.account_balance_outlined,
+            ),
+            initialValue: _selectedFacultyKey,
+            items: _academicFaculties
+                .map(
+                  (faculty) => DropdownMenuItem<String>(
+                    value: faculty.key,
+                    child: Text(faculty.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: _isAcademicSyncing ? null : _onFacultyChanged,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            key: ValueKey(
+              'department-${_selectedFacultyKey ?? 'none'}-${_selectedDepartmentKey ?? 'empty'}',
+            ),
+            isExpanded: true,
+            initialValue: _selectedDepartmentKey,
+            decoration: _buildCardFieldDecoration(
+              theme: theme,
+              labelText: 'Bölüm',
+              icon: Icons.apartment_outlined,
+              helperText: _selectedFacultyKey == null
+                  ? 'Önce fakülte seçin.'
+                  : _isDepartmentsLoading
+                  ? 'Bölümler getiriliyor.'
+                  : null,
+              suffixIcon: _isDepartmentsLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : null,
+            ),
+            items: _availableDepartments
+                .map(
+                  (department) => DropdownMenuItem<String>(
+                    value: department.key,
+                    child: Text(
+                      department.name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged:
+                _selectedFacultyKey == null ||
+                    _isDepartmentsLoading ||
+                    _isAcademicSyncing
+                ? null
+                : _onDepartmentChanged,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            key: ValueKey(
+              'grade-${_selectedDepartmentKey ?? 'none'}-${_selectedGradeKey ?? 'empty'}',
+            ),
+            isExpanded: true,
+            initialValue: _selectedGradeKey,
+            decoration: _buildCardFieldDecoration(
+              theme: theme,
+              labelText: 'Sınıf',
+              icon: Icons.format_list_numbered_outlined,
+              helperText: _selectedDepartmentKey == null
+                  ? 'Önce bölüm seçin.'
+                  : _isGradesLoading
+                  ? 'Sınıflar getiriliyor.'
+                  : null,
+              suffixIcon: _isGradesLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : null,
+            ),
+            items: _availableGrades
+                .map(
+                  (grade) => DropdownMenuItem<String>(
+                    value: grade.key,
+                    child: Text(grade.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged:
+                _selectedDepartmentKey == null ||
+                    _isGradesLoading ||
+                    _isAcademicSyncing
+                ? null
+                : _onGradeChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityCard(ThemeData theme) {
+    return _buildStickyCard(
+      theme: theme,
+      title: 'Identity Card',
+      subtitle:
+          'Ad soyad ve ogrenci numarasi istege bagli. Dilerseniz atlayabilirsiniz.',
+      icon: Icons.badge_outlined,
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _nameController,
+            decoration: _buildCardFieldDecoration(
+              theme: theme,
+              labelText: 'Ad Soyad',
+              icon: Icons.person_outline,
+              helperText: 'İsteğe bağlı.',
+            ),
+            maxLength: 32,
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return null;
+              if (val.trim().length > 32) return 'En fazla 32 karakter';
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _studentIdController,
+            decoration: _buildCardFieldDecoration(
+              theme: theme,
+              labelText: 'Öğrenci Numarası',
+              icon: Icons.numbers_outlined,
+              helperText:
+                  _profile?.email != null &&
+                      extractStudentIdFromEmail(_profile?.email) != null
+                  ? 'E-postanızdan otomatik dolduruldu. İsterseniz değiştirebilir veya boş bırakabilirsiniz.'
+                  : 'İsteğe bağlı. Öğrenci değilseniz boş bırakabilirsiniz.',
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return null;
+              if (!RegExp(r'^\d{6,}$').hasMatch(val.trim())) {
+                return 'En az 6 haneli sayı olmalı';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepActions(bool isReady) {
+    final canInteract = isReady && !_isSaving;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        OutlinedButton(
+          onPressed: canInteract ? _handleBackAction : null,
+          child: const Text('Back'),
+        ),
+        const SizedBox(width: 12),
+        TextButton(
+          onPressed: canInteract ? _handleSkipAction : null,
+          child: const Text('Skip'),
+        ),
+        const SizedBox(width: 12),
+        FilledButton(
+          onPressed: canInteract ? _handleNextAction : null,
+          child: const Text('Next'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -674,25 +1031,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Profili Düzenle"),
-        actions: [
-          if (_isSaving)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+        actions: _isSaving
+            ? [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
                 ),
-              ),
-            )
-          else
-            IconButton(
-              onPressed: isReady ? _saveProfile : null,
-              icon: const Icon(Icons.check),
-              tooltip: "Kaydet",
-            ),
-        ],
+              ]
+            : null,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -705,254 +1057,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
               children: [
                 _buildStatusCard(theme),
                 const SizedBox(height: 24),
-                Text(
-                  "Temel Bilgiler",
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: _profileStep == 0
+                      ? _buildAcademicCard(theme)
+                      : _buildIdentityCard(theme),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: "Ad Soyad",
-                    prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                  ),
-                  maxLength: 32,
-                  validator: (val) {
-                    if (val == null || val.isEmpty) return "Ad soyad gerekli";
-                    if (val.length > 32) return "En fazla 32 karakter";
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _studentIdController,
-                  decoration: InputDecoration(
-                    labelText: "Öğrenci Numarası",
-                    helperText:
-                        _profile?.email != null &&
-                            extractStudentIdFromEmail(_profile?.email) != null
-                        ? "E-postanızdan otomatik dolduruldu. İsterseniz değiştirebilir veya boş bırakabilirsiniz."
-                        : "İsteğe bağlı. Öğrenci değilseniz boş bırakabilirsiniz.",
-                    prefixIcon: const Icon(Icons.badge_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return null;
-                    if (!RegExp(r'^\d{6,}$').hasMatch(val.trim())) {
-                      return "En az 6 haneli sayı olmalı";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: TextFormField(
-                        controller: _ageController,
-                        decoration: InputDecoration(
-                          labelText: "Yaş",
-                          prefixIcon: const Icon(Icons.cake_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: colorScheme.surface,
-                        ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        validator: (val) {
-                          if (val == null || val.isEmpty) return null;
-                          final age = int.tryParse(val);
-                          if (age == null) return "Geçersiz";
-                          if (age <= 13 || age >= 70) return "14-69 olmalı";
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey('gender-$_selectedGender'),
-                        isExpanded: true,
-                        initialValue: _selectedGender,
-                        decoration: InputDecoration(
-                          labelText: "Cinsiyet",
-                          prefixIcon: const Icon(Icons.wc_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: colorScheme.surface,
-                        ),
-                        items: _genders
-                            .map(
-                              (g) => DropdownMenuItem(
-                                value: g,
-                                child: Text(g, overflow: TextOverflow.ellipsis),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedGender = val),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "Okul Bilgileri",
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: ValueKey(
-                    'faculty-${_selectedFacultyKey ?? 'empty'}-${_academicFaculties.length}',
-                  ),
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: "Fakülte",
-                    prefixIcon: const Icon(Icons.school_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                  ),
-                  initialValue: _selectedFacultyKey,
-                  items: _academicFaculties
-                      .map(
-                        (faculty) => DropdownMenuItem<String>(
-                          value: faculty.key,
-                          child: Text(
-                            faculty.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: _isAcademicSyncing ? null : _onFacultyChanged,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: ValueKey(
-                    'department-${_selectedFacultyKey ?? 'none'}-${_selectedDepartmentKey ?? 'empty'}',
-                  ),
-                  isExpanded: true,
-                  initialValue: _selectedDepartmentKey,
-                  decoration: InputDecoration(
-                    labelText: "Bölüm",
-                    helperText: _selectedFacultyKey == null
-                        ? "Önce fakülte seçin."
-                        : _isDepartmentsLoading
-                        ? "Bölümler getiriliyor."
-                        : null,
-                    prefixIcon: const Icon(Icons.apartment_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                    suffixIcon: _isDepartmentsLoading
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : null,
-                  ),
-                  items: _availableDepartments
-                      .map(
-                        (department) => DropdownMenuItem<String>(
-                          value: department.key,
-                          child: Text(
-                            department.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged:
-                      _selectedFacultyKey == null ||
-                          _isDepartmentsLoading ||
-                          _isAcademicSyncing
-                      ? null
-                      : _onDepartmentChanged,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: ValueKey(
-                    'grade-${_selectedDepartmentKey ?? 'none'}-${_selectedGradeKey ?? 'empty'}',
-                  ),
-                  isExpanded: true,
-                  initialValue: _selectedGradeKey,
-                  decoration: InputDecoration(
-                    labelText: "Sınıf",
-                    helperText: _selectedDepartmentKey == null
-                        ? "Önce bölüm seçin."
-                        : _isGradesLoading
-                        ? "Sınıflar getiriliyor."
-                        : null,
-                    prefixIcon: const Icon(Icons.format_list_numbered_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                    suffixIcon: _isGradesLoading
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : null,
-                  ),
-                  items: _availableGrades
-                      .map(
-                        (grade) => DropdownMenuItem<String>(
-                          value: grade.key,
-                          child: Text(
-                            grade.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged:
-                      _selectedDepartmentKey == null ||
-                          _isGradesLoading ||
-                          _isAcademicSyncing
-                      ? null
-                      : _onGradeChanged,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
+                _buildStepActions(isReady),
                 const SizedBox(height: 32),
                 Text(
                   "Madalyalar",
@@ -963,27 +1075,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
                 const SizedBox(height: 12),
                 _buildBadgesSection(theme),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: FilledButton.icon(
-                    onPressed: isReady && !_isSaving ? _saveProfile : null,
-                    icon: const Icon(Icons.save),
-                    label: const Text(
-                      "Değişiklikleri Kaydet",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 32),
                 Text(
                   "Hesap Yönetimi",
