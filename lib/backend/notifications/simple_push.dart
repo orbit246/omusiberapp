@@ -57,6 +57,8 @@ class SimpleNotifications {
 
   static bool _isInitialized = false;
   static bool _listenersRegistered = false;
+  static bool _remoteRegistrationConfigured = false;
+  static bool _remoteRegistrationRetryScheduled = false;
   static Future<void>? _initializationFuture;
   static const String _staticPrefsKey = 'saved_notifications_v1';
   static const String _permissionPromptedKey =
@@ -90,8 +92,8 @@ class SimpleNotifications {
         });
       }
 
-      await _configureRemoteRegistration();
       await _requestPermissionIfNeeded();
+      await _configureRemoteRegistration();
 
       // Cold start: opened from terminated
       final initial = await _messaging.getInitialMessage();
@@ -179,11 +181,17 @@ class SimpleNotifications {
 
       if (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) {
-        await _messaging.requestPermission(
+        final settings = await _messaging.requestPermission(
           alert: true,
           badge: true,
           sound: true,
         );
+        final granted =
+            settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+        if (granted) {
+          await _configureRemoteRegistration(forceRefresh: true);
+        }
       }
 
       return await checkPermission();
@@ -204,7 +212,11 @@ class SimpleNotifications {
         settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
-  Future<void> _configureRemoteRegistration() async {
+  Future<void> _configureRemoteRegistration({bool forceRefresh = false}) async {
+    if (_remoteRegistrationConfigured && !forceRefresh) {
+      return;
+    }
+
     if (defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS) {
       final apnsToken = await _waitForApnsToken();
@@ -212,6 +224,7 @@ class SimpleNotifications {
         debugPrint(
           'APNs token not available yet. Skipping FCM token/topic registration for now.',
         );
+        _scheduleRemoteRegistrationRetry();
         return;
       }
       debugPrint('APNs token received.');
@@ -227,6 +240,8 @@ class SimpleNotifications {
     _messaging.onTokenRefresh.listen((updatedToken) {
       debugPrint('FCM token refreshed: $updatedToken');
     });
+    _remoteRegistrationConfigured = true;
+    _remoteRegistrationRetryScheduled = false;
   }
 
   Future<String?> _waitForApnsToken() async {
@@ -238,6 +253,22 @@ class SimpleNotifications {
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
     return null;
+  }
+
+  void _scheduleRemoteRegistrationRetry() {
+    if (_remoteRegistrationRetryScheduled) {
+      return;
+    }
+
+    _remoteRegistrationRetryScheduled = true;
+    Future<void>.delayed(const Duration(seconds: 5), () async {
+      _remoteRegistrationRetryScheduled = false;
+      try {
+        await _configureRemoteRegistration(forceRefresh: true);
+      } catch (e) {
+        debugPrint('Remote registration retry failed: $e');
+      }
+    });
   }
 
   static Future<void> _initializeCore() async {

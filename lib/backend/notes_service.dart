@@ -79,18 +79,23 @@ class NotesService {
         return "Genel";
       }
 
-      final faculties = await _profileService.fetchAcademicFaculties(
-        includeTree: true,
-      );
+      final faculties = await _profileService.fetchAcademicFaculties();
       AcademicDepartment? selectedDepartment;
       AcademicGrade? selectedGrade;
       for (final faculty in faculties) {
-        for (final department in faculty.departments) {
+        final departments = await _profileService.fetchAcademicDepartments(
+          faculty.key,
+        );
+        for (final department in departments) {
           if (department.key != profile.departmentKey) {
             continue;
           }
           selectedDepartment = department;
-          for (final grade in department.grades) {
+          final grades = await _profileService.fetchAcademicGrades(
+            department.key,
+            facultyKey: faculty.key,
+          );
+          for (final grade in grades) {
             if (grade.key == profile.gradeKey) {
               selectedGrade = grade;
               break;
