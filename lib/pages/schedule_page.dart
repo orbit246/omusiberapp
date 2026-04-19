@@ -33,9 +33,11 @@ class _SchedulePageState extends State<SchedulePage> {
   final UserProfileService _profileService = UserProfileService();
   Timer? _clockTimer;
   late Future<_SchedulePageData> _pageDataFuture;
+  int? _selectedProgramId;
+  String? _selectedClassKey;
 
   ProgramSchedule? _cachedGridProgram;
-  int? _cachedGridGradeLevel;
+  String? _cachedGridClassKey;
   _GridScheduleData? _cachedGridData;
 
   @override
@@ -57,47 +59,34 @@ class _SchedulePageState extends State<SchedulePage> {
 
   Future<_SchedulePageData> _loadPageData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Ders planını görmek için önce giriş yapmalısın.');
+    final profile = user == null
+        ? UserProfile(uid: '', name: 'Misafir Kullanıcı', role: 'guest')
+        : await _profileService.fetchUserProfile(user.uid) ??
+              UserProfile(
+                uid: user.uid,
+                name: user.displayName?.trim().isNotEmpty == true
+                    ? user.displayName!.trim()
+                    : 'Kullanıcı',
+                role: 'member',
+              );
+
+    List<AcademicFaculty> faculties;
+    try {
+      faculties = await _profileService.fetchAcademicFaculties();
+    } catch (_) {
+      faculties = const <AcademicFaculty>[];
     }
 
-    final profile = await _profileService.fetchUserProfile(user.uid);
-    if (profile == null) {
-      throw Exception('Profil bilgisi şu anda yüklenemedi.');
-    }
-
-    final faculties = await _profileService.fetchAcademicFaculties();
     final resolvedSelection = _resolveAcademicSelection(profile, faculties);
-
-    if (!resolvedSelection.isConfigured) {
-      return _SchedulePageData(
-        profile: profile,
-        faculties: faculties,
-        selection: resolvedSelection,
-      );
-    }
-
     final schedules = await ScheduleService().fetchSchedules(
-      departmentKey: resolvedSelection.department!.key,
+      departmentKey: resolvedSelection.department?.key,
     );
-    schedules.sort((a, b) {
-      final yearCompare = b.academicYear.compareTo(a.academicYear);
-      if (yearCompare != 0) {
-        return yearCompare;
-      }
-      final semesterCompare = b.semester.compareTo(a.semester);
-      if (semesterCompare != 0) {
-        return semesterCompare;
-      }
-      return a.programName.compareTo(b.programName);
-    });
 
     return _SchedulePageData(
       profile: profile,
       faculties: faculties,
       selection: resolvedSelection,
       schedules: schedules,
-      selectedProgram: schedules.isNotEmpty ? schedules.first : null,
     );
   }
 
@@ -105,7 +94,9 @@ class _SchedulePageState extends State<SchedulePage> {
     setState(() {
       _cachedGridData = null;
       _cachedGridProgram = null;
-      _cachedGridGradeLevel = null;
+      _cachedGridClassKey = null;
+      _selectedProgramId = null;
+      _selectedClassKey = null;
       _pageDataFuture = _loadPageData();
     });
   }
@@ -158,28 +149,45 @@ class _SchedulePageState extends State<SchedulePage> {
             return _buildErrorState(context);
           }
 
-          if (!pageData.selection.isConfigured) {
-            return _buildAcademicSelectionOptionalState(context);
-          }
-
-          final selectedProgram = pageData.selectedProgram;
+          final selectedProgram = _resolveSelectedProgram(pageData);
           if (selectedProgram == null) {
             return _buildEmptyState(context);
           }
 
-          final gridData = _gridDataFor(
+          final selectedClassKey = _resolveSelectedClassKey(
+            pageData,
             selectedProgram,
-            pageData.selection.grade!.level ?? 1,
           );
+          if (selectedClassKey == null) {
+            return _buildEmptyState(context);
+          }
+
+          final effectiveSelection = _selectionForProgram(
+            pageData.selection,
+            selectedProgram,
+          );
+          final gridData = _gridDataFor(selectedProgram, selectedClassKey);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              _buildTodayLessonCard(context, gridData),
+              _buildTodayLessonCard(
+                context,
+                gridData,
+                schedule: selectedProgram,
+                classKey: selectedClassKey,
+                classLabel: _classLabelForKey(
+                  pageData.faculties,
+                  selectedClassKey,
+                ),
+              ),
               const SizedBox(height: 18),
               _buildGridCard(
                 context,
-                pageData.selection,
+                pageData,
+                selectedProgram,
+                selectedClassKey,
+                effectiveSelection,
                 gridData,
               ),
             ],
@@ -228,49 +236,6 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  Widget _buildAcademicSelectionOptionalState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.school_outlined,
-              size: 52,
-              color: AppColors.coolGray.withValues(alpha: 0.9),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Ders planı henüz ayarlanmadı',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'İstersen fakülte, bölüm ve sınıf bilgilerini profilden ekleyebilirsin. Bu alanlar zorunlu değil.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(color: AppColors.coolGray, height: 1.5),
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () async {
-                await _openProfilePage();
-                if (!mounted) return;
-                _refreshSchedules();
-              },
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Profilden Düzenle'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Padding(
@@ -306,8 +271,11 @@ class _SchedulePageState extends State<SchedulePage> {
 
   Widget _buildTodayLessonCard(
     BuildContext context,
-    _GridScheduleData gridData,
-  ) {
+    _GridScheduleData gridData, {
+    required ProgramSchedule schedule,
+    required String classKey,
+    required String classLabel,
+  }) {
     final theme = Theme.of(context);
     final status = _resolveTodayLessonStatus(gridData);
 
@@ -340,6 +308,17 @@ class _SchedulePageState extends State<SchedulePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
+                        '${schedule.programName} • $classLabel',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.coolGray,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
                         'Bugün ders yok',
                         style: GoogleFonts.inter(
                           fontSize: 15,
@@ -349,7 +328,7 @@ class _SchedulePageState extends State<SchedulePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${status.dayLabel} sakin. Takvim boş, minik bir mola fena fikir değil.',
+                        '${status.dayLabel} sakin. ${classKey.trim().isEmpty ? "Takvim boş." : "$classLabel için takvim boş."}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: AppColors.coolGray,
@@ -364,6 +343,17 @@ class _SchedulePageState extends State<SchedulePage> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  '${schedule.programName} • $classLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.coolGray,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(
                   '${status.dayLabel} için anlık durum',
                   style: GoogleFonts.inter(
@@ -486,11 +476,17 @@ class _SchedulePageState extends State<SchedulePage> {
 
   Widget _buildGridCard(
     BuildContext context,
+    _SchedulePageData pageData,
+    ProgramSchedule selectedProgram,
+    String selectedClassKey,
     _ResolvedAcademicSelection selection,
     _GridScheduleData gridData,
   ) {
     final theme = Theme.of(context);
     final visibleDays = gridData.visibleDays;
+    final classOptions = _classOptionsForProgram(pageData, selectedProgram);
+    final inferredFallback =
+        selectedProgram.academicContext?.isInferredFallback == true;
 
     if (gridData.timeSlots.isEmpty || gridData.lessonCount == 0) {
       return Container(
@@ -517,10 +513,18 @@ class _SchedulePageState extends State<SchedulePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Bu programın seçili yılında henüz API verisi yok gibi görünüyor.',
+              'Bu programın seçili sınıfı için henüz API verisi görünmüyor.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(color: AppColors.coolGray, height: 1.45),
             ),
+            if (classOptions.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _buildClassSelector(
+                context,
+                options: classOptions,
+                selectedClassKey: selectedClassKey,
+              ),
+            ],
           ],
         ),
       );
@@ -567,16 +571,42 @@ class _SchedulePageState extends State<SchedulePage> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        'Haftalık Plan',
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: theme.textTheme.titleLarge?.color,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Haftalık Plan',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: theme.textTheme.titleLarge?.color,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedProgram.programName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: AppColors.coolGray,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    if (pageData.schedules.length > 1) ...[
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: _buildProgramSelector(
+                          context,
+                          schedules: pageData.schedules,
+                          selectedProgramId: selectedProgram.id,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
                     OutlinedButton(
                       onPressed: _openProfilePage,
                       style: OutlinedButton.styleFrom(
@@ -590,7 +620,7 @@ class _SchedulePageState extends State<SchedulePage> {
                         ),
                       ),
                       child: Text(
-                        'Sınıf Değiştir',
+                        'Profil',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -608,6 +638,16 @@ class _SchedulePageState extends State<SchedulePage> {
                     height: 1.4,
                   ),
                 ),
+                const SizedBox(height: 12),
+                _buildClassSelector(
+                  context,
+                  options: classOptions,
+                  selectedClassKey: selectedClassKey,
+                ),
+                if (inferredFallback) ...[
+                  const SizedBox(height: 10),
+                  _buildFallbackNote(context),
+                ],
               ],
             ),
           ),
@@ -712,6 +752,271 @@ class _SchedulePageState extends State<SchedulePage> {
     }
 
     return parts.join(' > ');
+  }
+
+  ProgramSchedule? _resolveSelectedProgram(_SchedulePageData pageData) {
+    if (pageData.schedules.isEmpty) {
+      return null;
+    }
+
+    final selectedProgramId = _selectedProgramId;
+    if (selectedProgramId != null) {
+      for (final schedule in pageData.schedules) {
+        if (schedule.id == selectedProgramId) {
+          return schedule;
+        }
+      }
+    }
+
+    for (final schedule in pageData.schedules) {
+      if (schedule.academicContext?.hasScheduleMatch == true) {
+        return schedule;
+      }
+    }
+
+    return pageData.schedules.first;
+  }
+
+  String? _resolveSelectedClassKey(
+    _SchedulePageData pageData,
+    ProgramSchedule selectedProgram,
+  ) {
+    final selectedClassKey = _selectedClassKey?.trim();
+    if (selectedClassKey != null &&
+        selectedProgram.hasClassKey(selectedClassKey)) {
+      return selectedClassKey;
+    }
+
+    final fallbackSelection = _selectionForProgram(
+      pageData.selection,
+      selectedProgram,
+    );
+    final preferredKeys = <String>[
+      if (selectedProgram.academicContext?.classKey case final contextClassKey?)
+        contextClassKey,
+      if (fallbackSelection.grade?.key case final profileGradeKey?)
+        profileGradeKey,
+      ...selectedProgram.preferredClassKeys,
+    ];
+
+    for (final key in preferredKeys) {
+      if (selectedProgram.hasClassKey(key)) {
+        return key;
+      }
+    }
+
+    final scheduleKeys = selectedProgram.classesByKey.keys;
+    return scheduleKeys.isNotEmpty ? scheduleKeys.first : null;
+  }
+
+  _ResolvedAcademicSelection _selectionForProgram(
+    _ResolvedAcademicSelection profileSelection,
+    ProgramSchedule schedule,
+  ) {
+    final context = schedule.academicContext;
+    if (context == null) {
+      return profileSelection;
+    }
+
+    return _ResolvedAcademicSelection(
+      faculty: context.faculty != null
+          ? AcademicFaculty(
+              key: context.faculty!.key,
+              name: context.faculty!.name,
+              departments: const <AcademicDepartment>[],
+            )
+          : profileSelection.faculty,
+      department: context.department != null
+          ? AcademicDepartment(
+              key: context.department!.key,
+              name: context.department!.name,
+              grades: const <AcademicGrade>[],
+            )
+          : profileSelection.department,
+      grade: context.grade != null
+          ? AcademicGrade(
+              key: context.grade!.key,
+              name: context.grade!.name,
+              level: context.grade!.level,
+            )
+          : profileSelection.grade,
+    );
+  }
+
+  List<_ClassOption> _classOptionsForProgram(
+    _SchedulePageData pageData,
+    ProgramSchedule selectedProgram,
+  ) {
+    return selectedProgram.preferredClassKeys
+        .map(
+          (key) => _ClassOption(
+            key: key,
+            label: _classLabelForKey(pageData.faculties, key),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  String _classLabelForKey(List<AcademicFaculty> faculties, String classKey) {
+    final normalizedClassKey = classKey.trim();
+    if (normalizedClassKey.isEmpty) {
+      return 'Sınıf';
+    }
+
+    for (final faculty in faculties) {
+      for (final department in faculty.departments) {
+        for (final grade in department.grades) {
+          if (grade.key == normalizedClassKey) {
+            return grade.name;
+          }
+        }
+      }
+    }
+
+    final gradeMatch = RegExp(
+      r'grade(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(normalizedClassKey);
+    final gradeLevel = int.tryParse(gradeMatch?.group(1) ?? '');
+    if (gradeLevel != null) {
+      return '$gradeLevel. Sınıf';
+    }
+
+    return normalizedClassKey;
+  }
+
+  Widget _buildProgramSelector(
+    BuildContext context, {
+    required List<ProgramSchedule> schedules,
+    required int selectedProgramId,
+  }) {
+    final theme = Theme.of(context);
+
+    return DropdownButtonFormField<int>(
+      initialValue: selectedProgramId,
+      items: schedules
+          .map(
+            (schedule) => DropdownMenuItem<int>(
+              value: schedule.id,
+              child: Text(
+                schedule.programName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() {
+          _selectedProgramId = value;
+          _selectedClassKey = null;
+          _cachedGridData = null;
+          _cachedGridProgram = null;
+          _cachedGridClassKey = null;
+        });
+      },
+      decoration: InputDecoration(
+        labelText: 'Program',
+        labelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.coolGray,
+        ),
+        isDense: true,
+        filled: true,
+        fillColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: AppColors.coolGray.withValues(alpha: 0.18),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClassSelector(
+    BuildContext context, {
+    required List<_ClassOption> options,
+    required String selectedClassKey,
+  }) {
+    if (options.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<String>(
+      initialValue: options.any((option) => option.key == selectedClassKey)
+          ? selectedClassKey
+          : options.first.key,
+      items: options
+          .map(
+            (option) => DropdownMenuItem<String>(
+              value: option.key,
+              child: Text(
+                option.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() {
+          _selectedClassKey = value;
+          _cachedGridData = null;
+          _cachedGridProgram = null;
+          _cachedGridClassKey = null;
+        });
+      },
+      decoration: InputDecoration(
+        labelText: 'Sınıf',
+        labelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.coolGray,
+        ),
+        isDense: true,
+        filled: true,
+        fillColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: AppColors.coolGray.withValues(alpha: 0.18),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackNote(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        'Bu program profil bilgilerin eksik olduğu için backend tarafinda tahmini olarak secildi.',
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+          height: 1.35,
+        ),
+      ),
+    );
   }
 
   Widget _buildCornerHeader(
@@ -1233,25 +1538,24 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  _GridScheduleData _gridDataFor(ProgramSchedule program, int gradeLevel) {
+  _GridScheduleData _gridDataFor(ProgramSchedule program, String classKey) {
     final cachedGridData = _cachedGridData;
     if (cachedGridData != null &&
         identical(_cachedGridProgram, program) &&
-        _cachedGridGradeLevel == gradeLevel) {
+        _cachedGridClassKey == classKey) {
       return cachedGridData;
     }
 
-    final gridData = _buildGridData(program, gradeLevel);
+    final gridData = _buildGridData(program, classKey);
     _cachedGridProgram = program;
-    _cachedGridGradeLevel = gradeLevel;
+    _cachedGridClassKey = classKey;
     _cachedGridData = gridData;
     return gridData;
   }
 
-  _GridScheduleData _buildGridData(ProgramSchedule program, int gradeLevel) {
-    final Map<String, List<ScheduleLesson>> rawData = program.gradeForLevel(
-      gradeLevel,
-    );
+  _GridScheduleData _buildGridData(ProgramSchedule program, String classKey) {
+    final Map<String, List<ScheduleLesson>> rawData = program
+        .scheduleForClassKey(classKey);
 
     final lessonsByDay = <String, Map<int, _GridLesson>>{};
     final uniqueTimes = <int>{};
@@ -1730,22 +2034,16 @@ class _SchedulePageData {
     required this.faculties,
     required this.selection,
     this.schedules = const <ProgramSchedule>[],
-    this.selectedProgram,
   });
 
   final UserProfile profile;
   final List<AcademicFaculty> faculties;
   final _ResolvedAcademicSelection selection;
   final List<ProgramSchedule> schedules;
-  final ProgramSchedule? selectedProgram;
 }
 
 class _ResolvedAcademicSelection {
-  const _ResolvedAcademicSelection({
-    this.faculty,
-    this.department,
-    this.grade,
-  });
+  const _ResolvedAcademicSelection({this.faculty, this.department, this.grade});
 
   final AcademicFaculty? faculty;
   final AcademicDepartment? department;
@@ -1759,6 +2057,13 @@ class _ResolvedAcademicSelection {
 }
 
 enum _TodayLessonPhase { noLessons, beforeFirst, inLesson, afterLast }
+
+class _ClassOption {
+  const _ClassOption({required this.key, required this.label});
+
+  final String key;
+  final String label;
+}
 
 class _DayColumn {
   const _DayColumn({required this.key, required this.label});
