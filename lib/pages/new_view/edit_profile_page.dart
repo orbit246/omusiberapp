@@ -2,15 +2,16 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/master_news_widgets_repository.dart';
 import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/academic_faculty_model.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/widgets/badge_widget.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class EditProfilePage extends StatefulWidget {
   final String? uid;
@@ -37,6 +38,7 @@ final Map<String, _CachedEditProfile> _profileCache = {};
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _profileService = UserProfileService();
+  final _authService = AuthService();
   final _auth = FirebaseAuth.instance;
 
   late final TextEditingController _nameController;
@@ -56,6 +58,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _resolvedUid;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isDeletingAccount = false;
   bool _isDepartmentsLoading = false;
   bool _isGradesLoading = false;
   bool _isAcademicSyncing = false;
@@ -590,6 +593,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _showDeleteAccountDialog() async {
+    if (_isDeletingAccount) return;
+
     final profile = _profile;
     final user = _auth.currentUser;
     final email = profile?.email ?? user?.email ?? '';
@@ -642,6 +647,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
 
     if (confirmed != true) return;
+    await _deleteAccount(uid: uid, email: email);
+    return;
+  }
+    /*
 
     final body = StringBuffer()
       ..writeln('Merhaba,')
@@ -678,6 +687,57 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
     );
+  }
+
+    */
+
+  Future<void> _deleteAccount({
+    required String uid,
+    required String email,
+  }) async {
+    if (_isDeletingAccount) return;
+
+    setState(() {
+      _isDeletingAccount = true;
+    });
+
+    try {
+      final appleDeletionAuthorization =
+          await _authService.prepareAppleDeletionAuthorization();
+
+      await _profileService.requestAccountDeletion(
+        uid: uid,
+        email: email,
+        appleAuthorizationCode: appleDeletionAuthorization?.authorizationCode,
+        appleUserIdentifier: appleDeletionAuthorization?.userIdentifier,
+        providerIds: _auth.currentUser?.providerData
+                .map((provider) => provider.providerId)
+                .where((providerId) => providerId.isNotEmpty)
+                .toList(growable: false) ??
+            const <String>[],
+      );
+      _profileCache.clear();
+      await _authService.clearLocalUserData();
+      await _authService.signOut(createAnonymousFallback: false);
+      await _closeApp();
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Hesap silinemedi: $message')));
+      setState(() {
+        _isDeletingAccount = false;
+      });
+    }
+  }
+
+  Future<void> _closeApp() async {
+    await SystemNavigator.pop();
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await SystemNavigator.pop(animated: true);
+    }
   }
 
   Widget _buildBadgesSection(ThemeData theme) {
@@ -1039,7 +1099,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildStepActions(bool isReady) {
-    final canInteract = isReady && !_isSaving && !_isAcademicSyncing;
+    final canInteract =
+        isReady && !_isSaving && !_isAcademicSyncing && !_isDeletingAccount;
     final canGoNext =
         canInteract && (_profileStep != 0 || _isAcademicStepComplete);
 
@@ -1074,7 +1135,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Profili Düzenle"),
-        actions: _isSaving
+        actions: _isSaving || _isDeletingAccount
             ? [
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1094,7 +1155,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: Form(
           key: _formKey,
           child: AbsorbPointer(
-            absorbing: !isReady || _isSaving,
+            absorbing: !isReady || _isSaving || _isDeletingAccount,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1162,7 +1223,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
           const SizedBox(height: 8),
           Text(
-            "Hesabınızın ve bağlı verilerinizin kalıcı olarak silinmesini talep edebilirsiniz. Devam etmeden önce geri alınamaz sonuçları açıklayan bir onay penceresi gösterilir.",
+            "Hesabınızın ve bağlı verilerinizin kalıcı olarak silinmesini talep edebilirsiniz.",
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onErrorContainer,
             ),
@@ -1171,7 +1232,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _showDeleteAccountDialog,
+              onPressed: _isDeletingAccount ? null : _showDeleteAccountDialog,
               icon: const Icon(Icons.delete_outline),
               label: const Text("Hesabımı Sil"),
               style: OutlinedButton.styleFrom(

@@ -15,6 +15,12 @@ class UserProfileService {
   static final Map<String, List<AcademicGrade>> _gradeCache =
       <String, List<AcademicGrade>>{};
 
+  static void clearCaches() {
+    _facultyCache = null;
+    _departmentCache.clear();
+    _gradeCache.clear();
+  }
+
   Exception _buildApiException(String fallbackMessage, String responseBody) {
     try {
       final decoded = json.decode(responseBody);
@@ -166,6 +172,44 @@ class UserProfileService {
       }
     } catch (e) {
       print('Error updating user profile: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> requestAccountDeletion({
+    String? uid,
+    String? email,
+    String? appleAuthorizationCode,
+    String? appleUserIdentifier,
+    List<String> providerIds = const <String>[],
+  }) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${Constants.baseUrl}/users/profile'),
+        headers: await _getHeaders(),
+        body: json.encode({
+          if (uid != null && uid.trim().isNotEmpty) 'uid': uid.trim(),
+          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+          if (appleAuthorizationCode != null &&
+              appleAuthorizationCode.trim().isNotEmpty)
+            'appleAuthorizationCode': appleAuthorizationCode.trim(),
+          if (appleUserIdentifier != null &&
+              appleUserIdentifier.trim().isNotEmpty)
+            'appleUserIdentifier': appleUserIdentifier.trim(),
+          if (providerIds.isNotEmpty) 'providerIds': providerIds,
+        }),
+      );
+
+      if (response.statusCode != 200 &&
+          response.statusCode != 202 &&
+          response.statusCode != 204) {
+        throw _buildApiException(
+          'Failed to request account deletion.',
+          response.body,
+        );
+      }
+    } catch (e) {
+      print('Error requesting account deletion: $e');
       rethrow;
     }
   }

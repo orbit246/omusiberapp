@@ -116,6 +116,34 @@ Expected behavior:
 - Continue validating Firebase ID tokens server-side.
 - Treat Apple-authenticated Firebase users like other authenticated users.
 
+### 8. Account deletion endpoint and Apple revocation support
+
+The client now initiates account deletion in-app and may call:
+
+- `DELETE /users/profile`
+
+Expected behavior:
+
+- Delete or schedule deletion of the authenticated user's account and associated backend data.
+- Accept a JSON body with optional fields such as:
+  - `uid`
+  - `email`
+  - `providerIds`
+  - `appleAuthorizationCode`
+  - `appleUserIdentifier`
+- Return `200`, `202`, or `204` on success.
+
+For Sign in with Apple users:
+
+- If `appleAuthorizationCode` is provided, exchange it server-side using Apple's token endpoint and store or derive the token material needed for revocation.
+- Revoke the Apple authorization using Apple's `/auth/revoke` endpoint and your Apple client secret infrastructure.
+- If Apple revocation cannot be completed automatically, still fulfill account deletion and log the condition for follow-up.
+
+Reference:
+
+- Apple account deletion guidance: https://developer.apple.com/support/offering-account-deletion-in-your-app
+- Apple token revocation: https://developer.apple.com/documentation/signinwithapplerestapi/revoke-tokens
+
 ## Recommended Data Model
 
 Suggested user profile shape:

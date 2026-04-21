@@ -197,6 +197,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isLoggedIn = user != null;
+    final hasRegisteredAccount = user != null && !user.isAnonymous;
 
     return CustomScrollView(
       slivers: [
@@ -465,7 +466,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
 
                 // Sign Out Button (Only if logged in)
-                if (isLoggedIn)
+                if (hasRegisteredAccount)
                   _buildSettingsTile(
                     context,
                     icon: Icons.logout,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/app_startup_controller.dart';
@@ -10,6 +11,7 @@ import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
@@ -173,19 +175,67 @@ class AuthService {
   }
 
   /// Sign out from Google and Firebase, then immediately sign in anonymously.
-  Future<void> signOut() async {
+  Future<void> signOut({bool createAnonymousFallback = true}) async {
     try {
       await _googleSignIn.signOut();
     } catch (_) {}
 
     try {
+      try {
+        await FirebaseMessaging.instance.deleteToken();
+      } catch (_) {}
+
       await AppStartupController.instance.ensureFirebaseReady();
       await _auth.signOut();
-      print('Signed out from Firebase. Creating fallback anonymous session...');
-      await signInAnonymously(acceptedTos: true, acceptedPrivacy: true);
+      if (createAnonymousFallback) {
+        print('Signed out from Firebase. Creating fallback anonymous session...');
+        await signInAnonymously(acceptedTos: true, acceptedPrivacy: true);
+      }
     } catch (e) {
       print('Error during sign out / anon-sign-in: $e');
     }
+  }
+
+  bool get isSignedInWithApple {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    return user.providerData.any((provider) => provider.providerId == 'apple.com');
+  }
+
+  Future<AppleDeletionAuthorization?> prepareAppleDeletionAuthorization() async {
+    if (!isSignedInWithApple) {
+      return null;
+    }
+
+    try {
+      final available = await SignInWithApple.isAvailable();
+      if (!available) {
+        return null;
+      }
+
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [],
+      );
+
+      final authorizationCode = credential.authorizationCode.trim();
+      if (authorizationCode.isEmpty) {
+        return null;
+      }
+
+      return AppleDeletionAuthorization(
+        authorizationCode: authorizationCode,
+        userIdentifier: credential.userIdentifier,
+      );
+    } catch (e) {
+      print('Apple deletion authorization failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearLocalUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    UserProfileService.clearCaches();
   }
 
   Future<String?> getIdToken() async {
@@ -336,4 +386,14 @@ AuthException _handleAuthError(Object e) {
   } else {
     return AuthException('Beklenmeyen bir hata oluştu: $e');
   }
+}
+
+class AppleDeletionAuthorization {
+  const AppleDeletionAuthorization({
+    required this.authorizationCode,
+    this.userIdentifier,
+  });
+
+  final String authorizationCode;
+  final String? userIdentifier;
 }

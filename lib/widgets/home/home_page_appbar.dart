@@ -76,6 +76,7 @@ class HomePageAppbar extends StatelessWidget {
   }
 
   void _showSideMenu(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
     final width = MediaQuery.of(context).size.width;
     final panelWidth = width >= 480 ? 320.0 : width * 0.86;
 
@@ -96,7 +97,10 @@ class HomePageAppbar extends StatelessWidget {
                 topRight: Radius.circular(16),
                 bottomRight: Radius.circular(16),
               ),
-              child: _SideMenu(onClose: () => Navigator.of(context).pop()),
+              child: _SideMenu(
+                onClose: () => Navigator.of(context).pop(),
+                showLogout: user != null && !user.isAnonymous,
+              ),
             ),
           ),
         ),
@@ -157,7 +161,7 @@ class HomePageAppbar extends StatelessWidget {
             title: Text('Ayarlar'),
           ),
         ),
-        if (user != null)
+        if (user != null && !user.isAnonymous)
           const PopupMenuItem<String>(
             value: 'logout',
             child: ListTile(
@@ -205,7 +209,9 @@ class HomePageAppbar extends StatelessWidget {
 
 class _SideMenu extends StatelessWidget {
   final VoidCallback onClose;
-  const _SideMenu({required this.onClose});
+  final bool showLogout;
+
+  const _SideMenu({required this.onClose, required this.showLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +228,7 @@ class _SideMenu extends StatelessWidget {
             decoration: BoxDecoration(color: theme.primary),
             alignment: Alignment.bottomLeft,
             child: Text(
-              'Menü',
+              'MenÃ¼',
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(color: theme.onSurface),
@@ -251,14 +257,15 @@ class _SideMenu extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.help_outline),
-            title: const Text('Yardım'),
+            title: const Text('YardÄ±m'),
             onTap: onClose,
           ),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Çıkış yap'),
-            onTap: onClose,
-          ),
+          if (showLogout)
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Ã‡Ä±kÄ±ÅŸ yap'),
+              onTap: onClose,
+            ),
         ],
       ),
     );

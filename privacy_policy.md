@@ -1,68 +1,118 @@
-# Gizlilik Politikası
+# Privacy Policy
 
-**Son Güncelleme:** 12 Şubat 2026
+**Last updated:** April 21, 2026
 
-**AkademiZ** ("biz", "bizim" veya "uygulama") olarak gizliliğinize önem veriyoruz. Bu Gizlilik Politikası, AkademiZ mobil uygulamasını kullandığınızda bilgilerinizin nasıl toplandığını, kullanıldığını ve korunduğunu açıklar.
+AkademiZ ("we", "our", or "the app") explains in this Privacy Policy what data we collect, how we use it, and how account deletion works.
 
-## 1. Toplanan Bilgiler
+## 1. Data We Collect
 
-Uygulamamızı kullandığınızda aşağıdaki türde bilgileri toplayabiliriz:
+### Account and identity data
 
-### A. Kişisel Bilgiler
-Uygulamaya Google ile giriş yaptığınızda (özellikle `@stu.omu.edu.tr` uzantılı öğrenci e-postanızla), aşağıdaki bilgilere erişebilir ve bunları Firebase (Google Cloud) altyapımızda saklayabiliriz:
-*   **Ad ve Soyad**
-*   **E-posta Adresi**
-*   **Profil Fotoğrafı**
-*   **Öğrenci Numarası** (E-posta adresinizden otomatik olarak türetilir)
+If you sign in with Google or Sign in with Apple, we may process:
 
-### B. Otomatik Olarak Toplanan Bilgiler
-Uygulama deneyimini iyileştirmek ve teknik sorunları gidermek amacıyla şu veriler toplanabilir:
-*   **Cihaz Bilgileri:** Cihaz modeli, işletim sistemi sürümü ve benzersiz cihaz tanımlayıcıları.
-*   **Kullanım Verileri:** Görüntülenen haberler, beğenilen içerikler, katılım sağlanan etkinlikler ve anket oylamaları.
-*   **Bildirim Belirteçleri (Tokens):** Size anlık bildirim (push notification) gönderebilmek için Firebase Cloud Messaging belirteçleri saklanır.
+- Name
+- Email address
+- Profile photo URL
+- Firebase user ID (`uid`)
+- Student ID, if you add it manually or if it can be reasonably derived from the numeric local-part of your email address
 
-### C. Yerel Veriler
-*   **Notlar:** Uygulama içindeki "Notlar" özelliğiyle oluşturduğunuz içerikler tamamen cihazınızın yerel depolama alanında saklanır ve sunucularımıza gönderilmez.
+### Profile data
 
-## 2. Bilgilerin Kullanımı
+If you choose to complete your profile, we may process:
 
-Topladığımız bilgileri şu amaçlarla kullanıyoruz:
-*   Sadece yetkili öğrencilerin (@stu.omu.edu.tr) özel içeriklere ve yönetim panelini girmesini sağlamak.
-*   Etkinliklere katılımınızı yönetmek.
-*   Kampüsle ilgili önemli gelişmeleri anlık bildirimlerle iletmek.
-*   Uygulama performansını analiz etmek ve hataları gidermek.
-*   Topluluk anketlerinde mükerrer oy kullanımını önlemek.
+- Faculty, department, and grade selections
+- Campus
+- Gender
+- Age
+- Profile privacy preference
 
-## 3. Veri Paylaşımı ve Üçüncü Taraflar
+### App activity data
 
-Verileriniz izniniz olmadan üçüncü taraflara satılmaz. Ancak şu hizmet sağlayıcılarını kullanıyoruz:
-*   **Firebase (Google):** Kimlik doğrulama, veritabanı, anlık bildirimler ve analizler için.
-*   **Google Giriş:** Güvenli oturum açma işlemi için.
+To provide app features, we may process:
 
-## 4. Veri Güvenliği
+- Event participation and saved events
+- Likes and poll votes
+- Notification tokens and notification history
+- Feedback submissions
 
-Bilgilerinizin güvenliğini sağlamak için endüstri standardı güvenlik önlemleri (SSL şifreleme, yetkilendirme kontrolleri) uygulanmaktadır. Ancak, internet üzerinden iletilen hiçbir yöntemin %100 güvenli olmadığını hatırlatmak isteriz.
+### Community content
 
-## 5. Kullanıcı Hakları ve Veri Silme
+The community feed shown in the app is moderated and managed by authorized moderators or administrators. It is not an open consumer-generated posting system.
 
-Kullanıcılar olarak aşağıdaki haklara sahipsiniz:
-*   Hesap bilgilerinizi görüntüleme.
-*   Hesabınızın ve ilişkili verilerinizin silinmesini talep etme.
-*   Anlık bildirimleri cihaz ayarlarından kapatma.
+### Local-only data
 
-Verilerinizin silinmesini istiyorsanız, uygulama içindeki geri bildirim bölümünden veya aşağıdaki iletişim adresinden bize ulaşabilirsiniz.
+Some data is stored only on your device:
 
-## 6. Çocukların Gizliliği
+- Notes created in the in-app notes feature
+- Certain cached app content and UI preferences
 
-Bu uygulama Ondokuz Mayıs Üniversitesi öğrencileri ve personeli için tasarlanmıştır. 13 yaşın altındaki çocuklardan bilerek kişisel veri toplamıyoruz.
+Notes are not uploaded to our servers unless a future feature explicitly states otherwise.
 
-## 7. Değişiklikler
+### Technical data
 
-Bu Gizlilik Politikası zaman zaman güncellenebilir. Değişiklik yapıldığında "Son Güncelleme" tarihi güncellenecektir.
+We may process limited technical data needed for security and functionality, such as:
 
-## 8. İletişim
+- Firebase authentication tokens
+- Push notification tokens
+- Device model and operating system version
+- Error and diagnostic information needed to operate the service
 
-Gizlilik politikamızla ilgili sorularınız için bizimle iletişime geçebilirsiniz:
-*   **Geliştirici:** NortixLabs
-*   **E-posta:** admin@nortixlabs.com
-*   **Web:** [akademiz-api.nortixlabs.com](https://akademiz-api.nortixlabs.com)
+## 2. How We Use Data
+
+We use data to:
+
+- Authenticate users
+- Create and maintain user profiles
+- Deliver news, event, notification, and profile features
+- Remember preferences and improve reliability
+- Prevent abuse of interactive features such as likes and polls
+- Review feedback and respond to support requests
+
+## 3. Third-Party Services
+
+We use the following service providers:
+
+- **Google Firebase** for authentication, cloud data, and push notifications
+- **AkademiZ backend services** for profile, content, feedback, and app feature APIs
+- **Google Sign-In** and **Sign in with Apple** for authentication flows
+
+## 4. Account Deletion
+
+You can initiate account deletion from inside the app settings/profile flow.
+
+When account deletion is requested, we may:
+
+- Delete or schedule deletion of your account record and associated backend data
+- Clear locally stored preferences and cached app data on the device
+- Sign you out of Firebase and stop the active app session
+
+If you used Sign in with Apple, the app may ask for a fresh Apple authorization step during deletion so our backend can attempt token revocation with Apple in line with Apple's account deletion guidance.
+
+## 5. Data Retention
+
+We keep personal data only as long as needed to provide the service, meet legal obligations, resolve disputes, or enforce our agreements.
+
+Local notes remain on your device until you delete them, clear app data, or remove the app.
+
+## 6. Your Choices
+
+You can:
+
+- View and edit profile information in the app
+- Request deletion of your account in the app
+- Disable notifications from device settings
+- Stop using the app at any time
+
+## 7. Children
+
+The app is intended for a university audience. We do not knowingly collect personal data from children under 13.
+
+## 8. Changes
+
+We may update this Privacy Policy from time to time. The latest version is the one published with the app and related policy pages.
+
+## 9. Contact
+
+- Developer: NortixLabs
+- Email: admin@nortixlabs.com
+- Web: https://akademiz-api.nortixlabs.com
