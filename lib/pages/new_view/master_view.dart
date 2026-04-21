@@ -18,6 +18,7 @@ import 'package:omusiber/pages/new_view/food_menu_page.dart';
 import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/pages/new_view/academic_calendar_page.dart';
 import 'package:omusiber/pages/new_view/edit_profile_page.dart';
+import 'package:omusiber/widgets/profile/account_profile_entry.dart';
 
 class MasterView extends StatefulWidget {
   const MasterView({super.key, this.initialTabIndex = 0});
@@ -243,7 +244,7 @@ class _MasterViewState extends State<MasterView>
     }
 
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) {
+    if (user == null) {
       _openSettingsPage();
       return;
     }
@@ -291,43 +292,7 @@ class _MasterViewState extends State<MasterView>
   }
 
   Widget _buildBadgedTab({required String text, required int index}) {
-    final bool isUnread = _unreadStates[index];
-
-    return Tab(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(text),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            width: isUnread ? 14.0 : 0.0,
-            height: 8,
-            alignment: Alignment.centerLeft,
-            clipBehavior: Clip.hardEdge,
-            decoration: const BoxDecoration(),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              child: Row(
-                children: [
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.redAccent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return Tab(text: text);
   }
 
   Widget _buildDrawerHeader(
@@ -335,121 +300,20 @@ class _MasterViewState extends State<MasterView>
     required User? user,
     required bool isAuthLoading,
   }) {
-    const drawerText = Color(0xFFE5EAF4);
-    const drawerMuted = Color(0xFFB6C0D0);
-    const drawerAccent = Color(0xFF4385F5);
-    final isGuest = user == null || user.isAnonymous;
-    final displayName = isAuthLoading
-        ? "Hoş Geldiniz"
-        : isGuest
-        ? "Hoş Geldiniz"
-        : ((user.displayName?.trim().isNotEmpty ?? false)
-              ? user.displayName!.trim()
-              : "Hoş Geldiniz");
-    final subtitle = isAuthLoading
-        ? "Hesap hazırlanıyor"
-        : isGuest
-        ? "Misafir Hesabı"
-        : (user.email ?? "Kullanıcı");
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: const BoxDecoration(
-                  color: drawerAccent,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Colors.white,
-                  size: 29,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: drawerText,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: drawerMuted,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 58,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: drawerAccent,
-                foregroundColor: Colors.white,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                ),
-              ),
-              onPressed: () {
-                if (isAuthLoading) {
-                  return;
-                }
-
-                Navigator.of(context).pop();
-                if (isGuest) {
-                  _openSettingsPage();
-                } else {
-                  _openCurrentProfile();
-                }
-              },
-              icon: Icon(
-                isAuthLoading
-                    ? Icons.hourglass_top_rounded
-                    : isGuest
-                    ? Icons.login_rounded
-                    : Icons.person_outline_rounded,
-                size: 21,
-              ),
-              label: Text(
-                isAuthLoading
-                    ? "Yükleniyor"
-                    : isGuest
-                    ? "Giriş Yap /\nKaydol"
-                    : "Profilim",
-              ),
-            ),
-          ),
-        ],
+      child: AccountProfileEntry(
+        user: user,
+        isAuthLoading: isAuthLoading,
+        variant: AccountProfileEntryVariant.drawer,
+        onGuestTap: () {
+          Navigator.of(context).pop();
+          _openCurrentProfile();
+        },
+        onProfileTap: () {
+          Navigator.of(context).pop();
+          _openCurrentProfile();
+        },
       ),
     );
   }

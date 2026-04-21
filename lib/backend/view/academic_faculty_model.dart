@@ -9,9 +9,13 @@ class AcademicGrade {
     final rawLevel = json['level'];
     return AcademicGrade(
       key: (json['key'] as String? ?? '').trim(),
-      name: (json['name'] as String? ?? '').trim(),
+      name: _localizeGradeName((json['name'] as String? ?? '').trim()),
       level: rawLevel is num ? rawLevel.toInt() : int.tryParse('$rawLevel'),
     );
+  }
+
+  static String _localizeGradeName(String name) {
+    return name.replaceAll(RegExp(r'\bgrade\b', caseSensitive: false), 'Sınıf');
   }
 }
 

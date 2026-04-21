@@ -12,6 +12,7 @@ import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/about_page.dart';
 import 'package:omusiber/pages/new_view/feedback_page.dart';
 import 'package:omusiber/backend/update_service.dart';
+import 'package:omusiber/widgets/profile/account_profile_entry.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 
@@ -216,49 +217,15 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 // --- Account Section ---
                 _buildSectionHeader(context, "Hesap"),
-                if (isAuthLoading) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                    title: Text(
-                      "Hesap hazirlaniyor",
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    subtitle: const Text(
-                      "Bağlantı kurulurken ayarlar yükleniyor.",
-                    ),
-                  ),
-                ] else if (isLoggedIn) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
-                    title: Text(
-                      user.isAnonymous
-                          ? "Misafir Kullanıcı"
-                          : (user.displayName ?? "Kullanıcı"),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    subtitle: Text(
-                      user.isAnonymous
-                          ? "Anonim Hesap"
-                          : (user.email ?? "E-posta yok"),
-                    ),
+                if (isAuthLoading || isLoggedIn) ...[
+                  AccountProfileEntry(
+                    user: user,
+                    isAuthLoading: isAuthLoading,
+                    onProfileTap: _openCurrentProfile,
+                    onGuestTap: _openCurrentProfile,
                   ),
                   const SizedBox(height: 8),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.person_outline,
-                    title: "Profilim",
-                    subtitle: "Sınıf ve şube bilgilerini profilde gör",
-                    onTap: _openCurrentProfile,
-                  ),
-                  if (user.isAnonymous)
+                  if (user?.isAnonymous == true)
                     Column(
                       children: [
                         _buildSettingsTile(
