@@ -44,7 +44,7 @@ class AboutBottomSheet extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                "Version 0.2.0 Beta",
+                "Version 1.0",
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
