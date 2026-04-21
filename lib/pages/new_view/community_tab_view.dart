@@ -109,13 +109,30 @@ class CommunityTabContent extends StatelessWidget {
     }
 
     if (posts.isEmpty) {
-      return const Center(child: Text('Henüz gönderi yok.'));
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        displacement: 20,
+        edgeOffset: 0,
+        child: CustomScrollView(
+          controller: scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: const [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('Henüz gönderi yok.')),
+            ),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
       onRefresh: onRefresh,
+      displacement: 20,
+      edgeOffset: 0,
       child: ListView.builder(
         controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 16, bottom: 80),
         itemCount: posts.length + (isLoadingMore ? 1 : 0),
         itemBuilder: (context, index) {

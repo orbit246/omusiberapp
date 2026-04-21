@@ -43,27 +43,70 @@ class ScheduleService {
     final uri = Uri.parse('${Constants.baseUrl}/schedules').replace(
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
     );
+    _log(
+      'fetchSchedules sent uri=$uri params=${queryParameters.isEmpty ? '{}' : queryParameters}',
+    );
+
     try {
       final token = await AuthService().getIdToken();
+      final hasAuthToken = token != null && token.trim().isNotEmpty;
+      _log('GET $uri authPresent=$hasAuthToken');
+
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          if (token != null && token.trim().isNotEmpty)
-            'Authorization': 'Bearer $token',
+          if (hasAuthToken) 'Authorization': 'Bearer $token',
         },
+      );
+      _log(
+        'Response status=${response.statusCode} body=${_truncate(response.body)}',
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProgramSchedule.fromJson(json)).toList();
+        _log('Decoded schedule payload items=${data.length}');
+
+        final schedules = data
+            .map((json) => ProgramSchedule.fromJson(json))
+            .toList();
+        _log(
+          'Parsed schedules count=${schedules.length} details=${_summarizeSchedules(schedules)}',
+        );
+        return schedules;
       } else {
         throw Exception('Failed to load schedules: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching schedules: $e');
+      debugPrint('[ScheduleService ERROR] Error fetching schedules: $e');
       rethrow;
     }
+  }
+
+  void _log(String message) {
+    debugPrint('[ScheduleService] $message');
+  }
+
+  String _truncate(String value, {int max = 1000}) {
+    final compact = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= max) {
+      return compact;
+    }
+    return '${compact.substring(0, max)}...';
+  }
+
+  String _summarizeSchedules(List<ProgramSchedule> schedules) {
+    if (schedules.isEmpty) {
+      return 'none';
+    }
+
+    return schedules
+        .take(10)
+        .map((schedule) {
+          final classKeys = schedule.classesByKey.keys.join('|');
+          return 'id=${schedule.id}, program="${schedule.programName}", classes=[$classKeys]';
+        })
+        .join('; ');
   }
 }

@@ -148,6 +148,22 @@ class ProgramSchedule {
 
   bool hasClassKey(String classKey) => classesByKey.containsKey(classKey);
 
+  int lessonCountForClassKey(String classKey) {
+    final classSchedule = classesByKey[classKey];
+    if (classSchedule == null) {
+      return 0;
+    }
+
+    return classSchedule.values.fold<int>(
+      0,
+      (total, lessons) => total + lessons.length,
+    );
+  }
+
+  bool hasLessonsForClassKey(String classKey) {
+    return lessonCountForClassKey(classKey) > 0;
+  }
+
   Map<String, List<ScheduleLesson>> scheduleForClassKey(String classKey) {
     return classesByKey[classKey] ?? const <String, List<ScheduleLesson>>{};
   }

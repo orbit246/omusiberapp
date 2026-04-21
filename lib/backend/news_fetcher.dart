@@ -67,9 +67,12 @@ class NewsFetcher {
       final String? jsonStr = prefs.getString(_storageKey);
       if (jsonStr != null) {
         final List<dynamic> decoded = json.decode(jsonStr);
-        _cachedNews = _limitCachedNews(
-          decoded.map((item) => NewsView.fromJson(item)).toList(),
-        );
+        final parsedNews = decoded
+            .whereType<Map>()
+            .map((item) => NewsView.fromJson(item.cast<String, dynamic>()))
+            .where(_isRealNewsView)
+            .toList(growable: false);
+        _cachedNews = _limitCachedNews(parsedNews);
         if (_cachedNews!.length != decoded.length) {
           await prefs.setString(
             _storageKey,
@@ -207,8 +210,10 @@ class NewsFetcher {
 
       final List<dynamic> data = json.decode(response.body);
       result = data
-          .map((jsonItem) => _parseNewsItem(jsonItem))
+          .whereType<Map>()
+          .map((jsonItem) => _parseNewsItem(jsonItem.cast<String, dynamic>()))
           .whereType<NewsView>()
+          .where(_isRealNewsView)
           .toList();
 
       _log('Fetched ${result.length} items from API.');
@@ -269,10 +274,21 @@ class NewsFetcher {
   NewsView? _parseNewsItem(Map<String, dynamic> json) {
     try {
       final id = json['id'] as int? ?? 0;
+      if (id <= 0) {
+        return null;
+      }
+      if ((json['title'] as String? ?? '').trim().isEmpty) {
+        return null;
+      }
       final title = json['title'] as String? ?? 'Başlıksız';
-      final summary = json['summary'] as String? ?? '';
-      final authorName = json['authorName'] as String? ?? 'Sistem';
+      final summary = (json['summary'] as String? ?? '').trim();
+      final authorName = (json['authorName'] as String? ?? '').trim();
       String? heroImage = json['heroImage'] as String?;
+
+      final cleanTitle = title.trim();
+      if (cleanTitle.isEmpty) {
+        return null;
+      }
 
       if (heroImage == null || heroImage.isEmpty) {
         heroImage = _fallbackImage;
@@ -325,10 +341,10 @@ class NewsFetcher {
 
       return NewsView(
         id: id,
-        title: title,
+        title: cleanTitle,
         summary: summary,
         heroImage: heroImage,
-        authorName: authorName,
+        authorName: authorName.isEmpty ? 'Bilinmeyen Yazar' : authorName,
         detailUrl: detailUrl,
         publishedAt: publishedAt,
         publishedAtText:
@@ -345,6 +361,24 @@ class NewsFetcher {
       _logError('Failed to parse news item', e);
       return null;
     }
+  }
+
+  bool _isRealNewsView(NewsView item) {
+    if (item.id <= 0 || item.title.trim().isEmpty) {
+      return false;
+    }
+
+    final normalizedTitle = item.title.toLowerCase().trim();
+    if (normalizedTitle == 'fake news' ||
+        normalizedTitle == 'mock news' ||
+        normalizedTitle == 'test news' ||
+        normalizedTitle == 'test haber' ||
+        normalizedTitle == 'ornek haber' ||
+        normalizedTitle == 'örnek haber') {
+      return false;
+    }
+
+    return true;
   }
 
   String? _formatDate(DateTime? date) {
