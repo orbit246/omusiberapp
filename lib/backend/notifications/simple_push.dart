@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
+import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/firebase_options.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,8 +23,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class SimpleNotifications {
-  static const List<String> _publicTopics = <String>['news', 'events_all'];
+  static const List<String> _eventTopics = <String>['news', 'events_all'];
   static const String _defaultChannelId = 'akademiz_general';
+  static const String _lastNewsFacultyTopicKey = 'lastNewsFacultyTopic';
+  static const String _newsFacultyTopicPrefix = 'news-faculty-';
 
   static const AndroidNotificationChannel _generalChannel =
       AndroidNotificationChannel(
@@ -52,6 +58,8 @@ class SimpleNotifications {
   SimpleNotifications({FirebaseMessaging? fcm}) : _fcm = fcm;
 
   final FirebaseMessaging? _fcm;
+  final UserProfileService _profileService = UserProfileService();
+  final NewsFetcher _newsFetcher = NewsFetcher();
 
   FirebaseMessaging get _messaging => _fcm ?? FirebaseMessaging.instance;
 
@@ -175,8 +183,12 @@ class SimpleNotifications {
 
       if (defaultTargetPlatform == TargetPlatform.android) {
         await _androidNotifications?.requestNotificationsPermission();
-        return (await _androidNotifications?.areNotificationsEnabled()) ??
-            false;
+        final granted =
+            (await _androidNotifications?.areNotificationsEnabled()) ?? false;
+        if (granted) {
+          await _configureRemoteRegistration(forceRefresh: true);
+        }
+        return granted;
       }
 
       if (defaultTargetPlatform == TargetPlatform.iOS ||
@@ -230,10 +242,11 @@ class SimpleNotifications {
       debugPrint('APNs token received.');
     }
 
-    for (final topic in _publicTopics) {
+    for (final topic in _eventTopics) {
       await _messaging.subscribeToTopic(topic);
       debugPrint('Subscribed to FCM topic: $topic');
     }
+    await syncNewsFacultyTopicFromCurrentProfile();
 
     final token = await _messaging.getToken();
     debugPrint('FCM token: $token');
@@ -242,6 +255,125 @@ class SimpleNotifications {
     });
     _remoteRegistrationConfigured = true;
     _remoteRegistrationRetryScheduled = false;
+  }
+
+  Future<void> syncNewsFacultyTopicFromCurrentProfile() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        await syncNewsFacultyTopic(facultySlug: null);
+        return;
+      }
+
+      final profile = await _profileService.fetchUserProfile(user.uid);
+      if (profile == null) {
+        await syncNewsFacultyTopic(facultySlug: null);
+        return;
+      }
+
+      final facultySlug = await _resolveNewsFacultySlug(profile);
+      if (facultySlug == null && _hasSelectedFaculty(profile)) {
+        debugPrint(
+          'News faculty topic sync skipped because selected faculty could not be mapped to a news slug.',
+        );
+        return;
+      }
+
+      await syncNewsFacultyTopic(facultySlug: facultySlug);
+    } catch (e) {
+      debugPrint('News faculty topic profile sync failed: $e');
+    }
+  }
+
+  Future<void> syncNewsFacultyTopic({required String? facultySlug}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final oldTopic = prefs.getString(_lastNewsFacultyTopicKey);
+      final normalizedSlug = facultySlug?.trim();
+      final newTopic = normalizedSlug == null || normalizedSlug.isEmpty
+          ? null
+          : '$_newsFacultyTopicPrefix$normalizedSlug';
+
+      if (oldTopic != null && oldTopic != newTopic) {
+        await _messaging.unsubscribeFromTopic(oldTopic);
+        debugPrint('Unsubscribed from FCM topic: $oldTopic');
+      }
+
+      if (newTopic != null && oldTopic != newTopic) {
+        await _messaging.subscribeToTopic(newTopic);
+        await prefs.setString(_lastNewsFacultyTopicKey, newTopic);
+        debugPrint('Subscribed to FCM topic: $newTopic');
+      }
+
+      if (newTopic == null) {
+        await prefs.remove(_lastNewsFacultyTopicKey);
+      }
+    } catch (e) {
+      debugPrint('News faculty topic sync failed: $e');
+    }
+  }
+
+  Future<String?> _resolveNewsFacultySlug(UserProfile profile) async {
+    final newsFaculties = await _newsFetcher.fetchFaculties();
+    if (newsFaculties.isEmpty) {
+      return null;
+    }
+
+    final profileFacultyName = profile.facultyName?.trim();
+    final profileFacultyKey = profile.facultyKey?.trim();
+    final selectedFacultyName =
+        profileFacultyName != null && profileFacultyName.isNotEmpty
+        ? profileFacultyName
+        : await _academicFacultyNameForKey(profileFacultyKey);
+
+    if (selectedFacultyName != null && selectedFacultyName.isNotEmpty) {
+      final normalizedSelectedName = _normalizeFacultyLabel(
+        selectedFacultyName,
+      );
+      for (final faculty in newsFaculties) {
+        if (_normalizeFacultyLabel(faculty.name) == normalizedSelectedName) {
+          return faculty.slug.trim();
+        }
+      }
+    }
+
+    if (profileFacultyKey != null && profileFacultyKey.isNotEmpty) {
+      for (final faculty in newsFaculties) {
+        if (faculty.slug.trim() == profileFacultyKey) {
+          return faculty.slug.trim();
+        }
+      }
+    }
+
+    return null;
+  }
+
+  Future<String?> _academicFacultyNameForKey(String? facultyKey) async {
+    final normalizedKey = facultyKey?.trim();
+    if (normalizedKey == null || normalizedKey.isEmpty) {
+      return null;
+    }
+
+    try {
+      final academicFaculties = await _profileService.fetchAcademicFaculties();
+      for (final faculty in academicFaculties) {
+        if (faculty.key == normalizedKey) {
+          return faculty.name;
+        }
+      }
+    } catch (e) {
+      debugPrint('Academic faculty lookup failed for notifications: $e');
+    }
+    return null;
+  }
+
+  String _normalizeFacultyLabel(String value) {
+    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  bool _hasSelectedFaculty(UserProfile profile) {
+    return (profile.facultyKey?.trim().isNotEmpty ?? false) ||
+        (profile.facultyName?.trim().isNotEmpty ?? false);
   }
 
   Future<String?> _waitForApnsToken() async {

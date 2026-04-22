@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:omusiber/backend/auth/auth_service.dart';
 import 'package:omusiber/backend/master_news_widgets_repository.dart';
+import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/profile_identity.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/academic_faculty_model.dart';
@@ -390,6 +391,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'departmentKey': departmentKey,
         'gradeKey': gradeKey,
       });
+      unawaited(SimpleNotifications().syncNewsFacultyTopicFromCurrentProfile());
       unawaited(MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true));
       return true;
     } catch (e) {
@@ -495,6 +497,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       await _profileService.updateUserProfile(uid, updates);
+      unawaited(SimpleNotifications().syncNewsFacultyTopicFromCurrentProfile());
 
       if (mounted) {
         final refreshedProfile = await _profileService.fetchUserProfile(uid);
@@ -650,7 +653,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     await _deleteAccount(uid: uid, email: email);
     return;
   }
-    /*
+  /*
 
     final body = StringBuffer()
       ..writeln('Merhaba,')
@@ -702,15 +705,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
     });
 
     try {
-      final appleDeletionAuthorization =
-          await _authService.prepareAppleDeletionAuthorization();
+      final appleDeletionAuthorization = await _authService
+          .prepareAppleDeletionAuthorization();
 
       await _profileService.requestAccountDeletion(
         uid: uid,
         email: email,
         appleAuthorizationCode: appleDeletionAuthorization?.authorizationCode,
         appleUserIdentifier: appleDeletionAuthorization?.userIdentifier,
-        providerIds: _auth.currentUser?.providerData
+        providerIds:
+            _auth.currentUser?.providerData
                 .map((provider) => provider.providerId)
                 .where((providerId) => providerId.isNotEmpty)
                 .toList(growable: false) ??
