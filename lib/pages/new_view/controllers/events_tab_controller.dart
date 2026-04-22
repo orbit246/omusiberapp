@@ -126,7 +126,7 @@ class EventsTabController extends ChangeNotifier {
     if (!_startupController.canUseAuthenticatedApis) {
       return;
     }
-    _backgroundRefresh.schedule();
+    _backgroundRefresh.schedule(ignoreStartupDeferral: _events.isEmpty);
   }
 
   @override

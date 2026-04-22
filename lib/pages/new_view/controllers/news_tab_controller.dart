@@ -526,7 +526,7 @@ class NewsTabController extends ChangeNotifier {
     if (!_canRunStartupRefresh()) {
       return;
     }
-    _backgroundRefresh.schedule();
+    _backgroundRefresh.schedule(ignoreStartupDeferral: _articles.isEmpty);
   }
 
   bool _isToday(DateTime? date) {

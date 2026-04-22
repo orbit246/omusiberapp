@@ -27,12 +27,14 @@ class BackgroundRefreshCoordinator {
 
   bool get isRefreshQueued => _refreshQueued;
 
-  void schedule() {
+  void schedule({bool ignoreStartupDeferral = false}) {
     if (_disposed || _refreshQueued || !(_canRefresh?.call() ?? true)) {
       return;
     }
 
-    final delay = _startupController.startupDeferral(_delay);
+    final delay = ignoreStartupDeferral
+        ? Duration.zero
+        : _startupController.startupDeferral(_delay);
     _timer?.cancel();
 
     if (delay == Duration.zero) {
