@@ -119,7 +119,9 @@ class EventsTabController extends ChangeNotifier {
   }
 
   List<PostView> _freshWithMocks(List<PostView> fresh) {
-    return [...fresh];
+    final events = [...fresh];
+    _repository.sortEventsByClosestDate(events);
+    return events;
   }
 
   void _handleStartupChanged() {

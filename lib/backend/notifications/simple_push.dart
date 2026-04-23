@@ -24,6 +24,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class SimpleNotifications {
   static const List<String> _eventTopics = <String>['news', 'events_all'];
+  static const String _androidNotificationIcon = 'launcher_icon';
   static const String _defaultChannelId = 'akademiz_general';
   static const String _lastNewsFacultyTopicKey = 'lastNewsFacultyTopic';
   static const String _newsFacultyTopicPrefix = 'news-faculty-';
@@ -490,7 +491,7 @@ class SimpleNotifications {
           channelDescription: channel.description,
           importance: Importance.max,
           priority: Priority.high,
-          icon: '@mipmap/launcher_icon',
+          icon: _androidNotificationIcon,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,

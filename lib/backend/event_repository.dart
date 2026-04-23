@@ -24,7 +24,7 @@ class EventRepository {
 
   Future<List<PostView>> getCachedEvents() async {
     if (_cachedEvents != null && _cachedEvents!.isNotEmpty) {
-      _sortEventsMostRecent(_cachedEvents!);
+      _sortEventsByClosestDate(_cachedEvents!);
       return _cachedEvents!;
     }
 
@@ -34,7 +34,7 @@ class EventRepository {
       if (jsonStr != null) {
         final List<dynamic> decoded = json.decode(jsonStr);
         _cachedEvents = decoded.map((item) => PostView.fromJson(item)).toList();
-        _sortEventsMostRecent(_cachedEvents!);
+        _sortEventsByClosestDate(_cachedEvents!);
         return _cachedEvents!;
       }
     } catch (e) {
@@ -110,7 +110,7 @@ class EventRepository {
       final List<PostView> events = data
           .map<PostView>((jsonItem) => PostView.fromJson(jsonItem))
           .toList();
-      _sortEventsMostRecent(events);
+      _sortEventsByClosestDate(events);
 
       if (!jsonListEquals<PostView>(
         _cachedEvents ?? const <PostView>[],
@@ -276,7 +276,11 @@ class EventRepository {
     return eventId;
   }
 
-  void _sortEventsMostRecent(List<PostView> events) {
+  void sortEventsByClosestDate(List<PostView> events) {
+    _sortEventsByClosestDate(events);
+  }
+
+  void _sortEventsByClosestDate(List<PostView> events) {
     DateTime resolveSortDate(PostView e) {
       if (e.eventDate != null) return e.eventDate!;
 
@@ -295,7 +299,24 @@ class EventRepository {
       return DateTime.fromMillisecondsSinceEpoch(0);
     }
 
-    events.sort((a, b) => resolveSortDate(b).compareTo(resolveSortDate(a)));
+    final now = DateTime.now();
+
+    events.sort((a, b) {
+      final aDate = resolveSortDate(a);
+      final bDate = resolveSortDate(b);
+      final aIsUpcoming = !aDate.isBefore(now);
+      final bIsUpcoming = !bDate.isBefore(now);
+
+      if (aIsUpcoming != bIsUpcoming) {
+        return aIsUpcoming ? -1 : 1;
+      }
+
+      if (aIsUpcoming) {
+        return aDate.compareTo(bDate);
+      }
+
+      return bDate.compareTo(aDate);
+    });
   }
 
   void _upsertCachedEvent(PostView event) {
@@ -309,7 +330,7 @@ class EventRepository {
     } else {
       _cachedEvents![idx] = event;
     }
-    _sortEventsMostRecent(_cachedEvents!);
+    _sortEventsByClosestDate(_cachedEvents!);
   }
 
   Future<void> _postEventInteraction({
