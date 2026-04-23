@@ -316,19 +316,29 @@ class _MasterViewState extends State<MasterView>
     required bool isAuthLoading,
   }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
-      child: AccountProfileEntry(
-        user: user,
-        isAuthLoading: isAuthLoading,
-        variant: AccountProfileEntryVariant.drawer,
-        onGuestTap: () {
-          Navigator.of(context).pop();
-          _openCurrentProfile();
-        },
-        onProfileTap: () {
-          Navigator.of(context).pop();
-          _openCurrentProfile();
-        },
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A2435),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF3A4D6B)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: AccountProfileEntry(
+            user: user,
+            isAuthLoading: isAuthLoading,
+            variant: AccountProfileEntryVariant.drawer,
+            onGuestTap: () {
+              Navigator.of(context).pop();
+              _openCurrentProfile();
+            },
+            onProfileTap: () {
+              Navigator.of(context).pop();
+              _openCurrentProfile();
+            },
+          ),
+        ),
       ),
     );
   }
@@ -374,7 +384,6 @@ class _MasterViewState extends State<MasterView>
               _openGradesPage();
             },
           ),
-          _buildDrawerDivider(),
           _buildDrawerSectionTitle(context, "Kampüs"),
           _buildDrawerTile(
             context: context,
@@ -403,7 +412,7 @@ class _MasterViewState extends State<MasterView>
 
   Widget _buildDrawerSectionTitle(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 24, 24, 16),
+      padding: const EdgeInsets.fromLTRB(28, 18, 24, 8),
       child: Text(
         title,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -417,7 +426,7 @@ class _MasterViewState extends State<MasterView>
 
   Widget _buildDrawerDivider() {
     return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 28),
+      padding: EdgeInsets.symmetric(horizontal: 16),
       child: Divider(height: 1, color: Color(0xFF31415D), thickness: 1),
     );
   }
@@ -429,27 +438,42 @@ class _MasterViewState extends State<MasterView>
     required VoidCallback onTap,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(right: 22),
-      child: ListTile(
-        contentPadding: const EdgeInsets.only(left: 31, right: 4),
-        minLeadingWidth: 28,
-        horizontalTitleGap: 15,
-        minVerticalPadding: 12,
-        leading: Icon(icon, size: 23, color: const Color(0xFFAEB8C8)),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: const Color(0xFFD8DEE9),
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Material(
+        color: const Color(0xFF1A2435),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF3A4D6B), width: 1),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: const Color(0xFFAEB8C8)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFFD8DEE9),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 22,
+                  color: Color(0xFF63718A),
+                ),
+              ],
+            ),
           ),
         ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          size: 22,
-          color: Color(0xFF63718A),
-        ),
-        onTap: onTap,
       ),
     );
   }

@@ -161,7 +161,7 @@ class AccountProfileEntry extends StatelessWidget {
                 size: 29,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,27 +191,41 @@ class AccountProfileEntry extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
-          height: 58,
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: drawerAccent,
-              foregroundColor: Colors.white,
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+          height: 54,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: drawerText,
+              side: const BorderSide(color: Color(0xFF3A4D6B)),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0,
               ),
             ),
             onPressed: _onTap,
-            icon: Icon(_actionIcon, size: 21),
-            label: Text(_actionLabel),
+            child: Row(
+              children: [
+                Icon(_actionIcon, size: 21),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _actionLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, size: 22),
+              ],
+            ),
           ),
         ),
       ],
