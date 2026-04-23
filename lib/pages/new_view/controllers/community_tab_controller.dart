@@ -24,6 +24,7 @@ class CommunityTabController extends ChangeNotifier {
 
   static const Duration _backgroundRefreshDelay = Duration(seconds: 4);
   static const int _pageSize = 20;
+  static final DateTime _showcaseNow = DateTime.now();
 
   final CommunityRepository _repository;
   final AppStartupController _startupController;
@@ -75,8 +76,8 @@ class CommunityTabController extends ChangeNotifier {
         return;
       }
 
-      if (shouldReplacePosts) {
-        _posts = page.posts;
+      if (shouldReplacePosts || page.posts.isEmpty) {
+        _posts = _withShowcaseFallback(page.posts);
       }
       _nextCursor = page.nextCursor;
       _isLoadingMore = false;
@@ -88,6 +89,7 @@ class CommunityTabController extends ChangeNotifier {
       }
       debugPrint("Background refresh failed: $error");
       if (_posts.isEmpty) {
+        _posts = _showcasePosts;
         _isLoading = false;
         notifyListeners();
       }
@@ -123,6 +125,36 @@ class CommunityTabController extends ChangeNotifier {
     }
   }
 
+  void toggleReaction(CommunityPost post, String emoji) {
+    final index = _posts.indexWhere((p) => p.id == post.id);
+    if (index == -1) return;
+
+    final current = _posts[index];
+    final selectedReactions = {...current.selectedReactions};
+    final reactionCounts = {...current.reactionCounts};
+    final wasSelected = selectedReactions.contains(emoji);
+
+    if (wasSelected) {
+      selectedReactions.remove(emoji);
+      reactionCounts[emoji] = ((reactionCounts[emoji] ?? 0) - 1).clamp(
+        0,
+        1 << 30,
+      );
+    } else {
+      selectedReactions.add(emoji);
+      reactionCounts[emoji] = (reactionCounts[emoji] ?? 0) + 1;
+    }
+
+    reactionCounts.removeWhere((_, count) => count <= 0);
+
+    _posts = [..._posts]
+      ..[index] = current.copyWith(
+        reactionCounts: reactionCounts,
+        selectedReactions: selectedReactions,
+      );
+    notifyListeners();
+  }
+
   Future<void> toggleLike(CommunityPost post) async {
     final index = _posts.indexWhere((p) => p.id == post.id);
     if (index == -1) return;
@@ -155,6 +187,70 @@ class CommunityTabController extends ChangeNotifier {
     }
     _backgroundRefresh.schedule(ignoreStartupDeferral: _posts.isEmpty);
   }
+
+  List<CommunityPost> _withShowcaseFallback(List<CommunityPost> posts) {
+    if (posts.isNotEmpty) return posts;
+    return _showcasePosts;
+  }
+
+  List<CommunityPost> get _showcasePosts => [
+    CommunityPost(
+      id: 'showcase-pinned-finals',
+      authorName: 'OMU Siber Topluluk',
+      content:
+          '**Final haftasi calisma noktasi onerileri**\n\nKutuphane dolarsa sessiz sinif, lab ve kampus ici sakin yer onerilerini bu baslikta toplayalim.',
+      createdAt: _showcaseNow.subtract(const Duration(minutes: 18)),
+      likes: 42,
+      category: 'announcement',
+      isPinned: true,
+      accentColor: 0xFF2563EB,
+      reactionCounts: const {'🔥': 18, '👏': 9, '👀': 6},
+      selectedReactions: const {'🔥'},
+    ),
+    CommunityPost(
+      id: 'showcase-poll-food',
+      authorName: 'Kampus Nabzi',
+      content: 'Bugunun yemegi icin hizli karar:',
+      createdAt: _showcaseNow.subtract(const Duration(hours: 2)),
+      likes: 17,
+      category: 'poll',
+      accentColor: 0xFFF97316,
+      reactionCounts: const {'😂': 14, '👍': 8},
+      poll: PollModel(
+        id: 'showcase-poll-food-options',
+        question: 'Bugun yemekhane denenir mi?',
+        userVotedOptionId: 'option-yes',
+        closesAt: _showcaseNow.add(const Duration(hours: 7)),
+        options: const [
+          PollOption(id: 'option-yes', text: 'Gidilir', votes: 58),
+          PollOption(id: 'option-mid', text: 'Kararsizim', votes: 24),
+          PollOption(id: 'option-no', text: 'Kantin daha guvenli', votes: 31),
+        ],
+      ),
+    ),
+    CommunityPost(
+      id: 'showcase-question',
+      authorName: 'Anonim',
+      content:
+          'Kampus icinde priz bulma sansi en yuksek yer neresi? Ozellikle ogleden sonra.',
+      createdAt: _showcaseNow.subtract(const Duration(hours: 5)),
+      likes: 9,
+      category: 'question',
+      accentColor: 0xFF10B981,
+      reactionCounts: const {'👀': 11, '👍': 5},
+    ),
+    CommunityPost(
+      id: 'showcase-campus',
+      authorName: 'Bir ogrenci',
+      content:
+          'Bugun kutuphane giris kati normalden sakin. Boslugu olan degerlendirsin.',
+      createdAt: _showcaseNow.subtract(const Duration(days: 1, hours: 3)),
+      likes: 23,
+      category: 'campus',
+      accentColor: 0xFFA855F7,
+      reactionCounts: const {'❤️': 12, '👏': 4},
+    ),
+  ];
 
   @override
   void dispose() {

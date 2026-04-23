@@ -15,11 +15,14 @@ class AppMarkdownBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final markdownData = _normalizeMarkdownBody(data);
 
     return MarkdownBody(
-      data: data,
+      data: markdownData,
       selectable: selectable,
       styleSheet: _markdownStyleSheet(theme),
+      builders: _markdownBuilders,
+      softLineBreak: true,
       onTapLink: (text, href, title) => _openMarkdownLink(context, href),
     );
   }
@@ -40,6 +43,7 @@ class AppMarkdownPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final markdownData = _normalizeMarkdownBody(data);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -56,8 +60,10 @@ class AppMarkdownPreview extends StatelessWidget {
                   minHeight: 0,
                   maxHeight: double.infinity,
                   child: MarkdownBody(
-                    data: data,
+                    data: markdownData,
                     styleSheet: _markdownStyleSheet(theme),
+                    builders: _markdownBuilders,
+                    softLineBreak: true,
                     onTapLink: (text, href, title) =>
                         _openMarkdownLink(context, href),
                   ),
@@ -83,6 +89,17 @@ class AppMarkdownPreview extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+final Map<String, MarkdownElementBuilder> _markdownBuilders = {
+  'pre': _WrappingPreBuilder(),
+};
+
+class _WrappingPreBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitText(dynamic text, TextStyle? preferredStyle) {
+    return Text.rich(TextSpan(text: text.textContent, style: preferredStyle));
   }
 }
 
@@ -130,7 +147,63 @@ MarkdownStyleSheet _markdownStyleSheet(ThemeData theme) {
       color: cs.onSurface,
       backgroundColor: cs.surfaceContainerHighest,
     ),
+    codeblockPadding: const EdgeInsets.all(12),
+    codeblockDecoration: BoxDecoration(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(8),
+    ),
   );
+}
+
+String _normalizeMarkdownBody(String value) {
+  final normalized = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  final lines = normalized.split('\n');
+
+  while (lines.isNotEmpty && lines.first.trim().isEmpty) {
+    lines.removeAt(0);
+  }
+  while (lines.isNotEmpty && lines.last.trim().isEmpty) {
+    lines.removeLast();
+  }
+
+  final contentIndents = lines
+      .where((line) => line.trim().isNotEmpty && !_isMarkdownBlockMarker(line))
+      .map(_leadingWhitespaceCount)
+      .toList(growable: false);
+  final commonIndent = contentIndents.isEmpty || contentIndents.contains(0)
+      ? 0
+      : contentIndents.reduce(
+          (value, element) => value < element ? value : element,
+        );
+
+  if (commonIndent == 0) return lines.join('\n');
+
+  return lines
+      .map((line) {
+        if (line.trim().isEmpty) return '';
+        final removeCount = _leadingWhitespaceCount(
+          line,
+        ).clamp(0, commonIndent);
+        return line.substring(removeCount);
+      })
+      .join('\n');
+}
+
+bool _isMarkdownBlockMarker(String line) {
+  final trimmed = line.trimLeft();
+  return trimmed.startsWith('```') || trimmed.startsWith('~~~');
+}
+
+int _leadingWhitespaceCount(String value) {
+  var count = 0;
+  for (final codeUnit in value.codeUnits) {
+    if (codeUnit == 0x20 || codeUnit == 0x09) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
 }
 
 Future<void> _openMarkdownLink(BuildContext context, String? href) async {

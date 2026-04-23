@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/deep_link_service.dart';
 import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/colors/app_theme.dart';
 import 'package:omusiber/backend/theme_manager.dart';
@@ -66,7 +67,14 @@ class _MyAppState extends State<MyApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       StartupLogger.log('First Flutter frame rendered; starting app bootstrap');
       unawaited(AppStartupController.instance.start());
+      unawaited(DeepLinkService.instance.start(navigatorKey: navKey));
     });
+  }
+
+  @override
+  void dispose() {
+    DeepLinkService.instance.dispose();
+    super.dispose();
   }
 
   @override

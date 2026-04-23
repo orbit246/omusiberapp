@@ -82,7 +82,7 @@ class _CommunityTabViewState extends State<CommunityTabView> {
   }
 }
 
-class CommunityTabContent extends StatelessWidget {
+class CommunityTabContent extends StatefulWidget {
   const CommunityTabContent({
     super.key,
     required this.posts,
@@ -103,18 +103,50 @@ class CommunityTabContent extends StatelessWidget {
   final ValueChanged<CommunityPost> onShare;
 
   @override
+  State<CommunityTabContent> createState() => _CommunityTabContentState();
+}
+
+class _CommunityTabContentState extends State<CommunityTabContent> {
+  static const List<_CommunityFilter> _filters = [
+    _CommunityFilter(id: 'all', label: 'Tümü'),
+    _CommunityFilter(id: 'pinned', label: 'Sabit'),
+    _CommunityFilter(id: 'announcement', label: 'Duyuru'),
+    _CommunityFilter(id: 'question', label: 'Soru'),
+    _CommunityFilter(id: 'poll', label: 'Anket'),
+    _CommunityFilter(id: 'campus', label: 'Kampüs'),
+  ];
+
+  String _selectedFilter = 'all';
+
+  List<CommunityPost> get _filteredPosts {
+    final filtered = widget.posts.where((post) {
+      return switch (_selectedFilter) {
+        'all' => true,
+        'pinned' => post.isPinned,
+        _ => post.category == _selectedFilter,
+      };
+    }).toList();
+
+    filtered.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return filtered;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (widget.isLoading) {
       return const CommunityLoadingState();
     }
 
-    if (posts.isEmpty) {
+    if (widget.posts.isEmpty) {
       return RefreshIndicator(
-        onRefresh: onRefresh,
+        onRefresh: widget.onRefresh,
         displacement: 20,
         edgeOffset: 0,
         child: CustomScrollView(
-          controller: scrollController,
+          controller: widget.scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: const [
             SliverFillRemaining(
@@ -126,30 +158,115 @@ class CommunityTabContent extends StatelessWidget {
       );
     }
 
+    final visiblePosts = _filteredPosts;
+
     return RefreshIndicator(
-      onRefresh: onRefresh,
+      onRefresh: widget.onRefresh,
       displacement: 20,
       edgeOffset: 0,
       child: ListView.builder(
-        controller: scrollController,
+        controller: widget.scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 16, bottom: 80),
-        itemCount: posts.length + (isLoadingMore ? 1 : 0),
+        itemCount:
+            (visiblePosts.isEmpty ? 2 : visiblePosts.length + 1) +
+            (widget.isLoadingMore ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= posts.length) {
+          if (index == 0) {
+            return _CommunityFilterBar(
+              filters: _filters,
+              selectedFilter: _selectedFilter,
+              onSelected: (filter) {
+                setState(() => _selectedFilter = filter.id);
+              },
+            );
+          }
+
+          final postIndex = index - 1;
+          if (visiblePosts.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 42),
+              child: Center(child: Text('Bu filtrede gönderi yok.')),
+            );
+          }
+
+          if (postIndex >= visiblePosts.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Center(child: CircularProgressIndicator()),
             );
           }
 
-          final post = posts[index];
+          final post = visiblePosts[postIndex];
           return CommunityPostCard(
             post: post,
-            onLike: () => onLike(post),
-            onShare: () => onShare(post),
+            onLike: () => widget.onLike(post),
+            onShare: () => widget.onShare(post),
           );
         },
+      ),
+    );
+  }
+}
+
+class _CommunityFilter {
+  const _CommunityFilter({required this.id, required this.label});
+
+  final String id;
+  final String label;
+}
+
+class _CommunityFilterBar extends StatelessWidget {
+  const _CommunityFilterBar({
+    required this.filters,
+    required this.selectedFilter,
+    required this.onSelected,
+  });
+
+  final List<_CommunityFilter> filters;
+  final String selectedFilter;
+  final ValueChanged<_CommunityFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SizedBox(
+        height: 42,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: filters.length,
+          separatorBuilder: (context, index) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final filter = filters[index];
+            final isSelected = filter.id == selectedFilter;
+            return ChoiceChip(
+              selected: isSelected,
+              label: Text(filter.label),
+              onSelected: (_) => onSelected(filter),
+              showCheckmark: false,
+              labelStyle: TextStyle(
+                color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+              selectedColor: cs.primary,
+              backgroundColor: cs.surfaceContainerHighest.withValues(
+                alpha: 0.45,
+              ),
+              side: BorderSide(
+                color: isSelected
+                    ? cs.primary
+                    : cs.outlineVariant.withValues(alpha: 0.7),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

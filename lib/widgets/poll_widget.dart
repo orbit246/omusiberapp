@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/backend/community_repository.dart';
-import 'package:omusiber/widgets/shared/app_markdown.dart';
 
 class PollWidget extends StatefulWidget {
   final String postId;
@@ -64,49 +63,51 @@ class _PollWidgetState extends State<PollWidget> {
     final isExpired = _poll.isClosed || DateTime.now().isAfter(_poll.closesAt);
     final totalVotes = _poll.totalVotes;
     final showResults = hasVoted || isExpired;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Container(
       margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(
-            context,
-          ).colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.42)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Question
-          AppMarkdownBody(data: _poll.question),
-          const SizedBox(height: 12),
-
-          // Options
-          ..._poll.options.map((option) {
+          _PollHeader(question: _poll.question),
+          const SizedBox(height: 14),
+          ..._poll.options.asMap().entries.map((entry) {
+            final index = entry.key;
+            final option = entry.value;
             final isSelected = _poll.userVotedOptionId == option.id;
             final percentage = totalVotes > 0 ? option.votes / totalVotes : 0.0;
+            final optionColor = _optionColor(index);
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: showResults
-                  ? _buildResultBar(option, percentage, isSelected)
-                  : _buildVoteButton(option),
+                  ? _buildResultBar(option, percentage, isSelected, optionColor)
+                  : _buildVoteButton(option, optionColor),
             );
           }),
-
-          // Footer
           Padding(
-            padding: const EdgeInsets.only(top: 4.0),
+            padding: const EdgeInsets.only(top: 6),
             child: Text(
               _buildFooterText(totalVotes, isExpired, hasVoted),
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -126,22 +127,40 @@ class _PollWidgetState extends State<PollWidget> {
     return "Süre dolmak üzere";
   }
 
-  Widget _buildVoteButton(PollOption option) {
+  Widget _buildVoteButton(PollOption option, Color optionColor) {
     return InkWell(
       onTap: _isVoting ? null : () => _handleVote(option.id),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        constraints: const BoxConstraints(minHeight: 44),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        constraints: const BoxConstraints(minHeight: 50),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-          ),
-          borderRadius: BorderRadius.circular(8),
+          color: optionColor.withValues(alpha: 0.14),
+          border: Border.all(color: optionColor.withValues(alpha: 0.58)),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: optionColor.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Expanded(child: AppMarkdownBody(data: option.text))],
+          children: [
+            _SelectionDot(color: optionColor, isSelected: false),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                option.text,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -151,14 +170,14 @@ class _PollWidgetState extends State<PollWidget> {
     PollOption option,
     double percentage,
     bool isSelected,
+    Color optionColor,
   ) {
-    final theme = Theme.of(context);
     final percentageInt = (percentage * 100).toInt();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: Stack(
             children: [
               Positioned.fill(
@@ -168,52 +187,69 @@ class _PollWidgetState extends State<PollWidget> {
                     widthFactor: percentage.clamp(0, 1),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.colorScheme.primary.withValues(alpha: 0.2)
-                            : theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: LinearGradient(
+                          colors: [
+                            optionColor.withValues(alpha: 0.5),
+                            optionColor.withValues(alpha: 0.22),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
                 ),
               ),
               Container(
-                constraints: const BoxConstraints(minHeight: 44),
+                constraints: const BoxConstraints(minHeight: 52),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
+                  horizontal: 14,
+                  vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: isSelected
-                      ? Border.all(color: theme.colorScheme.primary, width: 1.5)
-                      : null,
+                  color: optionColor.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? optionColor.withValues(alpha: 0.9)
+                        : optionColor.withValues(alpha: 0.5),
+                    width: isSelected ? 1.8 : 1.1,
+                  ),
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (isSelected)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0, top: 2),
-                        child: Icon(
-                          Icons.check_circle,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
+                    _SelectionDot(color: optionColor, isSelected: isSelected),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: AppMarkdownBody(
-                        data: "${option.text} (${option.votes})",
+                      child: Text(
+                        option.text,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        "$percentageInt%",
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: optionColor.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: optionColor.withValues(alpha: 0.38),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          "$percentageInt% • ${option.votes}",
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                            color: optionColor,
+                          ),
                         ),
                       ),
                     ),
@@ -224,6 +260,88 @@ class _PollWidgetState extends State<PollWidget> {
           ),
         );
       },
+    );
+  }
+
+  Color _optionColor(int index) {
+    const colors = [
+      Color(0xFF2563EB),
+      Color(0xFF10B981),
+      Color(0xFFF97316),
+      Color(0xFFA855F7),
+      Color(0xFFE11D48),
+    ];
+    return colors[index % colors.length];
+  }
+}
+
+class _PollHeader extends StatelessWidget {
+  const _PollHeader({required this.question});
+
+  final String question;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: cs.primary.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.34)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [Icon(Icons.poll_rounded, size: 16, color: cs.primary)],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            question,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w900,
+              height: 1.25,
+              color: cs.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SelectionDot extends StatelessWidget {
+  const _SelectionDot({required this.color, required this.isSelected});
+
+  final Color color;
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isSelected ? color : Colors.transparent,
+        border: Border.all(
+          color: isSelected ? color : color.withValues(alpha: 0.72),
+          width: 1.7,
+        ),
+      ),
+      child: isSelected
+          ? const Icon(Icons.check_rounded, size: 13, color: Colors.white)
+          : null,
     );
   }
 }

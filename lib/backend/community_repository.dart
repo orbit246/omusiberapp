@@ -213,6 +213,64 @@ class CommunityRepository {
     }
   }
 
+  Future<CommunityPost?> fetchPostById(String postId) async {
+    final normalizedId = postId.trim();
+    if (normalizedId.isEmpty) return null;
+
+    for (final post in await getCachedPosts()) {
+      if (post.id == normalizedId) {
+        return post;
+      }
+    }
+
+    try {
+      final headers = await _authorizedHeaders();
+      final response = await http
+          .get(Uri.parse('$_baseUrl/posts/$normalizedId'), headers: headers)
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) {
+        return _findPostInFreshPage(normalizedId);
+      }
+
+      final decoded = json.decode(response.body);
+      if (decoded is Map && decoded['post'] is Map) {
+        final post = CommunityPost.fromJson(
+          Map<String, dynamic>.from(decoded['post'] as Map),
+        );
+        _upsertCachedPost(post);
+        return post;
+      }
+      if (decoded is Map<String, dynamic>) {
+        final post = CommunityPost.fromJson(decoded);
+        _upsertCachedPost(post);
+        return post;
+      }
+    } catch (e) {
+      debugPrint('Fetch community post by id failed: $e');
+    }
+
+    return _findPostInFreshPage(normalizedId);
+  }
+
+  Future<CommunityPost?> _findPostInFreshPage(String postId) async {
+    try {
+      final page = await fetchPostsPage(
+        forceRefresh: true,
+        fallbackToCacheOnError: true,
+        limit: 50,
+      );
+      for (final post in page.posts) {
+        if (post.id == postId) {
+          return post;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
   Future<void> createPost(String content, {String? imageUrl}) async {
     final ready = await AppStartupController.instance
         .ensureAuthenticatedSession();
@@ -299,6 +357,23 @@ class CommunityRepository {
         : (current.likes - (current.isLiked ? 1 : 0)).clamp(0, 1 << 30);
 
     _cachedPosts[idx] = current.copyWith(isLiked: isLiked, likes: nextLikes);
+
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(
+        _storageKey,
+        json.encode(_cachedPosts.map((e) => e.toJson()).toList()),
+      );
+    });
+  }
+
+  void _upsertCachedPost(CommunityPost post) {
+    final idx = _cachedPosts.indexWhere((p) => p.id == post.id);
+    if (idx == -1) {
+      _cachedPosts.insert(0, post);
+    } else {
+      _cachedPosts[idx] = post;
+    }
+    _cachedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString(

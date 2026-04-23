@@ -271,6 +271,51 @@ class NewsFetcher {
     return [];
   }
 
+  Future<NewsView?> fetchNewsById(int newsId) async {
+    if (newsId <= 0) return null;
+
+    try {
+      final cached = await getCachedNews();
+      for (final item in cached) {
+        if (item.id == newsId) {
+          return item;
+        }
+      }
+
+      final headers = await _authorizedHeaders();
+      final response = await http
+          .get(Uri.parse('$_baseUrl/news/$newsId'), headers: headers)
+          .timeout(timeout);
+
+      if (response.statusCode != 200) {
+        return null;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        return null;
+      }
+
+      return _parseNewsItem(decoded.cast<String, dynamic>());
+    } catch (e) {
+      if (e is StateError) {
+        rethrow;
+      }
+      _logError('Failed to fetch news by id=$newsId', e);
+      try {
+        final items = await fetchLatestNews(forceRefresh: true);
+        for (final item in items) {
+          if (item.id == newsId) {
+            return item;
+          }
+        }
+        return null;
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
   NewsView? _parseNewsItem(Map<String, dynamic> json) {
     try {
       final id = json['id'] as int? ?? 0;

@@ -64,6 +64,7 @@ dependencies:
   device_info_plus: ^12.3.0
   in_app_update: ^4.2.5
   cached_network_image: ^3.4.1
+  app_links: 6.4.1
 
 dev_dependencies:
   flutter_test:

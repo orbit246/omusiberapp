@@ -16,7 +16,7 @@ class ShareService {
         news.title,
         news.summary,
         news.publishedAtText,
-        _cleanUrl(news.detailUrl),
+        _akademizUrl('news', news.id.toString()),
       ]),
     );
   }
@@ -31,7 +31,7 @@ class ShareService {
         if (event.eventDate != null) _formatDateTime(event.eventDate!),
         event.location,
         event.description,
-        _cleanUrl(event.redirectTo),
+        _akademizUrl('events', event.id),
       ]),
     );
   }
@@ -48,7 +48,7 @@ class ShareService {
         post.authorName,
         _formatDateTime(post.createdAt),
         post.content,
-        _cleanUrl(post.imageUrl),
+        _akademizUrl('community', post.id),
       ]),
     );
   }
@@ -116,10 +116,8 @@ class ShareService {
         .join('\n\n');
   }
 
-  static String? _cleanUrl(String? url) {
-    final trimmed = url?.trim();
-    if (trimmed == null || trimmed.isEmpty) return null;
-    return trimmed;
+  static String _akademizUrl(String category, String id) {
+    return 'https://www.nortixlabs.com/akademiz/$category/${Uri.encodeComponent(id)}';
   }
 
   static String _stripMarkdown(String value) {

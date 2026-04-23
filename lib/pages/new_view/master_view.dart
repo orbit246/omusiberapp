@@ -9,6 +9,7 @@ import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/pages/new_view/events_tab_view.dart';
 import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
+import 'package:omusiber/pages/new_view/notes_placeholder_page.dart';
 import 'package:omusiber/pages/new_view/notes_tab_view.dart';
 import 'package:omusiber/pages/new_view/community_tab_view.dart';
 import 'package:omusiber/backend/update_service.dart';
@@ -283,7 +284,13 @@ class _MasterViewState extends State<MasterView>
     setState(() => _unreadNotifications = false);
   }
 
-  void _openNotesPage() {
+  void _openGradesPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const NotesPlaceholderPage()),
+    );
+  }
+
+  void _openMyNotesPage() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const NotesTabView(showAppBar: true),
@@ -293,6 +300,14 @@ class _MasterViewState extends State<MasterView>
 
   Widget _buildBadgedTab({required String text, required int index}) {
     return Tab(text: text);
+  }
+
+  Color _tabAccentColor(int index, ColorScheme colorScheme) {
+    return switch (index) {
+      1 => const Color(0xFFE5484D),
+      2 => const Color(0xFFF97316),
+      _ => colorScheme.primary,
+    };
   }
 
   Widget _buildDrawerHeader(
@@ -350,6 +365,15 @@ class _MasterViewState extends State<MasterView>
               _openAcademicCalendarSheet();
             },
           ),
+          _buildDrawerTile(
+            context: context,
+            icon: Icons.edit_note_rounded,
+            title: "Notlar",
+            onTap: () {
+              Navigator.of(context).pop();
+              _openGradesPage();
+            },
+          ),
           _buildDrawerDivider(),
           _buildDrawerSectionTitle(context, "Kampüs"),
           _buildDrawerTile(
@@ -369,7 +393,7 @@ class _MasterViewState extends State<MasterView>
             title: "Notlarım",
             onTap: () {
               Navigator.of(context).pop();
-              _openNotesPage();
+              _openMyNotesPage();
             },
           ),
         ],
@@ -470,6 +494,7 @@ class _MasterViewState extends State<MasterView>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final tabAccentColor = _tabAccentColor(_tabController.index, colorScheme);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -565,9 +590,9 @@ class _MasterViewState extends State<MasterView>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(72),
+          preferredSize: const Size.fromHeight(71),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 3, 12, 12),
             child: Container(
               height: 54,
               padding: const EdgeInsets.all(6),
@@ -584,13 +609,13 @@ class _MasterViewState extends State<MasterView>
                 dividerColor: Colors.transparent,
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicator: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  color: tabAccentColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.16),
+                    color: tabAccentColor.withValues(alpha: 0.24),
                   ),
                 ),
-                labelColor: colorScheme.primary,
+                labelColor: tabAccentColor,
                 unselectedLabelColor: colorScheme.onSurfaceVariant,
                 labelStyle: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
@@ -601,7 +626,7 @@ class _MasterViewState extends State<MasterView>
                 labelPadding: EdgeInsets.zero,
                 splashBorderRadius: BorderRadius.circular(18),
                 overlayColor: WidgetStatePropertyAll(
-                  colorScheme.primary.withValues(alpha: 0.06),
+                  tabAccentColor.withValues(alpha: 0.06),
                 ),
                 onTap: (index) => _handleTabSelection(index),
                 tabs: [
@@ -617,7 +642,7 @@ class _MasterViewState extends State<MasterView>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const _MasterBackgroundBlobs(),
+          _MasterBackgroundBlobs(accentColor: tabAccentColor),
           IndexedStack(
             index: _tabController.index,
             children: List<Widget>.generate(3, (index) {
@@ -631,7 +656,9 @@ class _MasterViewState extends State<MasterView>
 }
 
 class _MasterBackgroundBlobs extends StatelessWidget {
-  const _MasterBackgroundBlobs();
+  const _MasterBackgroundBlobs({required this.accentColor});
+
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -640,9 +667,9 @@ class _MasterBackgroundBlobs extends StatelessWidget {
     return RepaintBoundary(
       child: CustomPaint(
         painter: _MasterBackgroundBlobPainter(
-          primary: colorScheme.primary,
-          secondary: colorScheme.secondary,
-          tertiary: colorScheme.tertiary,
+          primary: accentColor,
+          secondary: Color.lerp(accentColor, colorScheme.secondary, 0.35)!,
+          tertiary: Color.lerp(accentColor, colorScheme.tertiary, 0.45)!,
         ),
         child: const SizedBox.expand(),
       ),

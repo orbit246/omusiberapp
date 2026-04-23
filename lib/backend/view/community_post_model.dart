@@ -8,6 +8,11 @@ class CommunityPost {
   final int likes;
   final bool isLiked;
   final PollModel? poll; // Added Poll
+  final String category;
+  final bool isPinned;
+  final int? accentColor;
+  final Map<String, int> reactionCounts;
+  final Set<String> selectedReactions;
 
   CommunityPost({
     required this.id,
@@ -19,6 +24,11 @@ class CommunityPost {
     this.likes = 0,
     this.isLiked = false,
     this.poll,
+    this.category = 'general',
+    this.isPinned = false,
+    this.accentColor,
+    this.reactionCounts = const {},
+    this.selectedReactions = const {},
   });
 
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
@@ -34,6 +44,15 @@ class CommunityPost {
       likes: json['likes'] ?? 0,
       isLiked: json['isLiked'] ?? false,
       poll: json['poll'] != null ? PollModel.fromJson(json['poll']) : null,
+      category: json['category']?.toString() ?? 'general',
+      isPinned: json['isPinned'] == true || json['pinned'] == true,
+      accentColor: _parseAccentColor(
+        json['accentColor'] ?? json['borderColor'],
+      ),
+      reactionCounts: _parseReactionCounts(json['reactionCounts']),
+      selectedReactions: _parseSelectedReactions(
+        json['selectedReactions'] ?? json['userReactions'],
+      ),
     );
   }
 
@@ -47,6 +66,11 @@ class CommunityPost {
     'likes': likes,
     'isLiked': isLiked,
     'poll': poll?.toJson(),
+    'category': category,
+    'isPinned': isPinned,
+    'accentColor': accentColor,
+    'reactionCounts': reactionCounts,
+    'selectedReactions': selectedReactions.toList(),
   };
 
   CommunityPost copyWith({
@@ -59,6 +83,11 @@ class CommunityPost {
     int? likes,
     bool? isLiked,
     PollModel? poll,
+    String? category,
+    bool? isPinned,
+    int? accentColor,
+    Map<String, int>? reactionCounts,
+    Set<String>? selectedReactions,
   }) {
     return CommunityPost(
       id: id ?? this.id,
@@ -70,8 +99,38 @@ class CommunityPost {
       likes: likes ?? this.likes,
       isLiked: isLiked ?? this.isLiked,
       poll: poll ?? this.poll,
+      category: category ?? this.category,
+      isPinned: isPinned ?? this.isPinned,
+      accentColor: accentColor ?? this.accentColor,
+      reactionCounts: reactionCounts ?? this.reactionCounts,
+      selectedReactions: selectedReactions ?? this.selectedReactions,
     );
   }
+}
+
+Map<String, int> _parseReactionCounts(dynamic value) {
+  if (value is! Map) return const {};
+  return value.map((key, rawCount) {
+    final count = rawCount is num
+        ? rawCount.toInt()
+        : int.tryParse(rawCount?.toString() ?? '') ?? 0;
+    return MapEntry(key.toString(), count);
+  });
+}
+
+Set<String> _parseSelectedReactions(dynamic value) {
+  if (value is List) return value.map((item) => item.toString()).toSet();
+  if (value is Set) return value.map((item) => item.toString()).toSet();
+  return const {};
+}
+
+int? _parseAccentColor(dynamic value) {
+  if (value is int) return value;
+  final raw = value?.toString().trim();
+  if (raw == null || raw.isEmpty) return null;
+  final normalized = raw.replaceFirst('#', '').replaceFirst('0x', '');
+  final withAlpha = normalized.length == 6 ? 'FF$normalized' : normalized;
+  return int.tryParse(withAlpha, radix: 16);
 }
 
 class PollModel {
@@ -134,7 +193,7 @@ class PollOption {
   final String text;
   final int votes;
 
-  PollOption({required this.id, required this.text, this.votes = 0});
+  const PollOption({required this.id, required this.text, this.votes = 0});
 
   factory PollOption.fromJson(Map<String, dynamic> json) {
     return PollOption(
