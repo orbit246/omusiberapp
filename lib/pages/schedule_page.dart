@@ -358,15 +358,6 @@ class _SchedulePageState extends State<SchedulePage> {
                     color: theme.textTheme.bodyLarge?.color,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Cihaz saatine göre güncellenir.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: AppColors.coolGray,
-                    height: 1.35,
-                  ),
-                ),
                 const SizedBox(height: 12),
                 _buildLessonMomentTile(
                   context,

@@ -290,6 +290,17 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
+  void _openAttendancePage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const NotesPlaceholderPage(
+          title: 'Devamsızlıklar',
+          icon: Icons.fact_check_outlined,
+        ),
+      ),
+    );
+  }
+
   void _openMyNotesPage() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -382,6 +393,15 @@ class _MasterViewState extends State<MasterView>
             onTap: () {
               Navigator.of(context).pop();
               _openGradesPage();
+            },
+          ),
+          _buildDrawerTile(
+            context: context,
+            icon: Icons.fact_check_outlined,
+            title: "Devamsızlıklar",
+            onTap: () {
+              Navigator.of(context).pop();
+              _openAttendancePage();
             },
           ),
           _buildDrawerSectionTitle(context, "Kampüs"),

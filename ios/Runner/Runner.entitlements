@@ -8,10 +8,5 @@
 	<array>
 		<string>Default</string>
 	</array>
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:www.nortixlabs.com</string>
-		<string>applinks:nortixlabs.com</string>
-	</array>
 </dict>
 </plist>

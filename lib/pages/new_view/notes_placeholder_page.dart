@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class NotesPlaceholderPage extends StatelessWidget {
-  const NotesPlaceholderPage({super.key});
+  const NotesPlaceholderPage({
+    super.key,
+    this.title = 'Notlar',
+    this.icon = Icons.edit_note_rounded,
+  });
+
+  final String title;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +20,7 @@ class NotesPlaceholderPage extends StatelessWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Notlar',
+          title,
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -27,7 +34,7 @@ class NotesPlaceholderPage extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.edit_note_rounded,
+                icon,
                 size: 72,
                 color: colorScheme.primary,
               ),
