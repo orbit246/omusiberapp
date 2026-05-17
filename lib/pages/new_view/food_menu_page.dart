@@ -46,6 +46,48 @@ class _FoodMenuPageState extends State<FoodMenuPage> {
               ),
             ],
           ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: colorScheme.primary.withOpacity(0.18),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Bu veriler tahmidir, yemek programı günlük olarak değişiklikler gösterebilir detaylı bilgi için fakülte sorumlunuz ile görüşün.",
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           FutureBuilder<List<FoodMenu>>(
             future: _menuFuture,
             builder: (context, snapshot) {

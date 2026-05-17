@@ -26,6 +26,7 @@ class AppStartupController extends ChangeNotifier {
   Object? _lastError;
   Future<void>? _startFuture;
   bool _firebaseReady = false;
+  bool _needsAgreement = false;
   bool _backgroundMessageHandlerRegistrationScheduled = false;
   bool _backgroundMessageHandlerRegistered = false;
 
@@ -33,7 +34,7 @@ class AppStartupController extends ChangeNotifier {
   Object? get lastError => _lastError;
   bool get isFirebaseReady => _firebaseReady;
   bool get isBooting => _stage == AppStartupStage.booting;
-  bool get needsAgreement => _stage == AppStartupStage.waitingForAgreement;
+  bool get needsAgreement => _needsAgreement;
   bool get canUseAuthenticatedApis => _stage == AppStartupStage.ready;
   bool get isInStartupWarmup =>
       _startupStopwatch.elapsed < _startupWarmupWindow;
@@ -67,7 +68,7 @@ class AppStartupController extends ChangeNotifier {
   Future<bool> ensureAuthenticatedSession() async {
     await start();
 
-    if (!_firebaseReady || needsAgreement) {
+    if (!_firebaseReady) {
       return false;
     }
 
@@ -102,6 +103,7 @@ class AppStartupController extends ChangeNotifier {
     );
 
     _lastError = null;
+    _needsAgreement = false;
     _stage = AppStartupStage.ready;
     notifyListeners();
   }
@@ -119,6 +121,7 @@ class AppStartupController extends ChangeNotifier {
     StartupLogger.log('AppStartupController._performStartup() entered');
     _stage = AppStartupStage.booting;
     _lastError = null;
+    _needsAgreement = false;
     notifyListeners();
 
     try {
@@ -129,6 +132,12 @@ class AppStartupController extends ChangeNotifier {
       });
       _firebaseReady = true;
       StartupLogger.log('Firebase initialized');
+      await StartupLogger.logAsync(
+        'SimpleNotifications.captureLaunchIntent()',
+        () {
+          return SimpleNotifications.captureLaunchIntent();
+        },
+      );
       _scheduleBackgroundMessageHandlerRegistration();
 
       final currentUser = await StartupLogger.logAsync(
@@ -138,32 +147,27 @@ class AppStartupController extends ChangeNotifier {
       StartupLogger.log(
         'FirebaseAuth currentUser result=${currentUser == null ? 'null' : currentUser.uid}',
       );
-      if (currentUser != null) {
-        StartupLogger.log(
-          'Existing Firebase user found; marking startup ready',
-        );
-        _stage = AppStartupStage.ready;
-        notifyListeners();
-        return;
-      }
 
       final hasAccepted = await StartupLogger.logAsync(
         'SharedPreferences agreement acceptance check',
         _hasStoredAgreementAcceptance,
       );
       StartupLogger.log('Agreement accepted=$hasAccepted');
-      if (!hasAccepted) {
+      _needsAgreement = !hasAccepted;
+      if (_needsAgreement) {
         StartupLogger.log(
-          'No stored agreement acceptance found; waiting for agreement flow',
+          'No stored agreement acceptance found; continuing startup and showing agreement banner',
         );
-        _stage = AppStartupStage.waitingForAgreement;
-        notifyListeners();
-        return;
+      } else {
+        StartupLogger.log('Stored agreement acceptance found');
       }
 
-      StartupLogger.log(
-        'Stored agreement acceptance found; marking startup ready',
-      );
+      if (currentUser != null) {
+        StartupLogger.log(
+          'Existing Firebase user found; marking startup ready',
+        );
+      }
+
       _stage = AppStartupStage.ready;
       notifyListeners();
     } catch (error) {

@@ -125,7 +125,7 @@ class CommunityTabController extends ChangeNotifier {
     }
   }
 
-  void toggleReaction(CommunityPost post, String emoji) {
+  Future<void> toggleReaction(CommunityPost post, String emoji) async {
     final index = _posts.indexWhere((p) => p.id == post.id);
     if (index == -1) return;
 
@@ -153,6 +153,36 @@ class CommunityTabController extends ChangeNotifier {
         selectedReactions: selectedReactions,
       );
     notifyListeners();
+
+    try {
+      final serverState = await _repository.setPostReaction(
+        postId: post.id,
+        emoji: emoji,
+        isSelected: !wasSelected,
+      );
+      final refreshedIndex = _posts.indexWhere((p) => p.id == post.id);
+      if (refreshedIndex == -1) return;
+
+      final refreshed = _posts[refreshedIndex];
+      _posts = [..._posts]
+        ..[refreshedIndex] = refreshed.copyWith(
+          reactionCounts: serverState.reactionCounts,
+          selectedReactions: serverState.selectedReactions,
+        );
+      notifyListeners();
+    } catch (_) {
+      final rollbackIndex = _posts.indexWhere((p) => p.id == post.id);
+      if (rollbackIndex != -1) {
+        _posts = [..._posts]..[rollbackIndex] = current;
+        _repository.updatePostReactionsInCache(
+          postId: current.id,
+          reactionCounts: current.reactionCounts,
+          selectedReactions: current.selectedReactions,
+        );
+        notifyListeners();
+      }
+      rethrow;
+    }
   }
 
   Future<void> toggleLike(CommunityPost post) async {
@@ -198,33 +228,33 @@ class CommunityTabController extends ChangeNotifier {
       id: 'showcase-pinned-finals',
       authorName: 'OMU Siber Topluluk',
       content:
-          '**Final haftasi calisma noktasi onerileri**\n\nKutuphane dolarsa sessiz sinif, lab ve kampus ici sakin yer onerilerini bu baslikta toplayalim.',
+          '**Final haftası çalışma noktası önerileri**\n\nKütüphane dolarsa sessiz sınıf, lab ve kampüs içi sakin yer önerilerini bu başlıkta toplayalım.',
       createdAt: _showcaseNow.subtract(const Duration(minutes: 18)),
       likes: 42,
       category: 'announcement',
       isPinned: true,
       accentColor: 0xFF2563EB,
-      reactionCounts: const {'🔥': 18, '👏': 9, '👀': 6},
-      selectedReactions: const {'🔥'},
+      reactionCounts: const {'\u{1F525}': 18, '\u{1F44F}': 9, '\u{1F440}': 6},
+      selectedReactions: const {'\u{1F525}'},
     ),
     CommunityPost(
       id: 'showcase-poll-food',
-      authorName: 'Kampus Nabzi',
-      content: 'Bugunun yemegi icin hizli karar:',
+      authorName: 'Kampüs Nabzı',
+      content: 'Bugünün yemeği için hızlı karar:',
       createdAt: _showcaseNow.subtract(const Duration(hours: 2)),
       likes: 17,
       category: 'poll',
       accentColor: 0xFFF97316,
-      reactionCounts: const {'😂': 14, '👍': 8},
+      reactionCounts: const {'\u{1F602}': 14, '\u{1F44D}': 8},
       poll: PollModel(
         id: 'showcase-poll-food-options',
-        question: 'Bugun yemekhane denenir mi?',
+        question: 'Bugün yemekhane denenir mi?',
         userVotedOptionId: 'option-yes',
         closesAt: _showcaseNow.add(const Duration(hours: 7)),
         options: const [
           PollOption(id: 'option-yes', text: 'Gidilir', votes: 58),
-          PollOption(id: 'option-mid', text: 'Kararsizim', votes: 24),
-          PollOption(id: 'option-no', text: 'Kantin daha guvenli', votes: 31),
+          PollOption(id: 'option-mid', text: 'Kararsızım', votes: 24),
+          PollOption(id: 'option-no', text: 'Kantin daha güvenli', votes: 31),
         ],
       ),
     ),
@@ -232,23 +262,26 @@ class CommunityTabController extends ChangeNotifier {
       id: 'showcase-question',
       authorName: 'Anonim',
       content:
-          'Kampus icinde priz bulma sansi en yuksek yer neresi? Ozellikle ogleden sonra.',
+          'Kampüs içinde priz bulma şansı en yüksek yer neresi? Özellikle öğleden sonra.',
       createdAt: _showcaseNow.subtract(const Duration(hours: 5)),
       likes: 9,
       category: 'question',
       accentColor: 0xFF10B981,
-      reactionCounts: const {'👀': 11, '👍': 5},
+      reactionCounts: const {'\u{1F440}': 11, '\u{1F44D}': 5},
     ),
     CommunityPost(
       id: 'showcase-campus',
-      authorName: 'Bir ogrenci',
+      authorName: 'Bir öğrenci',
       content:
-          'Bugun kutuphane giris kati normalden sakin. Boslugu olan degerlendirsin.',
+          'Bugün kütüphane giriş katı normalden sakin. Boşluğu olan değerlendirsin.',
       createdAt: _showcaseNow.subtract(const Duration(days: 1, hours: 3)),
       likes: 23,
       category: 'campus',
       accentColor: 0xFFA855F7,
-      reactionCounts: const {'❤️': 12, '👏': 4},
+      reactionCounts: const {
+        '\u{2764}\u{FE0F}': 12,
+        '\u{1F44F}': 4,
+      },
     ),
   ];
 

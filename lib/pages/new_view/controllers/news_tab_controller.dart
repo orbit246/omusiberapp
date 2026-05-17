@@ -70,6 +70,11 @@ class NewsTabController extends ChangeNotifier {
   bool get isFacultyNewsLoading => _isFacultyNewsLoading;
   String? get errorMessage => _errorMessage;
   int get visibleNewsCount => _visibleNewsCount;
+  bool get hasCachedContent =>
+      _articles.isNotEmpty ||
+      (_summaryWidgets != null && _summaryWidgets!.sections.isNotEmpty);
+  bool get shouldShowColdStartShimmer =>
+      _initialCacheLoadComplete && !hasCachedContent && _isNewsLoading;
   bool get hasMoreVisibleNews =>
       visibleFilteredArticles.length < filteredArticles.length;
 

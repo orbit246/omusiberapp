@@ -33,24 +33,26 @@ class CommunityPost {
 
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
     return CommunityPost(
-      id: json['id']?.toString() ?? '',
-      authorName: json['authorName'] ?? 'Anonim',
-      authorImage: json['authorImage'],
-      content: json['content'] ?? '',
-      imageUrl: json['imageUrl'],
+      id: _asString(json['id']),
+      authorName: _asString(json['authorName'], fallback: 'Anonim'),
+      authorImage: _asNullableString(json['authorImage']),
+      content: _asString(json['content']),
+      imageUrl: _asNullableString(json['imageUrl']),
       createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+          ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      likes: json['likes'] ?? 0,
-      isLiked: json['isLiked'] ?? false,
-      poll: json['poll'] != null ? PollModel.fromJson(json['poll']) : null,
-      category: json['category']?.toString() ?? 'general',
+      likes: _asInt(json['likes']),
+      isLiked: _asBool(json['isLiked']),
+      poll: json['poll'] is Map
+          ? PollModel.fromJson(Map<String, dynamic>.from(json['poll'] as Map))
+          : null,
+      category: _asString(json['category'], fallback: 'general'),
       isPinned: json['isPinned'] == true || json['pinned'] == true,
       accentColor: _parseAccentColor(
         json['accentColor'] ?? json['borderColor'],
       ),
-      reactionCounts: _parseReactionCounts(json['reactionCounts']),
-      selectedReactions: _parseSelectedReactions(
+      reactionCounts: parseReactionCounts(json['reactionCounts']),
+      selectedReactions: parseSelectedReactions(
         json['selectedReactions'] ?? json['userReactions'],
       ),
     );
@@ -108,7 +110,7 @@ class CommunityPost {
   }
 }
 
-Map<String, int> _parseReactionCounts(dynamic value) {
+Map<String, int> parseReactionCounts(dynamic value) {
   if (value is! Map) return const {};
   return value.map((key, rawCount) {
     final count = rawCount is num
@@ -118,7 +120,7 @@ Map<String, int> _parseReactionCounts(dynamic value) {
   });
 }
 
-Set<String> _parseSelectedReactions(dynamic value) {
+Set<String> parseSelectedReactions(dynamic value) {
   if (value is List) return value.map((item) => item.toString()).toSet();
   if (value is Set) return value.map((item) => item.toString()).toSet();
   return const {};
@@ -138,7 +140,7 @@ class PollModel {
   final String question;
   final List<PollOption> options;
   final String? userVotedOptionId;
-  final DateTime closesAt;
+  final DateTime? closesAt;
   final bool isClosed;
 
   PollModel({
@@ -146,31 +148,35 @@ class PollModel {
     required this.question,
     required this.options,
     this.userVotedOptionId,
-    required this.closesAt,
+    this.closesAt,
     this.isClosed = false,
   });
 
   int get totalVotes => options.fold(0, (sum, opt) => sum + opt.votes);
+  bool get hasDeadline => closesAt != null;
+  bool get isExpired =>
+      isClosed || (closesAt != null && DateTime.now().isAfter(closesAt!));
 
   factory PollModel.fromJson(Map<String, dynamic> json) {
-    final DateTime parsedClosesAt =
-        DateTime.tryParse(
-          (json['closesAt'] ?? json['expiresAt'])?.toString() ?? '',
-        ) ??
-        DateTime.now().add(const Duration(days: 7));
+    final rawClosesAt = json['closesAt'] ?? json['expiresAt'];
+    final DateTime? parsedClosesAt = rawClosesAt == null
+        ? null
+        : DateTime.tryParse(rawClosesAt.toString());
 
     final bool parsedIsClosed =
-        (json['isClosed'] as bool?) ?? DateTime.now().isAfter(parsedClosesAt);
+        (json['isClosed'] as bool?) ??
+        (parsedClosesAt != null && DateTime.now().isAfter(parsedClosesAt));
 
     return PollModel(
-      id: json['id']?.toString() ?? '',
-      question: json['question'] ?? '',
+      id: _asString(json['id']),
+      question: _asString(json['question']),
       options:
           (json['options'] as List<dynamic>?)
-              ?.map((e) => PollOption.fromJson(Map<String, dynamic>.from(e)))
+              ?.whereType<Map>()
+              .map((e) => PollOption.fromJson(Map<String, dynamic>.from(e)))
               .toList() ??
           [],
-      userVotedOptionId: json['userVotedOptionId'],
+      userVotedOptionId: _asNullableString(json['userVotedOptionId']),
       closesAt: parsedClosesAt,
       isClosed: parsedIsClosed,
     );
@@ -181,10 +187,10 @@ class PollModel {
     'question': question,
     'options': options.map((e) => e.toJson()).toList(),
     'userVotedOptionId': userVotedOptionId,
-    'closesAt': closesAt.toIso8601String(),
+    'closesAt': closesAt?.toIso8601String(),
     'isClosed': isClosed,
     // Backward compatibility for old cached shape
-    'expiresAt': closesAt.toIso8601String(),
+    'expiresAt': closesAt?.toIso8601String(),
   };
 }
 
@@ -197,13 +203,35 @@ class PollOption {
 
   factory PollOption.fromJson(Map<String, dynamic> json) {
     return PollOption(
-      id: json['id']?.toString() ?? '',
-      text: json['text'] ?? '',
-      votes: (json['votes'] is num)
-          ? (json['votes'] as num).toInt()
-          : int.tryParse(json['votes']?.toString() ?? '') ?? 0,
+      id: _asString(json['id']),
+      text: _asString(json['text']),
+      votes: _asInt(json['votes']),
     );
   }
 
   Map<String, dynamic> toJson() => {'id': id, 'text': text, 'votes': votes};
+}
+
+String _asString(dynamic value, {String fallback = ''}) {
+  final normalized = _asNullableString(value);
+  return normalized == null || normalized.isEmpty ? fallback : normalized;
+}
+
+String? _asNullableString(dynamic value) {
+  if (value == null) return null;
+  final normalized = value.toString().trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+int _asInt(dynamic value, {int fallback = 0}) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? fallback;
+}
+
+bool _asBool(dynamic value, {bool fallback = false}) {
+  if (value is bool) return value;
+  final normalized = value?.toString().trim().toLowerCase();
+  if (normalized == 'true' || normalized == '1') return true;
+  if (normalized == 'false' || normalized == '0') return false;
+  return fallback;
 }

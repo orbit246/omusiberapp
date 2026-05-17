@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/notifications/notification_navigation_intent.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/backend/startup_logger.dart';
@@ -43,33 +44,37 @@ class _MasterViewState extends State<MasterView>
   final TabBadgeService _badgeService = TabBadgeService();
   final AppStartupController _startupController = AppStartupController.instance;
   static const Duration _notificationsInitDelay = Duration(seconds: 15);
-  static const Duration _permissionReminderDelay = Duration(seconds: 10);
   static const Duration _updateCheckDelay = Duration(seconds: 12);
   static const Duration _updateCheckScheduleDelay = Duration(seconds: 10);
   bool _notificationsInitialized = false;
   bool _notificationsInitScheduled = false;
   bool _updateCheckScheduled = false;
   Timer? _notificationsInitTimer;
-  Timer? _permissionReminderStartTimer;
-  Timer? _permissionReminderTimer;
   Timer? _updateCheckStartTimer;
   Timer? _updateCheckTimer;
+  StreamSubscription<int>? _notificationNavigationSubscription;
 
   @override
   void initState() {
     super.initState();
+    final launchTabIndex = NotificationNavigationIntentService.instance
+        .consumePendingTabIndex();
+    final initialTabIndex = launchTabIndex ?? widget.initialTabIndex;
     StartupLogger.log(
-      'MasterView.initState() initialTabIndex=${widget.initialTabIndex}',
+      'MasterView.initState() initialTabIndex=$initialTabIndex',
     );
-    _appBarTitle = _titleForIndex(widget.initialTabIndex);
+    _appBarTitle = _titleForIndex(initialTabIndex);
     _tabController = TabController(
       length: 3,
       vsync: this,
-      initialIndex: widget.initialTabIndex,
+      initialIndex: initialTabIndex,
     );
-    _tabBodies[widget.initialTabIndex] = _buildTabBodyForIndex(
-      widget.initialTabIndex,
-    );
+    _tabBodies[initialTabIndex] = _buildTabBodyForIndex(initialTabIndex);
+
+    _notificationNavigationSubscription = NotificationNavigationIntentService
+        .instance
+        .tabIndexStream
+        .listen(_openTabFromNotification);
 
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -82,11 +87,11 @@ class _MasterViewState extends State<MasterView>
       if (!mounted) {
         return;
       }
-      _permissionReminderStartTimer?.cancel();
-      _permissionReminderStartTimer = Timer(_permissionReminderDelay, () {
-        if (!mounted) return;
-        _startPermissionReminder();
-      });
+      final pendingTabIndex = NotificationNavigationIntentService.instance
+          .consumePendingTabIndex();
+      if (pendingTabIndex != null) {
+        _openTabFromNotification(pendingTabIndex);
+      }
       _handleStartupChanged();
       _scheduleUpdateCheckAfterStartupBreath();
     });
@@ -143,51 +148,6 @@ class _MasterViewState extends State<MasterView>
     });
   }
 
-  void _startPermissionReminder() {
-    _permissionReminderTimer?.cancel();
-    _permissionReminderTimer = Timer(const Duration(seconds: 30), () async {
-      if (!mounted) return;
-      final hasPermission = await SimpleNotifications().checkPermission();
-      if (!hasPermission && mounted) {
-        _showPermissionBanner();
-      }
-    });
-  }
-
-  void _showPermissionBanner() {
-    ScaffoldMessenger.of(context).showMaterialBanner(
-      MaterialBanner(
-        elevation: 1,
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        leading: Icon(
-          Icons.notifications_active_outlined,
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
-        ),
-        content: Text(
-          "Önemli duyurulardan haberdar olmak için bildirimleri açın.",
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-            },
-            child: const Text("BİRAZDAN"),
-          ),
-          TextButton(
-            onPressed: () async {
-              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-              await SimpleNotifications().requestPermission();
-            },
-            child: const Text("ŞİMDİ AÇ"),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _titleForIndex(int index) {
     switch (index) {
       case 1:
@@ -219,6 +179,20 @@ class _MasterViewState extends State<MasterView>
         _unreadStates[index] = false;
       }
     });
+  }
+
+  void _openTabFromNotification(int index) {
+    if (!mounted || index < 0 || index >= _tabController.length) {
+      return;
+    }
+
+    if (_tabController.index == index) {
+      _handleTabSelection(index);
+      return;
+    }
+
+    _tabBodies[index] ??= _buildTabBodyForIndex(index);
+    _tabController.animateTo(index);
   }
 
   Widget _buildTabBodyForIndex(int index) {
@@ -526,10 +500,9 @@ class _MasterViewState extends State<MasterView>
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
     _notificationsInitTimer?.cancel();
-    _permissionReminderStartTimer?.cancel();
-    _permissionReminderTimer?.cancel();
     _updateCheckStartTimer?.cancel();
     _updateCheckTimer?.cancel();
+    unawaited(_notificationNavigationSubscription?.cancel());
     _tabController.dispose();
     super.dispose();
   }

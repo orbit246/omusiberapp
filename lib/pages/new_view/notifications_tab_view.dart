@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
-import 'package:omusiber/backend/mock_notifications.dart';
 
 class NotificationsTabView extends StatefulWidget {
   const NotificationsTabView({super.key});
@@ -41,8 +40,7 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
           return Center(child: Text("Hata: ${snapshot.error}"));
         }
 
-        final fetched = snapshot.data ?? [];
-        final notifications = [...mockNotifications, ...fetched];
+        final notifications = snapshot.data ?? [];
 
         if (notifications.isEmpty) {
           return RefreshIndicator(
@@ -143,8 +141,8 @@ class _NotificationsTabViewState extends State<NotificationsTabView> {
                   }, childCount: notifications.length),
                 ),
               ),
-              // --- FOOTER SECTION ---
 
+              // --- FOOTER SECTION ---
               const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
           ),

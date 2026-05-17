@@ -182,10 +182,8 @@ class _EventsTabViewState extends State<EventsTabView> {
           onRefresh: _controller.refresh,
           onScrollNotification: _handleScrollNotification,
           onBackToTop: _scrollToTop,
-          onBookmark: (event, isBookmarked) {
-            if (!isBookmarked) return;
-            unawaited(_controller.trackEventLike(event.id, isLiked: true));
-          },
+          onLike: (event, isLiked) =>
+              unawaited(_controller.toggleEventLike(event.id, isLiked)),
           onShare: (event) =>
               unawaited(ShareService.shareEvent(context, event)),
           onOpenEvent: (event) {
@@ -211,7 +209,7 @@ class EventsTabContent extends StatelessWidget {
     required this.onRefresh,
     required this.onScrollNotification,
     required this.onBackToTop,
-    required this.onBookmark,
+    required this.onLike,
     required this.onShare,
     required this.onOpenEvent,
   });
@@ -224,7 +222,7 @@ class EventsTabContent extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final ValueChanged<ScrollNotification> onScrollNotification;
   final VoidCallback onBackToTop;
-  final void Function(PostView event, bool isBookmarked) onBookmark;
+  final void Function(PostView event, bool isLiked) onLike;
   final ValueChanged<PostView> onShare;
   final ValueChanged<PostView> onOpenEvent;
 
@@ -283,8 +281,7 @@ class EventsTabContent extends StatelessWidget {
                         animate: shouldAnimate,
                         child: EventListCard(
                           event: event,
-                          onBookmark: (isBookmarked) =>
-                              onBookmark(event, isBookmarked),
+                          onLike: (isLiked) => onLike(event, isLiked),
                           onShare: () => onShare(event),
                           onOpen: () => onOpenEvent(event),
                         ),
@@ -313,13 +310,13 @@ class EventListCard extends StatelessWidget {
   const EventListCard({
     super.key,
     required this.event,
-    required this.onBookmark,
+    required this.onLike,
     required this.onShare,
     required this.onOpen,
   });
 
   final PostView event;
-  final ValueChanged<bool> onBookmark;
+  final ValueChanged<bool> onLike;
   final VoidCallback onShare;
   final VoidCallback onOpen;
 
@@ -352,11 +349,12 @@ class EventListCard extends StatelessWidget {
       tags: tags,
       publisher: event.publisher,
       isLiked: event.isLiked == true,
+      likeCount: event.likeCount,
       isJoined: event.isJoined == true,
       isPast: isPast,
       isRegistrationClosed: event.isRegistrationClosed,
       onJoin: onOpen,
-      onBookmark: onBookmark,
+      onLike: onLike,
       onShare: onShare,
     );
   }

@@ -7,10 +7,12 @@ import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/pages/news_item_page.dart';
 import 'package:omusiber/pages/new_view/controllers/news_tab_controller.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/pages/schedule_page.dart';
+import 'package:omusiber/widgets/home/notification_consent_addon.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
@@ -24,9 +26,15 @@ class NewsTabView extends StatefulWidget {
 class _NewsTabViewState extends State<NewsTabView> {
   static const int _imagePrefetchLimit = 2;
   late final NewsTabController _controller;
+  final SimpleNotifications _notifications = SimpleNotifications();
 
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
+  bool _notificationPermissionGranted = true;
+  bool _notificationPermissionLoaded = false;
+  bool _notificationRequestInFlight = false;
+  bool _notificationPromptHandled = false;
+  Timer? _notificationPromptTimer;
 
   MasterNewsWidgetsView? get _summaryWidgets => _controller.summaryWidgets;
   String get _selectedSortKey => _controller.selectedSortKey;
@@ -36,6 +44,8 @@ class _NewsTabViewState extends State<NewsTabView> {
   bool get _isSummaryLoading => _controller.isSummaryLoading;
   bool get _isNewsLoading => _controller.isNewsLoading;
   bool get _isFacultyNewsLoading => _controller.isFacultyNewsLoading;
+  bool get _shouldShowColdStartShimmer =>
+      _controller.shouldShowColdStartShimmer;
   String? get _errorMessage => _controller.errorMessage;
   List<NewsView> get _filteredArticles => _controller.filteredArticles;
   List<NewsView> get _visibleFilteredArticles =>
@@ -51,6 +61,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     _controller = NewsTabController()..addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(_refreshNotificationConsentState());
       unawaited(_controller.loadInitialData());
     });
   }
@@ -59,6 +70,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   void dispose() {
     _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
+    _notificationPromptTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -195,6 +207,142 @@ class _NewsTabViewState extends State<NewsTabView> {
         ),
         duration: const Duration(seconds: 2),
       ),
+    );
+  }
+
+  Future<void> _refreshNotificationConsentState({
+    bool schedulePrompt = false,
+  }) async {
+    final hasPermission = await _notifications.checkPermission();
+    if (!mounted) return;
+
+    setState(() {
+      _notificationPermissionGranted = hasPermission;
+      _notificationPermissionLoaded = true;
+    });
+
+    if (!hasPermission && schedulePrompt) {
+      unawaited(_scheduleNotificationPrompt());
+    }
+  }
+
+  Future<void> _scheduleNotificationPrompt() async {
+    if (_notificationPromptHandled) {
+      return;
+    }
+
+    final shouldShow = await _notifications.shouldShowEnablePrompt();
+    if (!mounted || !shouldShow) {
+      return;
+    }
+
+    _notificationPromptHandled = true;
+    _notificationPromptTimer?.cancel();
+    _notificationPromptTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted || _notificationPermissionGranted) {
+        return;
+      }
+      unawaited(_showNotificationPrompt());
+    });
+  }
+
+  Future<void> _showNotificationPrompt() async {
+    await _notifications.markEnablePromptSeen();
+    if (!mounted) return;
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final shouldEnable = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.notifications_active_outlined,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Bildirimleri etkinleştir',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Fakültene özel haberler, etkinlikler ve topluluk gönderileri yayına alındığında hızlıca haber al.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Daha sonra'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Etkinleştir'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldEnable == true) {
+      await _enableNotifications();
+    }
+  }
+
+  Future<void> _enableNotifications() async {
+    if (_notificationRequestInFlight) {
+      return;
+    }
+
+    setState(() => _notificationRequestInFlight = true);
+    final granted = await _notifications.requestPermission();
+    if (!mounted) return;
+
+    await _refreshNotificationConsentState();
+    if (!mounted) return;
+
+    setState(() => _notificationRequestInFlight = false);
+
+    _showToast(
+      granted
+          ? 'Bildirimler etkinleştirildi.'
+          : 'Bildirim izni verilmedi. Ayarlardan daha sonra açabilirsin.',
+      granted ? Icons.check_circle_rounded : Icons.info_rounded,
+      granted,
     );
   }
 
@@ -688,6 +836,13 @@ class _NewsTabViewState extends State<NewsTabView> {
         physics: const NeverScrollableScrollPhysics(),
         slivers: [
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          if (_notificationPermissionLoaded && !_notificationPermissionGranted)
+            SliverToBoxAdapter(
+              child: NotificationConsentAddon(
+                onEnable: _enableNotifications,
+                isLoading: _notificationRequestInFlight,
+              ),
+            ),
           SliverToBoxAdapter(child: _buildLoadingSection('Bugun')),
           const SliverToBoxAdapter(child: _LoadingSummaryCard()),
           const SliverToBoxAdapter(child: _LoadingSummaryCard()),
@@ -1098,7 +1253,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     final colorScheme = theme.colorScheme;
     final visibleArticles = _visibleFilteredArticles;
 
-    if (_isSummaryLoading && _isNewsLoading) {
+    if ((_isSummaryLoading && _isNewsLoading) || _shouldShowColdStartShimmer) {
       return _buildLoadingState(context);
     }
 
@@ -1146,6 +1301,14 @@ class _NewsTabViewState extends State<NewsTabView> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              if (_notificationPermissionLoaded &&
+                  !_notificationPermissionGranted)
+                SliverToBoxAdapter(
+                  child: NotificationConsentAddon(
+                    onEnable: _enableNotifications,
+                    isLoading: _notificationRequestInFlight,
+                  ),
+                ),
               ..._buildSummarySlivers(context),
               SliverToBoxAdapter(
                 child: _buildSectionLabel(

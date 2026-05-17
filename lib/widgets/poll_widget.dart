@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/backend/community_repository.dart';
+import 'package:omusiber/backend/view/community_post_model.dart';
 
 class PollWidget extends StatefulWidget {
   final String postId;
@@ -23,20 +23,27 @@ class _PollWidgetState extends State<PollWidget> {
     _poll = widget.poll;
   }
 
+  @override
+  void didUpdateWidget(covariant PollWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.postId != widget.postId || oldWidget.poll != widget.poll) {
+      _poll = widget.poll;
+    }
+  }
+
   Future<void> _handleVote(String optionId) async {
-    final isClosed = _poll.isClosed || DateTime.now().isAfter(_poll.closesAt);
+    final isClosed = _poll.isExpired;
     if (isClosed) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Bu oylama kapanmistir.")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bu oylama kapanmıştır.')),
+        );
       }
       return;
     }
 
     setState(() => _isVoting = true);
     try {
-      // Simulate repo call
       final updatedPoll = await CommunityRepository().votePoll(
         widget.postId,
         optionId,
@@ -52,7 +59,7 @@ class _PollWidgetState extends State<PollWidget> {
         setState(() => _isVoting = false);
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("Oylama hatası: $e")));
+        ).showSnackBar(SnackBar(content: Text('Oylama hatası: $e')));
       }
     }
   }
@@ -60,7 +67,7 @@ class _PollWidgetState extends State<PollWidget> {
   @override
   Widget build(BuildContext context) {
     final hasVoted = _poll.userVotedOptionId != null;
-    final isExpired = _poll.isClosed || DateTime.now().isAfter(_poll.closesAt);
+    final isExpired = _poll.isExpired;
     final totalVotes = _poll.totalVotes;
     final showResults = hasVoted || isExpired;
     final theme = Theme.of(context);
@@ -117,14 +124,22 @@ class _PollWidgetState extends State<PollWidget> {
   }
 
   String _buildFooterText(int totalVotes, bool isExpired, bool hasVoted) {
-    if (isExpired) return "$totalVotes oy • Süre doldu";
-    if (hasVoted) return "$totalVotes oy • Oylandı";
+    if (isExpired) return '$totalVotes oy • Süre doldu';
 
-    final diff = _poll.closesAt.difference(DateTime.now());
-    if (diff.inDays > 0) return "${diff.inDays} gün kaldı";
-    if (diff.inHours > 0) return "${diff.inHours} saat kaldı";
-    if (diff.inMinutes > 0) return "${diff.inMinutes} dakika kaldı";
-    return "Süre dolmak üzere";
+    final deadlineText = _buildDeadlineText();
+    if (hasVoted) return '$totalVotes oy • Oylandı • $deadlineText';
+    return '$totalVotes oy • $deadlineText';
+  }
+
+  String _buildDeadlineText() {
+    final closesAt = _poll.closesAt;
+    if (closesAt == null) return 'Süre sınırı yok';
+
+    final diff = closesAt.difference(DateTime.now());
+    if (diff.inDays > 0) return '${diff.inDays} gün kaldı';
+    if (diff.inHours > 0) return '${diff.inHours} saat kaldı';
+    if (diff.inMinutes > 0) return '${diff.inMinutes} dakika kaldı';
+    return 'Süre dolmak üzere';
   }
 
   Widget _buildVoteButton(PollOption option, Color optionColor) {

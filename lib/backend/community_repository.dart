@@ -15,6 +15,16 @@ class CommunityPostsPage {
   const CommunityPostsPage({required this.posts, this.nextCursor});
 }
 
+class CommunityReactionState {
+  final Map<String, int> reactionCounts;
+  final Set<String> selectedReactions;
+
+  const CommunityReactionState({
+    required this.reactionCounts,
+    required this.selectedReactions,
+  });
+}
+
 class CommunityRepository {
   static final CommunityRepository _instance = CommunityRepository._internal();
   factory CommunityRepository() => _instance;
@@ -347,6 +357,72 @@ class CommunityRepository {
     throw Exception('Failed to update like for post $postId: $lastError');
   }
 
+  Future<CommunityReactionState> setPostReaction({
+    required String postId,
+    required String emoji,
+    required bool isSelected,
+  }) async {
+    final headers = await _requiredAuthorizedHeaders(
+      includeJsonContentType: true,
+    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/posts/$postId/reactions'),
+          headers: headers,
+          body: jsonEncode({'emoji': emoji, 'selected': isSelected}),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+        'Failed to update reaction for post $postId: '
+        'HTTP ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Invalid reaction response for post $postId');
+    }
+
+    final reactionState = CommunityReactionState(
+      reactionCounts: parseReactionCounts(decoded['reactionCounts']),
+      selectedReactions: parseSelectedReactions(
+        decoded['selectedReactions'],
+      ),
+    );
+
+    updatePostReactionsInCache(
+      postId: postId,
+      reactionCounts: reactionState.reactionCounts,
+      selectedReactions: reactionState.selectedReactions,
+    );
+
+    return reactionState;
+  }
+
+  void updatePostReactionsInCache({
+    required String postId,
+    required Map<String, int> reactionCounts,
+    required Set<String> selectedReactions,
+  }) {
+    final idx = _cachedPosts.indexWhere((p) => p.id == postId);
+    if (idx == -1) return;
+
+    final current = _cachedPosts[idx];
+    _cachedPosts[idx] = current.copyWith(
+      reactionCounts: reactionCounts,
+      selectedReactions: selectedReactions,
+    );
+
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(
+        _storageKey,
+        json.encode(_cachedPosts.map((e) => e.toJson()).toList()),
+      );
+    });
+  }
+
   void _updateLikeInCache({required String postId, required bool isLiked}) {
     final idx = _cachedPosts.indexWhere((p) => p.id == postId);
     if (idx == -1) return;
@@ -384,53 +460,52 @@ class CommunityRepository {
   }
 
   Future<PollModel> votePoll(String postId, String optionId) async {
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 500));
+    final headers = await _requiredAuthorizedHeaders(
+      includeJsonContentType: true,
+    );
+    final int? optionIdAsInt = int.tryParse(optionId);
+    if (optionIdAsInt == null) {
+      throw Exception('Invalid optionId: $optionId');
+    }
 
-    // Find the post in cache (mock)
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/posts/$postId/poll/vote'),
+          headers: headers,
+          body: jsonEncode({'optionId': optionIdAsInt}),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode == 403) {
+      throw Exception('Bu oylama suresi dolmustur.');
+    }
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+        'Failed to vote poll for post $postId: '
+        'HTTP ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Invalid poll vote response for post $postId');
+    }
+
+    final updatedPoll = PollModel.fromJson(decoded);
     final postIndex = _cachedPosts.indexWhere((p) => p.id == postId);
     if (postIndex != -1) {
       final post = _cachedPosts[postIndex];
-      if (post.poll != null) {
-        final poll = post.poll!;
-        final isClosed = poll.isClosed || DateTime.now().isAfter(poll.closesAt);
-        if (isClosed) {
-          throw Exception("Bu oylama suresi dolmustur.");
-        }
-
-        // Update counts
-        final newOptions = poll.options.map((opt) {
-          if (opt.id == optionId) {
-            return PollOption(id: opt.id, text: opt.text, votes: opt.votes + 1);
-          }
-          return opt;
-        }).toList();
-
-        final newPoll = PollModel(
-          id: poll.id,
-          question: poll.question,
-          options: newOptions,
-          userVotedOptionId: optionId,
-          closesAt: poll.closesAt,
-          isClosed: false,
+      _cachedPosts[postIndex] = post.copyWith(poll: updatedPoll);
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString(
+          _storageKey,
+          json.encode(_cachedPosts.map((e) => e.toJson()).toList()),
         );
-
-        // Update post in cache
-        _cachedPosts[postIndex] = CommunityPost(
-          id: post.id,
-          authorName: post.authorName,
-          authorImage: post.authorImage,
-          content: post.content,
-          imageUrl: post.imageUrl,
-          createdAt: post.createdAt,
-          likes: post.likes,
-          isLiked: post.isLiked,
-          poll: newPoll,
-        );
-        return newPoll;
-      }
+      });
     }
-    throw Exception("Post or Poll not found");
+
+    return updatedPoll;
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
+import 'package:omusiber/widgets/shared/app_skeleton.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EventDetailsPage extends StatefulWidget {
@@ -27,15 +28,35 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   bool _isJoining = false;
   bool _hasJoined = false;
   PostView? _event;
+  int _likeCount = 0;
 
   @override
   void initState() {
     super.initState();
     _event = widget.event;
     _isFavorited = widget.event.isLiked;
+    _likeCount = widget.event.likeCount;
     _hasJoined = widget.event.isJoined;
     unawaited(_repo.trackEventView(widget.event.id));
     unawaited(_refreshEventStatus());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _precacheEventImages();
+    });
+  }
+
+  void _precacheEventImages() {
+    final event = _event ?? widget.event;
+    final images = event.imageLinks.isNotEmpty
+        ? event.imageLinks
+        : (event.thubnailUrl.isNotEmpty ? [event.thubnailUrl] : <String>[]);
+
+    for (final imagePath in images) {
+      if (!imagePath.startsWith('http')) {
+        continue;
+      }
+      unawaited(precacheImage(CachedNetworkImageProvider(imagePath), context));
+    }
   }
 
   Future<void> _handleJoinAction() async {
@@ -113,6 +134,39 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Baglanti acilamadi.')));
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    final event = _event ?? widget.event;
+    final previousLiked = _isFavorited;
+    final previousLikeCount = _likeCount;
+    final nextLiked = !previousLiked;
+    final nextLikeCount = nextLiked
+        ? previousLikeCount + (previousLiked ? 0 : 1)
+        : (previousLikeCount - (previousLiked ? 1 : 0)).clamp(0, 1 << 30);
+
+    setState(() {
+      _isFavorited = nextLiked;
+      _likeCount = nextLikeCount;
+      _event = event.copyWith(
+        isLiked: nextLiked,
+        metadata: {...event.metadata, 'likes': nextLikeCount},
+      );
+    });
+
+    try {
+      await _repo.trackEventLike(event.id, isLiked: nextLiked);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isFavorited = previousLiked;
+        _likeCount = previousLikeCount;
+        _event = event;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Begeni senkronize edilemedi.')),
+      );
     }
   }
 
@@ -198,7 +252,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                 leading: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                   ),
                   child: ClipOval(
@@ -253,7 +307,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withOpacity(0.4),
+                                Colors.black.withValues(alpha: 0.4),
                                 Colors.transparent,
                               ],
                             ),
@@ -278,7 +332,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 20,
                           offset: const Offset(0, -5),
                         ),
@@ -352,13 +406,13 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: colorScheme.primary
-                                                .withOpacity(0.08),
+                                                .withValues(alpha: 0.08),
                                             borderRadius: BorderRadius.circular(
                                               20,
                                             ),
                                             border: Border.all(
                                               color: colorScheme.primary
-                                                  .withOpacity(0.1),
+                                                  .withValues(alpha: 0.1),
                                             ),
                                           ),
                                           child: Text(
@@ -460,14 +514,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: (isDark ? Colors.black : Colors.white).withOpacity(
-                      0.8,
+                    color: (isDark ? Colors.black : Colors.white).withValues(
+                      alpha: 0.8,
                     ),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -483,32 +539,30 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         tooltip: 'Paylaş',
                       ),
                       const SizedBox(width: 4),
-                      // Bookmark
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _isFavorited = !_isFavorited;
-                          });
-                          if (_isFavorited) {
-                            unawaited(
-                              _repo.trackEventLike(event.id, isLiked: true),
-                            );
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                _isFavorited
-                                    ? 'Kaydedildi'
-                                    : 'Kayıt kaldırıldı',
-                              ),
-                              behavior: SnackBarBehavior.floating,
+                      // Like
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: _toggleLike,
+                            icon: Icon(
+                              _isFavorited
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
                             ),
-                          );
-                        },
-                        icon: Icon(
-                          _isFavorited ? Icons.bookmark : Icons.bookmark_border,
-                        ),
-                        color: _isFavorited ? colorScheme.primary : null,
+                            color: _isFavorited ? colorScheme.primary : null,
+                            tooltip: 'Begen',
+                          ),
+                          Text(
+                            '$_likeCount',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: _isFavorited
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                       if (hasExternalLink) ...[
                         const SizedBox(width: 4),
@@ -601,6 +655,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       _event = fresh;
       _hasJoined = fresh.isJoined;
       _isFavorited = fresh.isLiked;
+      _likeCount = fresh.likeCount;
     });
   }
 
@@ -618,7 +673,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, size: 22, color: colorScheme.primary),
@@ -653,27 +708,50 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   Widget _buildImage(String imagePath) {
     if (imagePath.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: imagePath,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        placeholder: (context, url) => Container(
-          color: Colors.grey.shade100,
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey.shade200,
-          child: const Center(
-            child: Icon(
-              Icons.image_not_supported,
-              size: 50,
-              color: Colors.grey,
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final mediaQuery = MediaQuery.of(context);
+          final logicalWidth = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : mediaQuery.size.width;
+          final logicalHeight = constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : 380.0;
+          final pixelRatio = mediaQuery.devicePixelRatio;
+          final cacheWidth = (logicalWidth * pixelRatio)
+              .round()
+              .clamp(1, 4096)
+              .toInt();
+          final cacheHeight = (logicalHeight * pixelRatio)
+              .round()
+              .clamp(1, 4096)
+              .toInt();
+
+          return CachedNetworkImage(
+            imageUrl: imagePath,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            memCacheWidth: cacheWidth,
+            memCacheHeight: cacheHeight,
+            fadeInDuration: const Duration(milliseconds: 220),
+            fadeOutDuration: const Duration(milliseconds: 120),
+            placeholder: (context, url) => AppSkeleton(
+              width: logicalWidth,
+              height: logicalHeight,
+              borderRadius: BorderRadius.zero,
             ),
-          ),
-        ),
+            errorWidget: (context, url, error) => Container(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: const Center(
+                child: Icon(Icons.image_not_supported, size: 50),
+              ),
+            ),
+          );
+        },
       );
     } else {
       return Image.asset(imagePath, fit: BoxFit.cover, width: double.infinity);
     }
   }
 }
+

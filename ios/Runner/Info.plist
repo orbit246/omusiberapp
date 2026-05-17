@@ -32,6 +32,16 @@
 				<string>com.googleusercontent.apps.598076585741-5404ekkfqie5tg7a0bdrjd3kvpudg1h9</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>akademiz</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>akademiz</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>

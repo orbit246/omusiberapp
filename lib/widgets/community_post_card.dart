@@ -91,7 +91,7 @@ class CommunityPostCard extends StatelessWidget {
                       () => unawaited(
                         ShareService.shareCommunityPost(context, post),
                       ),
-                  tooltip: 'Paylas',
+                  tooltip: 'Paylaş',
                   visualDensity: VisualDensity.compact,
                 ),
               ],
@@ -159,16 +159,16 @@ class CommunityPostCard extends StatelessWidget {
     final timeText = _formatTime(post.createdAt);
     final pollVotes = post.poll?.totalVotes;
     if (pollVotes == null) return timeText;
-    return '$timeText • $pollVotes Kisi Oy Verdi';
+    return '$timeText • $pollVotes kişi oy verdi';
   }
 
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final diff = now.difference(time);
-    if (diff.inSeconds < 60) return 'Simdi';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}d once';
-    if (diff.inHours < 24) return '${diff.inHours}s once';
-    if (diff.inDays < 7) return '${diff.inDays} Gun once';
+    if (diff.inSeconds < 60) return 'Şimdi';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+    if (diff.inHours < 24) return '${diff.inHours} sa önce';
+    if (diff.inDays < 7) return '${diff.inDays} gün önce';
     return DateFormat('d MMM', 'tr').format(time);
   }
 
@@ -177,7 +177,7 @@ class CommunityPostCard extends StatelessWidget {
       'announcement' => 'Duyuru',
       'question' => 'Soru',
       'poll' => 'Anket',
-      'campus' => 'Kampus',
+      'campus' => 'Kampüs',
       _ => 'Genel',
     };
   }
@@ -211,15 +211,15 @@ class _EmojiReactionBar extends StatefulWidget {
   });
 
   static const List<String> emojis = [
-    '❤️',
-    '🔥',
-    '👀',
-    '💀',
-    '🫡',
-    '🧐',
-    '😒',
-    '👏',
-    '😂',
+    '\u{1F44D}',
+    '\u{1F602}',
+    '\u{2764}\u{FE0F}',
+    '\u{1F525}',
+    '\u{1F440}',
+    '\u{1F44F}',
+    '\u{1F480}',
+    '\u{1F921}',
+    '\u{1FAE1}',
   ];
 
   final CommunityPost post;

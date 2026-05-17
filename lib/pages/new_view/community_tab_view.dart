@@ -55,9 +55,20 @@ class _CommunityTabViewState extends State<CommunityTabView> {
     unawaited(
       _controller.toggleLike(post).catchError((error) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Beğeni güncellenemedi.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Beğeni güncellenemedi.')),
+        );
+      }),
+    );
+  }
+
+  void _toggleReaction(CommunityPost post, String emoji) {
+    unawaited(
+      _controller.toggleReaction(post, emoji).catchError((error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tepki güncellenemedi.')),
+        );
       }),
     );
   }
@@ -74,6 +85,7 @@ class _CommunityTabViewState extends State<CommunityTabView> {
           scrollController: _scrollController,
           onRefresh: _controller.refresh,
           onLike: _toggleLike,
+          onReact: _toggleReaction,
           onShare: (post) =>
               unawaited(ShareService.shareCommunityPost(context, post)),
         );
@@ -91,6 +103,7 @@ class CommunityTabContent extends StatefulWidget {
     required this.scrollController,
     required this.onRefresh,
     required this.onLike,
+    required this.onReact,
     required this.onShare,
   });
 
@@ -100,6 +113,7 @@ class CommunityTabContent extends StatefulWidget {
   final ScrollController scrollController;
   final Future<void> Function() onRefresh;
   final ValueChanged<CommunityPost> onLike;
+  final void Function(CommunityPost post, String emoji) onReact;
   final ValueChanged<CommunityPost> onShare;
 
   @override
@@ -201,6 +215,7 @@ class _CommunityTabContentState extends State<CommunityTabContent> {
           return CommunityPostCard(
             post: post,
             onLike: () => widget.onLike(post),
+            onReact: (emoji) => widget.onReact(post, emoji),
             onShare: () => widget.onShare(post),
           );
         },

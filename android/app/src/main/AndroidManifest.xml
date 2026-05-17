@@ -37,12 +37,41 @@
 
                 <data
                     android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/event"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/community/post"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/news"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/user"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/schedule"/>
+
+                <data
+                    android:scheme="https"
                     android:host="www.nortixlabs.com"
                     android:pathPrefix="/akademiz"/>
                 <data
                     android:scheme="https"
                     android:host="nortixlabs.com"
                     android:pathPrefix="/akademiz"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+
+                <data android:scheme="akademiz"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

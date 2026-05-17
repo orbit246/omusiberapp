@@ -27,6 +27,11 @@ class PostView {
   bool get isJoined => _isJoined ?? false;
   bool get isLiked => _isLiked ?? false;
   bool get isRegistrationClosed => _isRegistrationClosed ?? false;
+  int get likeCount {
+    final raw = metadata['likes'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '') ?? 0;
+  }
 
   PostView({
     required this.id,
@@ -186,5 +191,49 @@ class PostView {
       'allowAppSignups': allowAppSignups,
       'redirectTo': redirectTo,
     };
+  }
+
+  PostView copyWith({
+    String? id,
+    String? title,
+    String? description,
+    List<String>? tags,
+    int? maxContributors,
+    int? remainingContributors,
+    double? ticketPrice,
+    String? location,
+    String? thubnailUrl,
+    List<String>? imageLinks,
+    Map<String, dynamic>? metadata,
+    DateTime? eventDate,
+    DateTime? registrationEndDate,
+    bool? isJoined,
+    bool? isLiked,
+    bool? isRegistrationClosed,
+    String? publisher,
+    bool? allowAppSignups,
+    String? redirectTo,
+  }) {
+    return PostView(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      tags: tags ?? this.tags,
+      maxContributors: maxContributors ?? this.maxContributors,
+      remainingContributors: remainingContributors ?? this.remainingContributors,
+      ticketPrice: ticketPrice ?? this.ticketPrice,
+      location: location ?? this.location,
+      thubnailUrl: thubnailUrl ?? this.thubnailUrl,
+      imageLinks: imageLinks ?? this.imageLinks,
+      metadata: metadata ?? this.metadata,
+      eventDate: eventDate ?? this.eventDate,
+      registrationEndDate: registrationEndDate ?? this.registrationEndDate,
+      isJoined: isJoined ?? _isJoined,
+      isLiked: isLiked ?? _isLiked,
+      isRegistrationClosed: isRegistrationClosed ?? _isRegistrationClosed,
+      publisher: publisher ?? this.publisher,
+      allowAppSignups: allowAppSignups ?? this.allowAppSignups,
+      redirectTo: redirectTo ?? this.redirectTo,
+    );
   }
 }

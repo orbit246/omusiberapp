@@ -14,29 +14,54 @@ enum DeepLinkCategory { news, events, community }
 class AkademizDeepLink {
   const AkademizDeepLink({required this.category, required this.id});
 
+  static const String webScheme = 'https';
+  static const String webHost = 'akademiz.nortixlabs.com';
+  static const String appScheme = 'akademiz';
+
   final DeepLinkCategory category;
   final String id;
 
   static AkademizDeepLink? parse(Uri uri) {
-    final host = uri.host.toLowerCase();
-    if (host != 'www.nortixlabs.com' && host != 'nortixlabs.com') {
-      return null;
-    }
-
+    final normalizedScheme = uri.scheme.toLowerCase();
+    final normalizedHost = uri.host.toLowerCase();
     final segments = uri.pathSegments
         .map(Uri.decodeComponent)
         .where((segment) => segment.trim().isNotEmpty)
         .toList(growable: false);
-    if (segments.length < 3 || segments.first.toLowerCase() != 'akademiz') {
+
+    if (normalizedScheme == appScheme) {
+      return _parseSegments([normalizedHost, ...segments]);
+    }
+
+    if (normalizedScheme != webScheme) {
       return null;
     }
 
-    final category = _parseCategory(segments[1]);
+    if (normalizedHost == webHost) {
+      return _parseSegments(segments);
+    }
+
+    if ((normalizedHost == 'www.nortixlabs.com' ||
+            normalizedHost == 'nortixlabs.com') &&
+        segments.isNotEmpty &&
+        segments.first.toLowerCase() == 'akademiz') {
+      return _parseSegments(segments.skip(1).toList(growable: false));
+    }
+
+    return null;
+  }
+
+  static AkademizDeepLink? _parseSegments(List<String> segments) {
+    if (segments.isEmpty) {
+      return null;
+    }
+
+    final category = _parseCategory(segments);
     if (category == null) {
       return null;
     }
 
-    final id = segments[2].trim();
+    final id = _extractId(category, segments);
     if (id.isEmpty) {
       return null;
     }
@@ -44,25 +69,91 @@ class AkademizDeepLink {
     return AkademizDeepLink(category: category, id: id);
   }
 
-  static DeepLinkCategory? _parseCategory(String value) {
-    switch (value.toLowerCase()) {
-      case 'news':
-      case 'haber':
-      case 'haberler':
-        return DeepLinkCategory.news;
-      case 'event':
-      case 'events':
-      case 'etkinlik':
-      case 'etkinlikler':
-        return DeepLinkCategory.events;
-      case 'community':
-      case 'post':
-      case 'posts':
-      case 'topluluk':
+  static DeepLinkCategory? _parseCategory(List<String> segments) {
+    final first = segments.first.toLowerCase();
+    if (_isNewsAlias(first)) return DeepLinkCategory.news;
+    if (_isEventAlias(first)) return DeepLinkCategory.events;
+    if (_isCommunityAlias(first)) {
+      if (segments.length >= 2 &&
+          <String>{'post', 'posts', 'gonderi', 'gonderiler'}
+              .contains(segments[1].toLowerCase())) {
         return DeepLinkCategory.community;
+      }
+      if (segments.length == 2) {
+        return DeepLinkCategory.community;
+      }
     }
     return null;
   }
+
+  static bool _isNewsAlias(String value) =>
+      value == 'news' || value == 'haber' || value == 'haberler';
+
+  static bool _isEventAlias(String value) =>
+      value == 'event' ||
+      value == 'events' ||
+      value == 'etkinlik' ||
+      value == 'etkinlikler';
+
+  static bool _isCommunityAlias(String value) =>
+      value == 'community' ||
+      value == 'post' ||
+      value == 'posts' ||
+      value == 'topluluk';
+
+  static String _extractId(DeepLinkCategory category, List<String> segments) {
+    switch (category) {
+      case DeepLinkCategory.news:
+      case DeepLinkCategory.events:
+        return segments.length >= 2 ? segments[1].trim() : '';
+      case DeepLinkCategory.community:
+        if (segments.isEmpty) return '';
+        if (_isCommunityAlias(segments.first.toLowerCase()) &&
+            segments.length >= 3 &&
+            <String>{'post', 'posts', 'gonderi', 'gonderiler'}
+                .contains(segments[1].toLowerCase())) {
+          return segments[2].trim();
+        }
+        return segments.length >= 2 ? segments[1].trim() : '';
+    }
+  }
+
+  Uri toWebUri() {
+    switch (category) {
+      case DeepLinkCategory.news:
+        return Uri(scheme: webScheme, host: webHost, path: '/news/$id');
+      case DeepLinkCategory.events:
+        return Uri(scheme: webScheme, host: webHost, path: '/event/$id');
+      case DeepLinkCategory.community:
+        return Uri(
+          scheme: webScheme,
+          host: webHost,
+          path: '/community/post/$id',
+        );
+    }
+  }
+
+  Uri toAppUri() {
+    switch (category) {
+      case DeepLinkCategory.news:
+        return Uri(scheme: appScheme, host: 'news', path: '/$id');
+      case DeepLinkCategory.events:
+        return Uri(scheme: appScheme, host: 'event', path: '/$id');
+      case DeepLinkCategory.community:
+        return Uri(scheme: appScheme, host: 'community', path: '/post/$id');
+    }
+  }
+
+  static Uri newsUri(int id) =>
+      AkademizDeepLink(category: DeepLinkCategory.news, id: id.toString())
+          .toWebUri();
+
+  static Uri eventUri(String id) =>
+      AkademizDeepLink(category: DeepLinkCategory.events, id: id).toWebUri();
+
+  static Uri communityPostUri(String id) =>
+      AkademizDeepLink(category: DeepLinkCategory.community, id: id)
+          .toWebUri();
 }
 
 class DeepLinkService {

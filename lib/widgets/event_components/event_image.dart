@@ -1,4 +1,6 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 class EventImageBlock extends StatelessWidget {
   const EventImageBlock({
@@ -37,12 +39,25 @@ class _NetworkThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (!_validUrl) return _fallback(cs);
-    return Image.network(
-      url.trim(),
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    final cacheWidth = (width * pixelRatio).round().clamp(1, 4096).toInt();
+    final cacheHeight = (height * pixelRatio).round().clamp(1, 4096).toInt();
+
+    return CachedNetworkImage(
+      imageUrl: url.trim(),
       height: height,
       width: width,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _fallback(cs),
+      memCacheWidth: cacheWidth,
+      memCacheHeight: cacheHeight,
+      fadeInDuration: const Duration(milliseconds: 220),
+      fadeOutDuration: const Duration(milliseconds: 120),
+      placeholder: (_, __) => AppSkeleton(
+        width: width,
+        height: height,
+        borderRadius: BorderRadius.zero,
+      ),
+      errorWidget: (_, __, ___) => _fallback(cs),
     );
   }
 

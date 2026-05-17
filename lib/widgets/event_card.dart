@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
@@ -22,12 +21,13 @@ class EventCard extends StatefulWidget {
     this.tags = const <EventTag>[],
     this.publisher,
     this.isLiked = false,
+    this.likeCount = 0,
     this.isJoined = false,
     this.isPast = false,
     this.isRegistrationClosed = false,
     // initialExpanded removed as concept is static now
     this.onJoin,
-    this.onBookmark,
+    this.onLike,
     this.onShare,
   });
 
@@ -42,11 +42,12 @@ class EventCard extends StatefulWidget {
   final List<EventTag> tags;
   final String? publisher;
   final bool isLiked;
+  final int likeCount;
   final bool isJoined;
   final bool isPast;
   final bool isRegistrationClosed;
   final VoidCallback? onJoin;
-  final ValueChanged<bool>? onBookmark;
+  final ValueChanged<bool>? onLike;
   final VoidCallback? onShare;
 
   @override
@@ -382,14 +383,27 @@ class _EventCardState extends State<EventCard> {
                         IconButton.filledTonal(
                           onPressed: () {
                             setState(() => _isSaved = !_isSaved);
-                            widget.onBookmark?.call(_isSaved);
-                            _toast(
-                              context,
-                              "Etkinlik ${_isSaved ? 'kaydedildi' : 'silindi'}",
-                            );
+                            widget.onLike?.call(_isSaved);
                           },
-                          icon: Icon(
-                            _isSaved ? Icons.favorite : Icons.favorite_border,
+                          icon: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _isSaved
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                '${widget.likeCount}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: _isSaved
+                                      ? cs.primary
+                                      : cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -429,16 +443,6 @@ class _EventCardState extends State<EventCard> {
     final pixelRatio = MediaQuery.of(context).devicePixelRatio;
     return (width * pixelRatio).round().clamp(1, 4096).toInt();
   }
-
-  void _toast(BuildContext context, String msg) {
-    Fluttertoast.showToast(
-      msg: msg,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.black87,
-      textColor: Colors.white,
-    );
-  }
-
   String _fallbackShareText() {
     return [
       widget.title,

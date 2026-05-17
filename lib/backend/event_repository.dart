@@ -259,10 +259,13 @@ class EventRepository {
   }
 
   Future<void> trackEventLike(String eventId, {required bool isLiked}) async {
-    if (!isLiked) return;
     final bodyId = _eventBodyId(eventId);
     if (bodyId == null) return;
-    await _postEventInteraction(endpoint: 'like', bodyId: bodyId);
+    await _postEventInteraction(
+      endpoint: isLiked ? 'like' : 'unlike',
+      bodyId: bodyId,
+    );
+    _updateLikeInCache(eventId: eventId, isLiked: isLiked);
   }
 
   Future<void> updateEvent(String eventId, PostView updatedEvent) async {
@@ -331,6 +334,22 @@ class EventRepository {
       _cachedEvents![idx] = event;
     }
     _sortEventsByClosestDate(_cachedEvents!);
+  }
+
+  void _updateLikeInCache({required String eventId, required bool isLiked}) {
+    if (_cachedEvents == null) return;
+    final index = _cachedEvents!.indexWhere((event) => event.id == eventId);
+    if (index == -1) return;
+
+    final current = _cachedEvents![index];
+    final nextLikeCount = isLiked
+        ? current.likeCount + (current.isLiked ? 0 : 1)
+        : (current.likeCount - (current.isLiked ? 1 : 0)).clamp(0, 1 << 30);
+
+    _cachedEvents![index] = current.copyWith(
+      isLiked: isLiked,
+      metadata: {...current.metadata, 'likes': nextLikeCount},
+    );
   }
 
   Future<void> _postEventInteraction({

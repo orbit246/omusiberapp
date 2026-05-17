@@ -118,6 +118,30 @@ class EventsTabController extends ChangeNotifier {
     return _repository.trackEventLike(eventId, isLiked: isLiked);
   }
 
+  Future<void> toggleEventLike(String eventId, bool isLiked) async {
+    final index = _events.indexWhere((event) => event.id == eventId);
+    if (index == -1) return;
+
+    final current = _events[index];
+    final nextLikeCount = isLiked
+        ? current.likeCount + (current.isLiked ? 0 : 1)
+        : (current.likeCount - (current.isLiked ? 1 : 0)).clamp(0, 1 << 30);
+
+    _events[index] = current.copyWith(
+      isLiked: isLiked,
+      metadata: {...current.metadata, 'likes': nextLikeCount},
+    );
+    notifyListeners();
+
+    try {
+      await _repository.trackEventLike(eventId, isLiked: isLiked);
+    } catch (error) {
+      debugPrint('Event like toggle failed: $error');
+      _events[index] = current;
+      notifyListeners();
+    }
+  }
+
   List<PostView> _freshWithMocks(List<PostView> fresh) {
     final events = [...fresh];
     _repository.sortEventsByClosestDate(events);

@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/notifications/notification_navigation_intent.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/firebase_options.dart';
@@ -68,10 +69,11 @@ class SimpleNotifications {
   static bool _listenersRegistered = false;
   static bool _remoteRegistrationConfigured = false;
   static bool _remoteRegistrationRetryScheduled = false;
+  static bool _launchIntentCaptured = false;
   static Future<void>? _initializationFuture;
   static const String _staticPrefsKey = 'saved_notifications_v1';
-  static const String _permissionPromptedKey =
-      'notification_permission_prompted_v1';
+  static const String _enablePromptSeenKey =
+      'notification_enable_prompt_seen_v1';
 
   Future<void> init() async {
     try {
@@ -98,16 +100,19 @@ class SimpleNotifications {
 
         FirebaseMessaging.onMessageOpenedApp.listen((msg) async {
           await saveMessage(msg);
+          _handleOpenedRemoteMessage(msg);
         });
       }
 
-      await _requestPermissionIfNeeded();
-      await _configureRemoteRegistration();
+      if (await checkPermission()) {
+        await _configureRemoteRegistration();
+      }
 
       // Cold start: opened from terminated
       final initial = await _messaging.getInitialMessage();
       if (initial != null) {
         await saveMessage(initial);
+        _handleOpenedRemoteMessage(initial);
       }
     } catch (e) {
       debugPrint('SimpleNotifications init error: $e');
@@ -137,10 +142,55 @@ class SimpleNotifications {
     }
   }
 
+  static Future<void> captureLaunchIntent() async {
+    if (_launchIntentCaptured) {
+      return;
+    }
+
+    _launchIntentCaptured = true;
+    await ensureInitialized();
+
+    try {
+      final launchDetails = await _localNotifications
+          .getNotificationAppLaunchDetails();
+      if (launchDetails?.didNotificationLaunchApp ?? false) {
+        final payload = launchDetails?.notificationResponse?.payload;
+        NotificationNavigationIntentService.instance.queueFromPayload(payload);
+      }
+    } catch (e) {
+      debugPrint('Local notification launch capture failed: $e');
+    }
+
+    try {
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
+      if (initialMessage != null) {
+        await saveMessage(initialMessage);
+        _handleOpenedRemoteMessage(initialMessage);
+      }
+    } catch (e) {
+      debugPrint('Remote notification launch capture failed: $e');
+    }
+  }
+
   Future<bool> ensurePermissionForDisplay() async {
     final hasPermission = await checkPermission();
     if (hasPermission) return true;
     return requestPermission();
+  }
+
+  Future<bool> shouldShowEnablePrompt() async {
+    if (await checkPermission()) {
+      return false;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    return !(prefs.getBool(_enablePromptSeenKey) ?? false);
+  }
+
+  Future<void> markEnablePromptSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_enablePromptSeenKey, true);
   }
 
   Future<void> showTestNotification() async {
@@ -161,21 +211,6 @@ class SimpleNotifications {
       channel: _generalChannel,
       payload: jsonEncode(item.data),
     );
-  }
-
-  Future<void> _requestPermissionIfNeeded() async {
-    if (await checkPermission()) {
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final alreadyPrompted = prefs.getBool(_permissionPromptedKey) ?? false;
-    if (alreadyPrompted) {
-      return;
-    }
-
-    await requestPermission();
-    await prefs.setBool(_permissionPromptedKey, true);
   }
 
   Future<bool> requestPermission() async {
@@ -421,7 +456,10 @@ class SimpleNotifications {
       iOS: darwinInit,
       macOS: darwinInit,
     );
-    await _localNotifications.initialize(initSettings);
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _handleLocalNotificationResponse,
+    );
   }
 
   static AndroidFlutterLocalNotificationsPlugin? get _androidNotifications =>
@@ -437,6 +475,16 @@ class SimpleNotifications {
     await androidPlugin.createNotificationChannel(_generalChannel);
     await androidPlugin.createNotificationChannel(_eventsChannel);
     await androidPlugin.createNotificationChannel(_announcementsChannel);
+  }
+
+  static void _handleLocalNotificationResponse(NotificationResponse response) {
+    NotificationNavigationIntentService.instance.queueFromPayload(
+      response.payload,
+    );
+  }
+
+  static void _handleOpenedRemoteMessage(RemoteMessage msg) {
+    NotificationNavigationIntentService.instance.queueFromData(msg.data);
   }
 
   static Future<void> handleRemoteMessage(
