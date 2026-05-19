@@ -179,6 +179,7 @@ class _StartupErrorOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final diagnosis = _describeStartupError(error);
 
     return ColoredBox(
       color: colorScheme.surface.withValues(alpha: 0.96),
@@ -200,7 +201,7 @@ class _StartupErrorOverlay extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Baslangic baglantisi kurulamadi',
+                      diagnosis.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -208,12 +209,22 @@ class _StartupErrorOverlay extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '$error',
+                      diagnosis.message,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    if (diagnosis.details != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        diagnosis.details!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: () => onRetry(),
@@ -228,4 +239,56 @@ class _StartupErrorOverlay extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StartupErrorDiagnosis {
+  const _StartupErrorDiagnosis({
+    required this.title,
+    required this.message,
+    this.details,
+  });
+
+  final String title;
+  final String message;
+  final String? details;
+}
+
+_StartupErrorDiagnosis _describeStartupError(Object? error) {
+  final raw = (error ?? 'Bilinmeyen hata').toString();
+  final normalized = raw.toLowerCase();
+
+  if (normalized.contains('socketexception') ||
+      normalized.contains('failed host lookup') ||
+      normalized.contains('network is unreachable') ||
+      normalized.contains('connection refused') ||
+      normalized.contains('connection closed') ||
+      normalized.contains('connection reset') ||
+      normalized.contains('timed out') ||
+      normalized.contains('handshakeexception')) {
+    return const _StartupErrorDiagnosis(
+      title: 'Internet baglantisi kurulamadi',
+      message:
+          'Sunucuya erisilemedi. Wi-Fi veya hucresel baglantinizi kontrol edip tekrar deneyin.',
+      details: 'Sorun devam ederse DNS, VPN veya TLS baglantisi engelleniyor olabilir.',
+    );
+  }
+
+  if (normalized.contains('firebase') ||
+      normalized.contains('googleservice-info') ||
+      normalized.contains('apns') ||
+      normalized.contains('messaging')) {
+    return _StartupErrorDiagnosis(
+      title: 'Uygulama baslatilamadi',
+      message:
+          'Baslangic sirasinda bir Firebase veya iOS yapilandirma hatasi olustu.',
+      details: raw,
+    );
+  }
+
+  return _StartupErrorDiagnosis(
+    title: 'Uygulama baslatilamadi',
+    message:
+        'Baslangic sirasinda beklenmeyen bir hata olustu. Tekrar deneyin.',
+    details: raw,
+  );
 }
