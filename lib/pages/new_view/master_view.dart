@@ -49,6 +49,7 @@ class _MasterViewState extends State<MasterView>
   bool _notificationsInitialized = false;
   bool _notificationsInitScheduled = false;
   bool _updateCheckScheduled = false;
+  bool _updatePromptVisible = false;
   Timer? _notificationsInitTimer;
   Timer? _updateCheckStartTimer;
   Timer? _updateCheckTimer;
@@ -126,13 +127,64 @@ class _MasterViewState extends State<MasterView>
     _updateCheckTimer?.cancel();
     if (delay == Duration.zero) {
       if (!mounted) return;
-      UpdateService().checkForUpdate();
+      unawaited(_runUpdateCheck());
       return;
     }
     _updateCheckTimer = Timer(delay, () {
       if (!mounted) return;
-      UpdateService().checkForUpdate();
+      unawaited(_runUpdateCheck());
     });
+  }
+
+  Future<void> _runUpdateCheck() async {
+    final result = await UpdateService().checkForUpdate();
+    if (!mounted || result.status != UpdateCheckStatus.updateAvailable) {
+      return;
+    }
+    await _showUpdateAvailableDialog();
+  }
+
+  Future<void> _showUpdateAvailableDialog() async {
+    if (_updatePromptVisible || !mounted) {
+      return;
+    }
+
+    _updatePromptVisible = true;
+    final shouldUpdate = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Guncelleme hazir'),
+          content: const Text(
+            'Uygulamanin yeni bir surumu mevcut. Simdi guncellemek ister misin?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Daha sonra'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Guncelle'),
+            ),
+          ],
+        );
+      },
+    );
+
+    _updatePromptVisible = false;
+    if (shouldUpdate != true || !mounted) {
+      return;
+    }
+
+    final result = await UpdateService().startUpdate();
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
   }
 
   void _scheduleUpdateCheckAfterStartupBreath() {

@@ -135,6 +135,10 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  Future<void> _retryInitialLoad() async {
+    await _controller.retryInitialLoad();
+  }
+
   void _clearActiveFilters() {
     unawaited(_controller.clearActiveFilters());
   }
@@ -902,6 +906,63 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  Widget _buildInitialLoadError(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.cloud_off_rounded,
+                  size: 34,
+                  color: colorScheme.error,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Haberler yuklenemedi',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _retryInitialLoad,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Tekrar dene'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingSection(String label) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -1275,7 +1336,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     } */
 
     if (_errorMessage != null && !_isNewsLoading && visibleArticles.isEmpty) {
-      return Center(child: Text(_errorMessage!));
+      return _buildInitialLoadError(context, _errorMessage!);
     }
 
     return Scaffold(

@@ -11,7 +11,6 @@ import 'package:omusiber/pages/new_view/edit_profile_page.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/about_page.dart';
 import 'package:omusiber/pages/new_view/feedback_page.dart';
-import 'package:omusiber/backend/update_service.dart';
 import 'package:omusiber/widgets/profile/account_profile_entry.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
@@ -275,20 +274,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     );
                   },
                 ),
-                _buildSettingsTile(
-                  context,
-                  icon: Icons.system_update_outlined,
-                  title: "Güncellemeleri Denetle",
-                  onTap: () async {
-                    final started = await UpdateService().checkForUpdate();
-                    if (!started && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Sürümünüz güncel.")),
-                      );
-                    }
-                  },
-                ),
-
                 // Dark Mode Switch (Toggle)
                 GestureDetector(
                   onLongPress: () {

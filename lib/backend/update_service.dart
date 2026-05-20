@@ -1,6 +1,27 @@
 import 'package:flutter/foundation.dart';
 import 'package:in_app_update/in_app_update.dart';
 
+enum UpdateCheckStatus {
+  updateAvailable,
+  started,
+  upToDate,
+  unsupportedPlatform,
+  unavailable,
+  failed,
+}
+
+class UpdateCheckResult {
+  const UpdateCheckResult({
+    required this.status,
+    required this.message,
+    this.details,
+  });
+
+  final UpdateCheckStatus status;
+  final String message;
+  final String? details;
+}
+
 class UpdateService {
   static final UpdateService _instance = UpdateService._internal();
   factory UpdateService() => _instance;
@@ -8,12 +29,20 @@ class UpdateService {
 
   AppUpdateInfo? _updateInfo;
 
-  /// Checks for update availability.
-  /// Returns true if an update flow was started, false otherwise.
-  Future<bool> checkForUpdate() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      // In-App Update API is currently only supported on Android by Google.
-      return false;
+  Future<UpdateCheckResult> checkForUpdate() async {
+    if (kIsWeb) {
+      return const UpdateCheckResult(
+        status: UpdateCheckStatus.unsupportedPlatform,
+        message: 'Web surumunde otomatik guncelleme denetimi desteklenmiyor.',
+      );
+    }
+
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return const UpdateCheckResult(
+        status: UpdateCheckStatus.unsupportedPlatform,
+        message:
+            'Bu cihazda uygulama ici guncelleme denetimi desteklenmiyor. Lutfen magazadan kontrol edin.',
+      );
     }
 
     try {
@@ -21,36 +50,91 @@ class UpdateService {
 
       if (_updateInfo?.updateAvailability ==
           UpdateAvailability.updateAvailable) {
-        // Decide whether to show immediate or flexible update.
-        // Priority 4 or 5 is usually considered critical/immediate.
-        if ((_updateInfo?.updatePriority ?? 0) >= 4) {
-          await performImmediateUpdate();
-        } else {
-          await performFlexibleUpdate();
-        }
-        return true;
+        return const UpdateCheckResult(
+          status: UpdateCheckStatus.updateAvailable,
+          message: 'Yeni bir guncelleme mevcut.',
+        );
       }
     } catch (e) {
       debugPrint('InAppUpdate Error: $e');
+      return UpdateCheckResult(
+        status: UpdateCheckStatus.failed,
+        message: 'Guncelleme denetimi yapilamadi.',
+        details: e.toString(),
+      );
     }
-    return false;
+    return const UpdateCheckResult(
+      status: UpdateCheckStatus.upToDate,
+      message: 'Yeni bir guncelleme bulunmadi.',
+    );
   }
 
-  /// Triggers an immediate update flow.
-  /// Shows a full-screen UI and prevents user from using the app until updated.
-  Future<void> performImmediateUpdate() async {
+  Future<UpdateCheckResult> startUpdate() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return const UpdateCheckResult(
+        status: UpdateCheckStatus.unsupportedPlatform,
+        message:
+            'Bu cihazda uygulama ici guncelleme denetimi desteklenmiyor. Lutfen magazadan kontrol edin.',
+      );
+    }
+
+    final info = _updateInfo;
+    if (info == null ||
+        info.updateAvailability != UpdateAvailability.updateAvailable) {
+      return const UpdateCheckResult(
+        status: UpdateCheckStatus.unavailable,
+        message: 'Baslatilabilecek bir guncelleme bulunmadi.',
+      );
+    }
+
+    try {
+      if ((info.updatePriority) >= 4) {
+        final started = await performImmediateUpdate();
+        if (!started) {
+          return const UpdateCheckResult(
+            status: UpdateCheckStatus.unavailable,
+            message:
+                'Guncelleme bulundu ama bu cihazda hemen baslatilamadi. Google Play uzerinden deneyin.',
+          );
+        }
+      } else {
+        final started = await performFlexibleUpdate();
+        if (!started) {
+          return const UpdateCheckResult(
+            status: UpdateCheckStatus.unavailable,
+            message:
+                'Guncelleme bulundu ama indirme baslatilamadi. Google Play uzerinden deneyin.',
+          );
+        }
+      }
+
+      return const UpdateCheckResult(
+        status: UpdateCheckStatus.started,
+        message: 'Guncelleme islemi baslatildi.',
+      );
+    } catch (e) {
+      debugPrint('Start Update Error: $e');
+      return UpdateCheckResult(
+        status: UpdateCheckStatus.failed,
+        message: 'Guncelleme baslatilamadi.',
+        details: e.toString(),
+      );
+    }
+  }
+
+  Future<bool> performImmediateUpdate() async {
     try {
       if (_updateInfo?.immediateUpdateAllowed ?? false) {
         await InAppUpdate.performImmediateUpdate();
+        return true;
       }
     } catch (e) {
       debugPrint('Immediate Update Error: $e');
     }
+    return false;
   }
 
-  /// Triggers a flexible update flow.
-  /// Downloads the update in the background.
-  Future<void> performFlexibleUpdate() async {
+  Future<bool> performFlexibleUpdate() async {
     try {
       if (_updateInfo?.flexibleUpdateAllowed ?? false) {
         await InAppUpdate.startFlexibleUpdate();
@@ -74,9 +158,11 @@ class UpdateService {
             await InAppUpdate.completeFlexibleUpdate();
           }
         });
+        return true;
       }
     } catch (e) {
       debugPrint('Flexible Update Error: $e');
     }
+    return false;
   }
 }

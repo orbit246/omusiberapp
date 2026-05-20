@@ -82,6 +82,14 @@ class NewsTabController extends ChangeNotifier {
     final raw = error.toString();
     final normalized = raw.toLowerCase();
 
+    if (normalized.contains('authentication is not ready yet')) {
+      return 'Haberler henuz hazir degil. Biraz sonra tekrar deneyin.';
+    }
+
+    if (normalized.contains('authentication failed')) {
+      return 'Haberler yuklenemedi. Oturum baslatilamadi, lutfen tekrar deneyin.';
+    }
+
     if (normalized.contains('502') || normalized.contains('bad gateway')) {
       return 'Haberler Yüklenemedi, Sonra Tekrardan Deneyin';
     }
@@ -329,9 +337,23 @@ class NewsTabController extends ChangeNotifier {
       notifyListeners();
       _startupRefreshComplete = true;
     } catch (error) {
-      if (error is StateError) {
-        return;
+      if (_articles.isEmpty) {
+        _isNewsLoading = false;
+        _errorMessage = _mapErrorMessage(error);
+        notifyListeners();
       }
+    }
+  }
+
+  Future<void> retryInitialLoad() async {
+    _startupRefreshComplete = false;
+    _isNewsLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await refreshInBackground();
+    } catch (error) {
       if (_articles.isEmpty) {
         _isNewsLoading = false;
         _errorMessage = _mapErrorMessage(error);
