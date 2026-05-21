@@ -20,22 +20,29 @@ class AppStartupController extends ChangeNotifier {
 
   static const String _agreementPrefsKey = 'startup_agreement_acceptance_v1';
   static const Duration _startupWarmupWindow = Duration(seconds: 10);
+  static const Duration _localFallbackActivationDelay = Duration(seconds: 10);
   static final Stopwatch _startupStopwatch = Stopwatch()..start();
 
   AppStartupStage _stage = AppStartupStage.idle;
   Object? _lastError;
   Future<void>? _startFuture;
   bool _firebaseReady = false;
+  bool _authenticatedSessionReady = false;
+  bool _localFallbackIdentityEnabled = false;
   bool _needsAgreement = false;
   bool _backgroundMessageHandlerRegistrationScheduled = false;
   bool _backgroundMessageHandlerRegistered = false;
+  Timer? _localFallbackTimer;
 
   AppStartupStage get stage => _stage;
   Object? get lastError => _lastError;
   bool get isFirebaseReady => _firebaseReady;
+  bool get hasAuthenticatedSession => _authenticatedSessionReady;
+  bool get shouldUseLocalFallbackIdentity => _localFallbackIdentityEnabled;
   bool get isBooting => _stage == AppStartupStage.booting;
   bool get needsAgreement => _needsAgreement;
-  bool get canUseAuthenticatedApis => _stage == AppStartupStage.ready;
+  bool get canUseAuthenticatedApis =>
+      _stage == AppStartupStage.ready && _authenticatedSessionReady;
   bool get isInStartupWarmup =>
       _startupStopwatch.elapsed < _startupWarmupWindow;
 
@@ -74,17 +81,16 @@ class AppStartupController extends ChangeNotifier {
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      markReady();
+      _setAuthenticatedSessionReady();
       return true;
     }
 
     try {
       await FirebaseAuth.instance.signInAnonymously();
-      markReady();
+      _setAuthenticatedSessionReady();
       return true;
     } catch (error) {
       _lastError = error;
-      _stage = AppStartupStage.failed;
       notifyListeners();
       return false;
     }
@@ -131,52 +137,124 @@ class AppStartupController extends ChangeNotifier {
         );
       });
       _firebaseReady = true;
+      _localFallbackTimer?.cancel();
+      _localFallbackIdentityEnabled = false;
       StartupLogger.log('Firebase initialized');
+    } catch (error) {
+      _firebaseReady = false;
+      _lastError = error;
+      _scheduleLocalFallbackIdentityActivation();
+      StartupLogger.log(
+        'Firebase startup failed, continuing with local fallback identity: $error',
+      );
+    }
+
+    if (_firebaseReady) {
+      unawaited(_captureLaunchIntentInBackground());
+      _scheduleBackgroundMessageHandlerRegistration();
+
+      try {
+        final currentUser = await StartupLogger.logAsync(
+          'FirebaseAuth.instance.currentUser check',
+          () async => FirebaseAuth.instance.currentUser,
+        );
+        StartupLogger.log(
+          'FirebaseAuth currentUser result=${currentUser == null ? 'null' : currentUser.uid}',
+        );
+
+        if (currentUser != null) {
+          _authenticatedSessionReady = true;
+          StartupLogger.log(
+            'Existing Firebase user found; marking startup ready',
+          );
+        } else {
+          unawaited(_ensureAnonymousSessionInBackground());
+        }
+      } catch (error) {
+        StartupLogger.log('FirebaseAuth currentUser check skipped: $error');
+        unawaited(_ensureAnonymousSessionInBackground());
+      }
+    }
+
+    final hasAccepted = await StartupLogger.logAsync(
+      'SharedPreferences agreement acceptance check',
+      _hasStoredAgreementAcceptance,
+    );
+    StartupLogger.log('Agreement accepted=$hasAccepted');
+    _needsAgreement = !hasAccepted;
+    if (_needsAgreement) {
+      StartupLogger.log(
+        'No stored agreement acceptance found; continuing startup and showing agreement banner',
+      );
+    } else {
+      StartupLogger.log('Stored agreement acceptance found');
+    }
+
+    _stage = AppStartupStage.ready;
+    notifyListeners();
+  }
+
+  Future<void> _ensureAnonymousSessionInBackground() async {
+    try {
+      final ready = await StartupLogger.logAsync(
+        'FirebaseAuth anonymous fallback sign-in',
+        ensureAuthenticatedSession,
+      );
+      StartupLogger.log('Anonymous fallback sign-in ready=$ready');
+    } catch (error) {
+      StartupLogger.log('Anonymous fallback sign-in skipped: $error');
+    }
+  }
+
+  Future<void> _captureLaunchIntentInBackground() async {
+    try {
       await StartupLogger.logAsync(
         'SimpleNotifications.captureLaunchIntent()',
         () {
-          return SimpleNotifications.captureLaunchIntent();
+          return SimpleNotifications.captureLaunchIntent().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {
+              throw TimeoutException(
+                'SimpleNotifications.captureLaunchIntent() timed out.',
+              );
+            },
+          );
         },
       );
-      _scheduleBackgroundMessageHandlerRegistration();
-
-      final currentUser = await StartupLogger.logAsync(
-        'FirebaseAuth.instance.currentUser check',
-        () async => FirebaseAuth.instance.currentUser,
-      );
-      StartupLogger.log(
-        'FirebaseAuth currentUser result=${currentUser == null ? 'null' : currentUser.uid}',
-      );
-
-      final hasAccepted = await StartupLogger.logAsync(
-        'SharedPreferences agreement acceptance check',
-        _hasStoredAgreementAcceptance,
-      );
-      StartupLogger.log('Agreement accepted=$hasAccepted');
-      _needsAgreement = !hasAccepted;
-      if (_needsAgreement) {
-        StartupLogger.log(
-          'No stored agreement acceptance found; continuing startup and showing agreement banner',
-        );
-      } else {
-        StartupLogger.log('Stored agreement acceptance found');
-      }
-
-      if (currentUser != null) {
-        StartupLogger.log(
-          'Existing Firebase user found; marking startup ready',
-        );
-      }
-
-      _stage = AppStartupStage.ready;
-      notifyListeners();
     } catch (error) {
-      StartupLogger.log('Startup failed: $error');
-      _lastError = error;
-      _stage = AppStartupStage.failed;
-      _startFuture = null;
+      StartupLogger.log('Launch intent capture skipped: $error');
+    }
+  }
+
+  void _setAuthenticatedSessionReady() {
+    final shouldNotify =
+        !_authenticatedSessionReady ||
+        _stage != AppStartupStage.ready ||
+        _lastError != null;
+    _authenticatedSessionReady = true;
+    _lastError = null;
+    _stage = AppStartupStage.ready;
+    if (shouldNotify) {
       notifyListeners();
     }
+  }
+
+  void _scheduleLocalFallbackIdentityActivation() {
+    if (_localFallbackIdentityEnabled) {
+      return;
+    }
+
+    _localFallbackTimer?.cancel();
+    _localFallbackTimer = Timer(_localFallbackActivationDelay, () {
+      if (_firebaseReady || _localFallbackIdentityEnabled) {
+        return;
+      }
+      _localFallbackIdentityEnabled = true;
+      StartupLogger.log(
+        'Firebase remained unavailable for ${_localFallbackActivationDelay.inSeconds} seconds; enabling local fallback identity.',
+      );
+      notifyListeners();
+    });
   }
 
   Future<bool> _hasStoredAgreementAcceptance() async {

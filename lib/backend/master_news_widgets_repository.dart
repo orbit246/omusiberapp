@@ -1,10 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/api_identity_service.dart';
 import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
@@ -61,28 +60,13 @@ class MasterNewsWidgetsRepository {
 
   Map<String, String> get _baseHeaders => const {'Accept': 'application/json'};
 
-  Future<String> _getAuthToken({bool forceRefresh = false}) async {
-    final ready = await AppStartupController.instance
-        .ensureAuthenticatedSession();
-    if (!ready) {
-      throw StateError('Authentication is not ready yet.');
-    }
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Authentication failed: no Firebase user available.');
-    }
-    final token = await user.getIdToken(forceRefresh);
-    if (token == null || token.isEmpty) {
-      throw Exception('Authentication failed: empty Firebase ID token.');
-    }
-    return token;
-  }
-
   Future<Map<String, String>> _authorizedHeaders({
     bool forceRefreshToken = false,
   }) async {
-    final token = await _getAuthToken(forceRefresh: forceRefreshToken);
-    return {..._baseHeaders, 'Authorization': 'Bearer $token'};
+    return ApiIdentityService.instance.buildHeaders(
+      baseHeaders: _baseHeaders,
+      forceRefreshToken: forceRefreshToken,
+    );
   }
 
   Future<http.Response> _getWidgetsResponse() async {
@@ -162,10 +146,6 @@ class MasterNewsWidgetsRepository {
 
       return widgets;
     } catch (e) {
-      if (e is StateError) {
-        rethrow;
-      }
-
       debugPrint('Failed to fetch master news widgets: $e');
       if (!fallbackToCacheOnError) {
         rethrow;

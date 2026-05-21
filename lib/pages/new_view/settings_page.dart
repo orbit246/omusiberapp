@@ -119,7 +119,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _openCurrentProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _startupController.isFirebaseReady
+        ? FirebaseAuth.instance.currentUser
+        : null;
     if (user == null) return;
 
     if (!mounted) return;

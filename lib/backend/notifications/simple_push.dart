@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/notifications/notification_navigation_intent.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
@@ -78,6 +79,12 @@ class SimpleNotifications {
   Future<void> init() async {
     try {
       await ensureInitialized();
+      if (!AppStartupController.instance.isFirebaseReady) {
+        debugPrint(
+          'SimpleNotifications init skipped because Firebase is unavailable.',
+        );
+        return;
+      }
       await _messaging.setAutoInitEnabled(true);
 
       // Ensure foreground notifications are shown
@@ -161,15 +168,17 @@ class SimpleNotifications {
       debugPrint('Local notification launch capture failed: $e');
     }
 
-    try {
-      final initialMessage = await FirebaseMessaging.instance
-          .getInitialMessage();
-      if (initialMessage != null) {
-        await saveMessage(initialMessage);
-        _handleOpenedRemoteMessage(initialMessage);
+    if (AppStartupController.instance.isFirebaseReady) {
+      try {
+        final initialMessage = await FirebaseMessaging.instance
+            .getInitialMessage();
+        if (initialMessage != null) {
+          await saveMessage(initialMessage);
+          _handleOpenedRemoteMessage(initialMessage);
+        }
+      } catch (e) {
+        debugPrint('Remote notification launch capture failed: $e');
       }
-    } catch (e) {
-      debugPrint('Remote notification launch capture failed: $e');
     }
   }
 
@@ -229,6 +238,9 @@ class SimpleNotifications {
 
       if (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) {
+        if (!AppStartupController.instance.isFirebaseReady) {
+          return false;
+        }
         final settings = await _messaging.requestPermission(
           alert: true,
           badge: true,
@@ -255,6 +267,10 @@ class SimpleNotifications {
       return (await _androidNotifications?.areNotificationsEnabled()) ?? false;
     }
 
+    if (!AppStartupController.instance.isFirebaseReady) {
+      return false;
+    }
+
     final settings = await _messaging.getNotificationSettings();
     return settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional;
@@ -262,6 +278,10 @@ class SimpleNotifications {
 
   Future<void> _configureRemoteRegistration({bool forceRefresh = false}) async {
     if (_remoteRegistrationConfigured && !forceRefresh) {
+      return;
+    }
+
+    if (!AppStartupController.instance.isFirebaseReady) {
       return;
     }
 
@@ -295,6 +315,9 @@ class SimpleNotifications {
 
   Future<void> syncNewsFacultyTopicFromCurrentProfile() async {
     try {
+      if (!AppStartupController.instance.isFirebaseReady) {
+        return;
+      }
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         await syncNewsFacultyTopic(facultySlug: null);
@@ -323,6 +346,9 @@ class SimpleNotifications {
 
   Future<void> syncNewsFacultyTopic({required String? facultySlug}) async {
     try {
+      if (!AppStartupController.instance.isFirebaseReady) {
+        return;
+      }
       final prefs = await SharedPreferences.getInstance();
       final oldTopic = prefs.getString(_lastNewsFacultyTopicKey);
       final normalizedSlug = facultySlug?.trim();

@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/api_identity_service.dart';
 import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:http/http.dart' as http;
@@ -66,59 +65,17 @@ class CommunityRepository {
   Future<Map<String, String>> _authorizedHeaders({
     bool includeJsonContentType = false,
   }) async {
-    final token = await _getOptionalAuthToken();
-    return {
-      if (includeJsonContentType) 'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    return ApiIdentityService.instance.buildHeaders(
+      includeJsonContentType: includeJsonContentType,
+    );
   }
 
   Future<Map<String, String>> _requiredAuthorizedHeaders({
     bool includeJsonContentType = false,
   }) async {
-    final ready = await AppStartupController.instance
-        .ensureAuthenticatedSession();
-    if (!ready) {
-      throw StateError('Authentication is not ready yet.');
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Authentication failed: no Firebase user available.');
-    }
-
-    final token = await user.getIdToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('Authentication failed: empty Firebase ID token.');
-    }
-
-    return {
-      if (includeJsonContentType) 'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
-
-  Future<String?> _getOptionalAuthToken() async {
-    final ready = await AppStartupController.instance.ensureFirebaseReady();
-    if (!ready) {
-      return null;
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return null;
-    }
-
-    try {
-      final token = await user.getIdToken();
-      if (token == null || token.isEmpty) {
-        return null;
-      }
-      return token;
-    } catch (e) {
-      debugPrint('Community fetch proceeding without auth token: $e');
-      return null;
-    }
+    return ApiIdentityService.instance.buildHeaders(
+      includeJsonContentType: includeJsonContentType,
+    );
   }
 
   Future<List<CommunityPost>> fetchPosts({bool forceRefresh = false}) async {
@@ -282,18 +239,13 @@ class CommunityRepository {
   }
 
   Future<void> createPost(String content, {String? imageUrl}) async {
-    final ready = await AppStartupController.instance
-        .ensureAuthenticatedSession();
-    if (!ready) {
-      throw Exception('Giriş hazır değil');
-    }
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception("Giriş yapmalısınız");
+    final localId = await ApiIdentityService.instance.getLocalPersistentId();
 
     final newPost = CommunityPost(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      authorName: user.displayName ?? "Kullanıcı",
-      authorImage: user.photoURL,
+      authorName:
+          'Yerel Kullanici (${localId.substring(0, localId.length > 20 ? 20 : localId.length)})',
+      authorImage: null,
       content: content,
       imageUrl: imageUrl,
       createdAt: DateTime.now(),
@@ -387,9 +339,7 @@ class CommunityRepository {
 
     final reactionState = CommunityReactionState(
       reactionCounts: parseReactionCounts(decoded['reactionCounts']),
-      selectedReactions: parseSelectedReactions(
-        decoded['selectedReactions'],
-      ),
+      selectedReactions: parseSelectedReactions(decoded['selectedReactions']),
     );
 
     updatePostReactionsInCache(

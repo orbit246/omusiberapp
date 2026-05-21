@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/schedule_service.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/academic_faculty_model.dart';
@@ -10,6 +11,7 @@ import 'package:omusiber/backend/view/schedule_model.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/colors/app_colors.dart';
 import 'package:omusiber/pages/new_view/edit_profile_page.dart';
+import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 class SchedulePage extends StatefulWidget {
   const SchedulePage({super.key});
@@ -56,24 +58,37 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   Future<_SchedulePageData> _loadPageData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final profile = user == null
-        ? UserProfile(uid: '', name: 'Misafir Kullanıcı', role: 'guest')
-        : await _profileService.fetchUserProfile(user.uid) ??
-              UserProfile(
-                uid: user.uid,
-                name: user.displayName?.trim().isNotEmpty == true
-                    ? user.displayName!.trim()
-                    : 'Kullanıcı',
-                role: 'member',
+    final user = AppStartupController.instance.isFirebaseReady
+        ? FirebaseAuth.instance.currentUser
+        : null;
+    final profileFuture = user == null
+        ? Future<UserProfile>.value(
+            UserProfile(uid: '', name: 'Misafir Kullanıcı', role: 'guest'),
+          )
+        : _profileService
+              .fetchUserProfile(user.uid, includeBadges: false)
+              .then(
+                (profile) =>
+                    profile ??
+                    UserProfile(
+                      uid: user.uid,
+                      name: user.displayName?.trim().isNotEmpty == true
+                          ? user.displayName!.trim()
+                          : 'Kullanıcı',
+                      role: 'member',
+                    ),
               );
 
-    List<AcademicFaculty> faculties;
-    try {
-      faculties = await _profileService.fetchAcademicFaculties();
-    } catch (_) {
-      faculties = const <AcademicFaculty>[];
-    }
+    final facultiesFuture = _profileService.fetchAcademicFaculties().catchError(
+      (_) => const <AcademicFaculty>[],
+    );
+
+    final results = await Future.wait<dynamic>([
+      profileFuture,
+      facultiesFuture,
+    ]);
+    final profile = results[0] as UserProfile;
+    final faculties = results[1] as List<AcademicFaculty>;
 
     final resolvedSelection = _resolveAcademicSelection(profile, faculties);
     final schedules = await ScheduleService().fetchSchedules(
@@ -98,7 +113,9 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   Future<void> _openProfilePage() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AppStartupController.instance.isFirebaseReady
+        ? FirebaseAuth.instance.currentUser
+        : null;
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -112,6 +129,9 @@ class _SchedulePageState extends State<SchedulePage> {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => EditProfilePage(uid: user.uid)),
     );
+
+    if (!mounted) return;
+    await _refreshSchedules();
   }
 
   @override
@@ -133,7 +153,7 @@ class _SchedulePageState extends State<SchedulePage> {
         future: _pageDataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return _buildLoadingState(context);
           }
 
           if (snapshot.hasError) {
@@ -190,6 +210,98 @@ class _SchedulePageState extends State<SchedulePage> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildLoadingState(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.coolGray.withValues(alpha: 0.14),
+            ),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSkeleton(
+                width: 170,
+                height: 11,
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              SizedBox(height: 8),
+              AppSkeleton(
+                width: 200,
+                height: 18,
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              SizedBox(height: 14),
+              _ScheduleMomentSkeleton(),
+              SizedBox(height: 10),
+              _ScheduleMomentSkeleton(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppColors.coolGray.withValues(alpha: 0.12),
+            ),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSkeleton(
+                width: 150,
+                height: 12,
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              SizedBox(height: 10),
+              AppSkeleton(
+                width: 230,
+                height: 20,
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              SizedBox(height: 18),
+              Row(
+                children: [
+                  AppSkeleton(
+                    width: 64,
+                    height: 34,
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: AppSkeleton(
+                      height: 34,
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  AppSkeleton(
+                    width: 82,
+                    height: 34,
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                ],
+              ),
+              SizedBox(height: 18),
+              _ScheduleGridSkeleton(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1865,6 +1977,89 @@ class _SchedulePageData {
   final List<AcademicFaculty> faculties;
   final _ResolvedAcademicSelection selection;
   final List<ProgramSchedule> schedules;
+}
+
+class _ScheduleMomentSkeleton extends StatelessWidget {
+  const _ScheduleMomentSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.coolGray.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.12)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSkeleton(
+            width: 42,
+            height: 10,
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+          SizedBox(height: 8),
+          AppSkeleton(
+            width: 150,
+            height: 16,
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+          SizedBox(height: 6),
+          AppSkeleton(
+            height: 11,
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduleGridSkeleton extends StatelessWidget {
+  const _ScheduleGridSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List<Widget>.generate(6, (index) {
+        return const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              AppSkeleton(
+                width: 54,
+                height: 52,
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppSkeleton(
+                  height: 52,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppSkeleton(
+                  height: 52,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: AppSkeleton(
+                  height: 52,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
 }
 
 class _ResolvedAcademicSelection {

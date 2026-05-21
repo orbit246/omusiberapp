@@ -1,9 +1,16 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:omusiber/backend/api_identity_service.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
-import 'package:omusiber/backend/auth/auth_service.dart';
+
+class _ScheduleCacheEntry {
+  const _ScheduleCacheEntry({required this.cachedAt, required this.schedules});
+
+  final DateTime cachedAt;
+  final List<ProgramSchedule> schedules;
+}
 
 class ScheduleService {
   // Singleton
@@ -12,12 +19,17 @@ class ScheduleService {
   ScheduleService._privateConstructor();
   factory ScheduleService() => _instance;
 
+  static const Duration _cacheDuration = Duration(minutes: 10);
+  final Map<String, _ScheduleCacheEntry> _cacheByQuery =
+      <String, _ScheduleCacheEntry>{};
+
   Future<List<ProgramSchedule>> fetchSchedules({
     String? departmentKey,
     int? scheduleId,
     String? programName,
     String? classKey,
     int? classIndex,
+    bool forceRefresh = false,
   }) async {
     final queryParameters = <String, String>{};
     final normalizedDepartmentKey = departmentKey?.trim();
@@ -43,22 +55,29 @@ class ScheduleService {
     final uri = Uri.parse('${Constants.baseUrl}/schedules').replace(
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
     );
+    final cacheKey = uri.toString();
+    final cachedEntry = _cacheByQuery[cacheKey];
+    if (!forceRefresh &&
+        cachedEntry != null &&
+        DateTime.now().difference(cachedEntry.cachedAt) < _cacheDuration) {
+      _log('Returning cached schedules for $cacheKey');
+      return cachedEntry.schedules;
+    }
+
     _log(
       'fetchSchedules sent uri=$uri params=${queryParameters.isEmpty ? '{}' : queryParameters}',
     );
 
     try {
-      final token = await AuthService().getIdToken();
-      final hasAuthToken = token != null && token.trim().isNotEmpty;
+      final headers = await ApiIdentityService.instance.buildHeaders(
+        includeJsonContentType: true,
+      );
+      final hasAuthToken = headers['Authorization']?.trim().isNotEmpty == true;
       _log('GET $uri authPresent=$hasAuthToken');
 
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          if (hasAuthToken) 'Authorization': 'Bearer $token',
-        },
+        headers: {...headers, 'Accept': 'application/json'},
       );
       _log(
         'Response status=${response.statusCode} body=${_truncate(response.body)}',
@@ -71,6 +90,10 @@ class ScheduleService {
         final schedules = data
             .map((json) => ProgramSchedule.fromJson(json))
             .toList();
+        _cacheByQuery[cacheKey] = _ScheduleCacheEntry(
+          cachedAt: DateTime.now(),
+          schedules: List<ProgramSchedule>.unmodifiable(schedules),
+        );
         _log(
           'Parsed schedules count=${schedules.length} details=${_summarizeSchedules(schedules)}',
         );

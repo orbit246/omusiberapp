@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/api_identity_service.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/academic_faculty_model.dart';
 import 'package:omusiber/backend/view/user_profile_model.dart';
@@ -9,6 +9,7 @@ import 'package:omusiber/models/user_badge.dart';
 
 class UserProfileService {
   FirebaseAuth get _auth => FirebaseAuth.instance;
+  static final Map<String, UserProfile> _profileCache = <String, UserProfile>{};
   static List<AcademicFaculty>? _facultyCache;
   static final Map<String, List<AcademicDepartment>> _departmentCache =
       <String, List<AcademicDepartment>>{};
@@ -16,6 +17,7 @@ class UserProfileService {
       <String, List<AcademicGrade>>{};
 
   static void clearCaches() {
+    _profileCache.clear();
     _facultyCache = null;
     _departmentCache.clear();
     _gradeCache.clear();
@@ -45,12 +47,9 @@ class UserProfileService {
 
   /// Helper to get headers with Firebase ID token
   Future<Map<String, String>> _getHeaders() async {
-    await AppStartupController.instance.ensureAuthenticatedSession();
-    final token = await _auth.currentUser?.getIdToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    return ApiIdentityService.instance.buildHeaders(
+      includeJsonContentType: true,
+    );
   }
 
   /// Fetch user badges from the backend API
@@ -215,7 +214,18 @@ class UserProfileService {
   }
 
   /// Fetch a full user profile by UID
-  Future<UserProfile?> fetchUserProfile(String uid) async {
+  Future<UserProfile?> fetchUserProfile(
+    String uid, {
+    bool forceRefresh = false,
+    bool includeBadges = true,
+  }) async {
+    if (!forceRefresh) {
+      final cached = _profileCache[uid];
+      if (cached != null) {
+        return cached;
+      }
+    }
+
     try {
       // If fetching "me", we can use a special endpoint or just the uid
       final url = uid == _auth.currentUser?.uid
@@ -229,8 +239,12 @@ class UserProfileService {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        final badges = await fetchUserBadges(uid);
-        return UserProfile.fromFirestore(data, uid, badges: badges);
+        final badges = includeBadges
+            ? await fetchUserBadges(uid)
+            : const <UserBadge>[];
+        final profile = UserProfile.fromFirestore(data, uid, badges: badges);
+        _profileCache[uid] = profile;
+        return profile;
       }
       return null;
     } catch (e) {
@@ -261,7 +275,8 @@ class UserProfileService {
     }
 
     if (decoded is Map<String, dynamic>) {
-      final nestedList = decoded['data'] ?? decoded['items'] ?? decoded['result'];
+      final nestedList =
+          decoded['data'] ?? decoded['items'] ?? decoded['result'];
       if (nestedList is List) {
         return nestedList
             .whereType<Map>()
@@ -358,7 +373,9 @@ class UserProfileService {
     }
 
     try {
-      final faculties = await _fetchAcademicFacultyTree(facultyKey: normalizedKey);
+      final faculties = await _fetchAcademicFacultyTree(
+        facultyKey: normalizedKey,
+      );
       AcademicFaculty? faculty;
       for (final item in faculties) {
         if (item.key == normalizedKey) {
@@ -395,7 +412,10 @@ class UserProfileService {
 
     try {
       final departments = facultyKey != null && facultyKey.trim().isNotEmpty
-          ? await fetchAcademicDepartments(facultyKey, forceRefresh: forceRefresh)
+          ? await fetchAcademicDepartments(
+              facultyKey,
+              forceRefresh: forceRefresh,
+            )
           : <AcademicDepartment>[];
       AcademicDepartment? department;
       for (final item in departments) {
@@ -412,7 +432,9 @@ class UserProfileService {
       }
 
       final classResponse = await http.get(
-        _buildAcademicUri('/classes', {'departmentKey': normalizedDepartmentKey}),
+        _buildAcademicUri('/classes', {
+          'departmentKey': normalizedDepartmentKey,
+        }),
         headers: await _getHeaders(),
       );
 

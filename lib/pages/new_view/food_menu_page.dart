@@ -40,7 +40,9 @@ class _FoodMenuPageState extends State<FoodMenuPage> {
                 icon: const Icon(Icons.refresh),
                 onPressed: () {
                   setState(() {
-                    _menuFuture = FoodMenuService().fetchMenus();
+                    _menuFuture = FoodMenuService().fetchMenus(
+                      forceRefresh: true,
+                    );
                   });
                 },
               ),

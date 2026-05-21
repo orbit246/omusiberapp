@@ -2,10 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/api_identity_service.dart';
 import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/news_view.dart';
@@ -88,32 +87,13 @@ class NewsFetcher {
     return [];
   }
 
-  Future<String> _getAuthToken() async {
-    final ready = await AppStartupController.instance
-        .ensureAuthenticatedSession();
-    if (!ready) {
-      throw StateError('Authentication is not ready yet.');
-    }
-    var user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Authentication failed: no Firebase user available.');
-    }
-    final token = await user.getIdToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('Authentication failed: empty Firebase ID token.');
-    }
-    return token;
-  }
-
   Future<Map<String, String>> _authorizedHeaders({
     bool includeJsonContentType = false,
   }) async {
-    final token = await _getAuthToken();
-    return {
-      ..._headers,
-      if (includeJsonContentType) 'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    return ApiIdentityService.instance.buildHeaders(
+      baseHeaders: _headers,
+      includeJsonContentType: includeJsonContentType,
+    );
   }
 
   void _log(String msg) {
@@ -235,9 +215,6 @@ class NewsFetcher {
         _cachedNews = limitedResult;
       }
     } catch (e) {
-      if (e is StateError) {
-        rethrow;
-      }
       _logError('CRITICAL FAILURE in fetchLatestNews', e);
       if (!hasFacultyFilter &&
           fallbackToCacheOnError &&
@@ -298,9 +275,6 @@ class NewsFetcher {
 
       return _parseNewsItem(decoded.cast<String, dynamic>());
     } catch (e) {
-      if (e is StateError) {
-        rethrow;
-      }
       _logError('Failed to fetch news by id=$newsId', e);
       try {
         final items = await fetchLatestNews(forceRefresh: true);
