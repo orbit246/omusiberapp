@@ -1,2 +1,7 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+
+// Safe archive-speed tweaks: disable indexing/module debug metadata for
+// release-style builds. Keep dSYM generation intact for crash symbolication.
+COMPILER_INDEX_STORE_ENABLE=NO
+CLANG_ENABLE_MODULE_DEBUGGING=NO
