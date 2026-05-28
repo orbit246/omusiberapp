@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
 import 'package:omusiber/backend/background_refresh_coordinator.dart';
@@ -7,6 +9,7 @@ import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/backend/view/master_news_widgets_view.dart';
 import 'package:omusiber/backend/view/news_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NewsRefreshFeedback {
   const NewsRefreshFeedback({required this.message, required this.isSuccess});
@@ -16,6 +19,11 @@ class NewsRefreshFeedback {
 }
 
 class NewsTabController extends ChangeNotifier {
+  static const String _sortKeyPrefsKey = 'news_filters_sort_key';
+  static const String _datePresetPrefsKey = 'news_filters_date_preset';
+  static const String _facultySlugPrefsKey = 'news_filters_faculty_slug';
+  static const String _tagsPrefsKey = 'news_filters_tags';
+
   NewsTabController({
     NewsFetcher? newsFetcher,
     MasterNewsWidgetsRepository? widgetsRepository,
@@ -29,6 +37,7 @@ class NewsTabController extends ChangeNotifier {
       refresh: refreshInBackground,
       canRefresh: _canRunStartupRefresh,
     );
+    _recomputeDerivedState();
     _startupController.addListener(_handleStartupChanged);
   }
 
@@ -44,6 +53,11 @@ class NewsTabController extends ChangeNotifier {
   final List<NewsView> _articles = [];
   final List<NewsFaculty> _faculties = [];
   final Set<String> _selectedTags = <String>{};
+  List<String> _availableTagsCache = const <String>[];
+  List<NewsView> _filteredArticlesCache = const <NewsView>[];
+  List<NewsView> _visibleFilteredArticlesCache = const <NewsView>[];
+  String _sortLabelCache = 'En Yeni';
+  String _filterSummaryCache = 'Tumu';
 
   MasterNewsWidgetsView? _summaryWidgets;
   String _selectedSortKey = 'newest';
@@ -56,6 +70,7 @@ class NewsTabController extends ChangeNotifier {
   int _visibleNewsCount = _initialVisibleNewsCount;
   bool _initialCacheLoadComplete = false;
   bool _startupRefreshComplete = false;
+  bool _filtersRestored = false;
   Future<void>? _facultiesLoadFuture;
 
   List<NewsView> get articles => List.unmodifiable(_articles);
@@ -107,19 +122,13 @@ class NewsTabController extends ChangeNotifier {
     return raw.replaceFirst('Exception: ', '');
   }
 
-  List<String> get availableTags {
-    final tags =
-        _articles
-            .expand((item) => item.tags)
-            .where((tag) => tag.trim().isNotEmpty)
-            .map((tag) => tag.trim())
-            .toSet()
-            .toList()
-          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return tags;
-  }
+  List<String> get availableTags => List.unmodifiable(_availableTagsCache);
 
-  String get sortLabel {
+  String get sortLabel => _sortLabelCache;
+
+  String get filterSummary => _filterSummaryCache;
+
+  String get _sortLabelUncached {
     switch (_selectedSortKey) {
       case 'oldest':
         return 'En Eski';
@@ -133,7 +142,7 @@ class NewsTabController extends ChangeNotifier {
     }
   }
 
-  String get filterSummary {
+  String get _filterSummaryUncached {
     final parts = <String>[];
 
     switch (_selectedDatePreset) {
@@ -180,7 +189,12 @@ class NewsTabController extends ChangeNotifier {
     return selectedSlug;
   }
 
-  List<NewsView> get filteredArticles {
+  List<NewsView> get filteredArticles => List.unmodifiable(_filteredArticlesCache);
+
+  List<NewsView> get visibleFilteredArticles =>
+      List.unmodifiable(_visibleFilteredArticlesCache);
+
+  List<NewsView> get _filteredArticlesUncached {
     final items = _articles.where((item) {
       final matchesDate = switch (_selectedDatePreset) {
         'today' => _isToday(item.publishedAt),
@@ -227,17 +241,10 @@ class NewsTabController extends ChangeNotifier {
     return items;
   }
 
-  List<NewsView> get visibleFilteredArticles {
-    final filtered = filteredArticles;
-    if (_visibleNewsCount >= filtered.length) {
-      return filtered;
-    }
-    return filtered.take(_visibleNewsCount).toList(growable: false);
-  }
-
   Future<void> loadInitialData() async {
     try {
       StartupLogger.log('NewsTabController.loadInitialData() started');
+      await _restoreFiltersIfNeeded();
       _isSummaryLoading = true;
       _isNewsLoading = true;
       _errorMessage = null;
@@ -255,6 +262,7 @@ class NewsTabController extends ChangeNotifier {
         ..clear()
         ..addAll(cachedNews);
       _resetVisibleNewsCount();
+      _recomputeDerivedState();
       _isSummaryLoading = false;
       _isNewsLoading = cachedNews.isEmpty;
       _errorMessage = null;
@@ -282,6 +290,7 @@ class NewsTabController extends ChangeNotifier {
     _visibleNewsCount = (_visibleNewsCount + _newsLoadMoreStep)
         .clamp(_initialVisibleNewsCount, total)
         .toInt();
+    _recomputeDerivedState();
     notifyListeners();
   }
 
@@ -334,6 +343,7 @@ class NewsTabController extends ChangeNotifier {
           ..addAll(newData);
         _resetVisibleNewsCount();
       }
+      _recomputeDerivedState();
       notifyListeners();
       _startupRefreshComplete = true;
     } catch (error) {
@@ -379,6 +389,7 @@ class NewsTabController extends ChangeNotifier {
           ..clear()
           ..addAll(fetchedData);
         _resetVisibleNewsCount();
+        _recomputeDerivedState();
         notifyListeners();
         return const NewsRefreshFeedback(
           message: 'Haberler yenilendi',
@@ -395,6 +406,7 @@ class NewsTabController extends ChangeNotifier {
 
       if (newItems.isNotEmpty) {
         _articles.insertAll(0, newItems);
+        _recomputeDerivedState();
         notifyListeners();
         return NewsRefreshFeedback(
           message: 'Yeni ${newItems.length} haber yüklendi',
@@ -402,6 +414,7 @@ class NewsTabController extends ChangeNotifier {
         );
       }
 
+      _recomputeDerivedState();
       notifyListeners();
       return const NewsRefreshFeedback(
         message: 'Yeni haber bulunamadı',
@@ -428,6 +441,8 @@ class NewsTabController extends ChangeNotifier {
       ..clear()
       ..addAll(tags);
     _resetVisibleNewsCount();
+    _recomputeDerivedState();
+    unawaited(_persistFilterState());
     notifyListeners();
 
     if (facultyChanged) {
@@ -442,6 +457,8 @@ class NewsTabController extends ChangeNotifier {
     _selectedFacultySlug = null;
     _selectedTags.clear();
     _resetVisibleNewsCount();
+    _recomputeDerivedState();
+    unawaited(_persistFilterState());
     notifyListeners();
 
     if (hadFacultyFilter) {
@@ -462,6 +479,7 @@ class NewsTabController extends ChangeNotifier {
       isFavorited: isLiked,
       likeCount: nextLikeCount,
     );
+    _recomputeDerivedState();
     notifyListeners();
 
     await _newsFetcher.trackNewsLike(newsId, isLiked: isLiked);
@@ -494,7 +512,9 @@ class NewsTabController extends ChangeNotifier {
         _selectedFacultySlug != null &&
         !_faculties.any((faculty) => faculty.slug == _selectedFacultySlug)) {
       _selectedFacultySlug = null;
+      unawaited(_persistFilterState());
     }
+    _recomputeDerivedState();
     notifyListeners();
   }
 
@@ -512,6 +532,7 @@ class NewsTabController extends ChangeNotifier {
         ..clear()
         ..addAll(fetchedData);
       _resetVisibleNewsCount();
+      _recomputeDerivedState();
     } catch (error) {
       debugPrint("Faculty-filtered news failed: $error");
     } finally {
@@ -522,6 +543,97 @@ class NewsTabController extends ChangeNotifier {
 
   void _resetVisibleNewsCount() {
     _visibleNewsCount = _initialVisibleNewsCount;
+  }
+
+  Future<void> _restoreFiltersIfNeeded() async {
+    if (_filtersRestored) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final storedSortKey = prefs.getString(_sortKeyPrefsKey);
+    final storedDatePreset = prefs.getString(_datePresetPrefsKey);
+    final storedFacultySlug = prefs.getString(_facultySlugPrefsKey);
+    final storedTags = prefs.getStringList(_tagsPrefsKey);
+
+    if (storedSortKey != null && _isValidSortKey(storedSortKey)) {
+      _selectedSortKey = storedSortKey;
+    }
+    if (storedDatePreset != null && _isValidDatePreset(storedDatePreset)) {
+      _selectedDatePreset = storedDatePreset;
+    }
+
+    _selectedFacultySlug =
+        storedFacultySlug == null || storedFacultySlug.isEmpty
+        ? null
+        : storedFacultySlug;
+
+    _selectedTags
+      ..clear()
+      ..addAll(
+        (storedTags ?? const <String>[])
+            .map((tag) => tag.trim())
+            .where((tag) => tag.isNotEmpty),
+      );
+
+    _filtersRestored = true;
+    _recomputeDerivedState();
+  }
+
+  Future<void> _persistFilterState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sortKeyPrefsKey, _selectedSortKey);
+    await prefs.setString(_datePresetPrefsKey, _selectedDatePreset);
+    if (_selectedFacultySlug == null || _selectedFacultySlug!.isEmpty) {
+      await prefs.remove(_facultySlugPrefsKey);
+    } else {
+      await prefs.setString(_facultySlugPrefsKey, _selectedFacultySlug!);
+    }
+    await prefs.setStringList(_tagsPrefsKey, _selectedTags.toList()..sort());
+  }
+
+  bool _isValidSortKey(String value) {
+    return value == 'newest' ||
+        value == 'oldest' ||
+        value == 'popular' ||
+        value == 'today';
+  }
+
+  bool _isValidDatePreset(String value) {
+    return value == 'all' || value == 'today' || value == 'week';
+  }
+
+  void _recomputeDerivedState() {
+    _sortLabelCache = _sortLabelUncached;
+    _availableTagsCache = List<String>.unmodifiable(_computeAvailableTags());
+    _filteredArticlesCache = List<NewsView>.unmodifiable(
+      _filteredArticlesUncached,
+    );
+    _visibleFilteredArticlesCache = List<NewsView>.unmodifiable(
+      _computeVisibleFilteredArticles(),
+    );
+    _filterSummaryCache = _filterSummaryUncached;
+  }
+
+  List<String> _computeAvailableTags() {
+    final tags =
+        _articles
+            .expand((item) => item.tags)
+            .where((tag) => tag.trim().isNotEmpty)
+            .map((tag) => tag.trim())
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return tags;
+  }
+
+  List<NewsView> _computeVisibleFilteredArticles() {
+    if (_visibleNewsCount >= _filteredArticlesCache.length) {
+      return _filteredArticlesCache;
+    }
+    return _filteredArticlesCache
+        .take(_visibleNewsCount)
+        .toList(growable: false);
   }
 
   bool _summaryWidgetsMatch(

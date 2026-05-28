@@ -36,12 +36,13 @@ class AppScrollBehavior extends MaterialScrollBehavior {
   }
 }
 
-void main() {
+Future<void> main() async {
   StartupLogger.start();
   StartupLogger.logSection('main()');
   StartupLogger.logSync('WidgetsFlutterBinding.ensureInitialized()', () {
     WidgetsFlutterBinding.ensureInitialized();
   });
+  await ThemeManager().loadThemeMode();
   StartupLogger.attachFrameTimingsLogger(maxFrames: 12);
   StartupLogger.logSync('runApp(const MyApp())', () {
     runApp(const MyApp());

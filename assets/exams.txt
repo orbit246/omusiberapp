@@ -1,0 +1,180 @@
+Cağrı - 1
+ÇHM102	Çağrı Merkezi Yönetimi II	6/3/2026	9:00	A202	79	Öğr. Gör. Dr. Dursun KIRMEMİŞ
+ÇHM104	Çağrı Alma Teknikleri II	6/4/2026	9:00	A202	72	Öğr. Gör. Dr. Dursun KIRMEMİŞ
+ÇHM106	Klavye Teknikleri II	6/4/2026	11:00	LAB1	70	Öğr. Gör. Dr. Dursun KIRMEMİŞ
+ÇHM108	Meslek Hukuku ve Etiği	6/8/2026	9:00	A202	55	Öğr. Gör. Meray KATAR KARAKAŞ
+ÇHM110	İletişim ve İkna	6/1/2026	9:00	A202	58	Öğr. Gör. Mustafa SOLMAZ
+ÇHM112	Çatışma ve Stres Yönetimi	6/2/2026	9:00	A202	56	Öğr. Gör. Mustafa SOLMAZ
+ÇHM114	İş ve Sosyal Güvenlik Hukuku	6/5/2026	9:00	A202	66	Öğr. Gör. Dr. M. Selçuk ÖZKAN
+ÇHM116	Ofis Programları II	6/10/2026	9:00	A202	59	Öğr. Gör. Tuğba CANSU TOPALLI
+ÇHM118	İş Sağlığı ve Güvenliği	6/9/2026	9:00	A202	55	Öğr. Gör. Aslı TOSYALI
+
+Çağrı - 2
+ÇHM206	Ticaret Hukuku	6/8/2026	13:00	D103	26	Öğr. Gör. Meray KATAR KARAKAŞ
+ÇHM212	İstatistik	6/10/2026	13:00	D103	27	Öğr. Gör. Dr. Azize Zehra ÇELENLİ BAŞARAN
+ÇHM216	Temel ve Ticari Matematik	6/2/2026	13:00	D103	24	Doç. Dr. Evren ERGÜN
+ÇHM222	Kalite Yönetimi	6/1/2026	13:00	D103	21	Öğr. Gör. Mustafa SOLMAZ
+ÇHM232	Zaman Yönetimi	6/3/2026	13:00	D103	30	Öğr. Gör. Dr. Dursun KIRMEMİŞ
+ÇHM234	Çağrı Merkezlerinde Takım Yönetimi	6/4/2026	13:00	D103	21	Öğr. Gör. Dr. Dursun KIRMEMİŞ
+ÇHM238	Çağrı Merkezleri İçin Temel Sat.Tek.	6/9/2026	13:00	D103	28	Öğr. Gör. Elif ATAMAN GÜNDOĞDU
+ÇHM240	Girişimcilik ve Yenilikçilik	6/5/2026	16:00	D103	25	Öğr. Gör. Neslihan YONDEMİR ÇALIŞKAN
+ÇHM202	İş Yeri Eğitimi	6/3/2026	12:00	D103		Öğr. Gör. Dr. Dursun KIRMEMİŞ
+ÇHM204	İş Yeri Uygulaması	6/3/2026	12:30	D103		Öğr. Gör. Dr. Dursun KIRMEMİŞ
+Online:
+Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz.		
+Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
+Yabancı Dil II	6/7/2026				
+Campus
+Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
+Atatürk İlkeleri ve İnkılap Tarihi II					
+Yabancı Dil II					
+
+Muhasebe - 1:
+MUV102	Genel Muhasebe-II	6/4/2026	9:00	A201	66	Öğr. Gör. Tunahan BİLGİN
+MUV104	Makro Ekonomi	6/10/2026	9:00	A201	67	Öğr. Gör. Seval ŞENGEZER
+MUV106	Ticaret Hukuku	6/12/2026	9:00	A201	43	Öğr. Gör. Meray KATAR KARAKAŞ
+MUV142	Vergi Hukuku	6/5/2026	9:00	A201	62	Öğr. Gör. Mustafa SOLMAZ
+MUV144	Finansal Yönetim	6/1/2026	09.00	A201	70	Öğr. Gör. Ömer YILMAZ
+MUV146	Muhasebe Denetimi	6/2/2026	16:00	A201	47	Öğr. Gör. Ömer YILMAZ
+MUV148	İş ve Sosyal Güvenlik Hukuku	6/8/2026	9:00	A201	50	Öğr. Gör. Dr. M. Selçuk ÖZKAN
+MUV110	Ticari Matematik	6/3/2026	9:00	A201	51	Doç. Dr. Evren ERGÜN
+MUV112	Ofis Programları-II	6/2/2023	9:00	A201	60	Öğr. Gör. Serkan VARAN
+
+Muhasebe - 2:
+MUV252	Muhasebe Uygulamaları	6/2/2026	13:00	A201	29	Öğr. Gör. Tunahan BİLGİN
+MUV258	Finansal Yatırım Araçları	6/9/2026	13:00	A201	38	Öğr. Gör. Dr. Azize Zehra ÇELENLİ BAŞARAN
+MUV266	İstatistik	6/8/2026	13:00	A201	31	Öğr. Gör. Dr. Azize Zehra ÇELENLİ BAŞARAN
+MUV268	Borçlar Hukuku	6/12/2026	13:00	A201	33	Öğr. Gör. Ömer OCAY
+MUV264	Pazarlama	6/10/2026	13:00	A201	33	Öğr. Gör. Seval ŞENGEZER
+MUV276	Bilgisayarlı Muhasebe	6/1/2026	13:00	A201	36	Öğr. Gör. Abdulkadir ERYILMAZ
+MUV250	Araştırma Yöntem ve Teknikleri	6/5/2026	13:00	A202	26	Öğr. Gör. Dr. M. Selçuk ÖZKAN
+ÇMUV254 	İş Yeri Eğitimi	6/2/2026	12:00	        		Öğr. Gör. Tunahan BİLGİN
+ÇMUV256	İş Yeri Uygulaması	6/2/2026	12:30			Öğr. Gör. Tunahan BİLGİN
+Online:
+TDİ102	Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz.		
+ATİ102	Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
+YDİ102	Yabancı Dil II	6/7/2026				
+Campus:
+TDİ102	Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
+ATİ102	Atatürk İlkeleri ve İnkılap Tarihi II					
+YDİ102	Yabancı Dil II					
+
+Sosyal Güvenlik - 1:
+SGP102	Sosyal Güvenliğe Giriş	6/8/2026	10:00	A201	67	Öğr. Gör. Dr. M. Selçuk ÖZKAN
+SGP104	Genel Muhasebe II	6/4/2026	10:00	A201	101	Öğr. Gör. Tunahan BİLGİN
+SGP106	Makro Ekonomi	6/10/2026	10:00	A201	96	Öğr. Gör. Seval ŞENGEZER
+SGP108	İş Sağlığı ve Güvenliği	6/9/2026	12:00	A201	64	Öğr. Gör. Aslı TOSYALI 
+SGP110	Ofis Programları II	6/2/2026	10:00	A201	82	Öğr. Gör. Serkan VARAN
+SGP112	Ticari Matematik	6/3/2026	10:00	A201	79	Doç. Dr. Evren ERGÜN
+Online:
+TDİ102	Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz. 		
+ATİ102	Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
+YDİ102	Yabancı Dil II	6/7/2026				
+TDİ102	Türk Dili II  (2.ÖĞRETİM) 	6/7/2026				
+ATİ102	Atatürk İlkeleri ve İnkılap Tarihi II (2.ÖĞRETİM) 	6/7/2026				
+YDİ102	Yabancı Dil II (2.ÖĞRETİM) 	6/7/2026				
+Campus:
+Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
+Atatürk İlkeleri ve İnkılap Tarihi II					
+Yabancı Dil II					
+
+Sosyal Güvenlik - 2:
+SGP202	Sosyal Güvenlik Hukuku II	6/12/2026	14:00	A201	58	Öğr. Gör. Meray KATAR KARAKAŞ
+SGP204	İş Hukuku Uygulamaları	6/8/2026	14:00	A201	55	Öğr. Gör. Dr. M. Selçuk ÖZKAN
+SGP206	İşletmelerde Sosyal Güvenlik Uyg.	6/1/2026	14:00	A201	54	Öğr. Gör. Mustafa SOLMAZ
+SGP208	Sosyal Güvenliğin Güncel Sorunları	6/2/2026	14:00	A201	54	Öğr. Gör. Ömer YILMAZ
+SGP210	Girişimcilik	6/5/2026	14:00	A201	58	Öğr. Gör. Neslihan YONDEMİR ÇALIŞKAN
+SGP212	Sigorta Pazarlaması	6/3/2026	14:00	A201	58	Öğr. Gör. Mustafa SOLMAZ
+SGP214	SGK Veri Giriş Uygulamaları	6/4/2026	14:00	A201	57	Öğr. Gör. Mustafa SOLMAZ
+SGP216	Müşteri İlişkileri Yönetimi	6/9/2026	14:00	A201	58	Öğr. Gör. Elif ATAMAN GÜNDOĞDU
+SGP218	İnsan Kaynakları Yönetimi	6/10/2026	14:00	A201	51	Öğr. Gör. Seval ŞENGEZER
+SGP220	Muhasebe Denetimi	6/2/2026	16:00	A201	62	Öğr. Gör. Ömer YILMAZ
+
+Bilişim Güvenliği - 1:
+BGP104	Web Tasarımının Temelleri	6/9/2026	10:00	A202	57	Öğr. Gör. ASLI TOSYALI
+BGP102	Java Programlama	6/4/2026	10:00	A202	56	Öğr. Gör. Tuğba CANSU TOPALLI
+BGP112	Bilgisayar Donanımı	6/2/2026	12:00	A202	58	Öğr. Gör. SERKAN VARAN
+BGP114	Veri Yapıları ve Programlama	6/1/2026	10:00	A202	60	Öğr. Gör. Dr. Hakan Can ALTUNAY
+BGP106	Veri Tabanı	6/8/2026	10:00	A202	57	Öğr. Gör. SEMA BİLGİLİ
+BGP110	Bilişim Hukuku	6/12/2026	10:00	A202	55	Öğr. Gör. Ömer OCAY
+BGP108	Bilgi ve Ağ Güvenliği	6/5/2026	10:00	A202	63	Öğr. Gör. EMRE ENGİN
+Online:
+Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz.		
+Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
+Yabancı Dil II	6/7/2026				
+Campus:
+Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
+Atatürk İlkeleri ve İnkılap Tarihi II					
+Yabancı Dil II					
+
+Bilişim Güvenliği - 2:
+BGP218	Kriptoloji Algoritmaları	6/3/2026	14:00	A202	37	Öğr. Gör. EMRE ENGİN
+BGP224	Güvenlik Denetim Süreci ve Yönetimi	6/5/2026	14:00	A202	38	Öğr. Gör. EMRE ENGİN
+BGP226	Bilgisayar Ağlarının Programlanması	6/1/2026	14:00	A202	38	Öğr. Gör. Dr. Hakan Can ALTUNAY
+BGP228	Ağ Güvenlik Uygulamaları	6/10/2026	14:00	A202	41	Öğr. Gör. EMRE ENGİN
+BGP230	Güvenlik Duvarı Çözüm Uygulamaları	6/2/2026	14:00	A202	39	Öğr. Gör. Dr. Hakan Can ALTUNAY
+BGP232	Sanallaştırma Teknolojileri	6/8/2026	14:00	A202	36	Öğr. Gör. SEMA BİLGİLİ
+BGP234	Girişimcilik ve Yenilikçilik	6/5/2026	16:00	A202	35	Öğr. Gör. Neslihan YONDEMİR ÇALIŞKAN
+BGP220	İş Yeri Eğitimi	6/3/2026	12:00			Öğr. Gör. Serkan VARAN
+BGP222	İş Yeri Uygulaması	6/3/2026	12:30			Öğr. Gör. Serkan VARAN
+
+Bankacılık - 1:
+BAN102	Genel Muhasebe II	6/1/2026	11:00	A202	52	Öğr. Gör. Abdulkadir ERYILMAZ
+BAN110	İstatistik	6/4/2026	11:00	A202	32	Öğr. Gör. Dr. A. Z. Ç. BAŞARAN
+BAN128	Finansal Yönetim	6/2/2026	11:00	A202	44	Öğr. Gör. Tunahan BİLGİN
+BAN132	Ticari Matematik	6/3/2026	11:00	A202	48	Doç. Dr. Evren ERGÜN
+BAN130	Finansal Piyasalar ve Yat.Araçları	6/8/2026	11:00	A202	44	Öğr. Gör. Dr. A. Z. Ç. BAŞARAN
+BAN108	İş ve Sosyal Güvenlik Hukuku	6/5/2026	11:00	A202	43	Öğr. Gör. Dr. M. Selçuk ÖZKAN
+BAN114	İletişim ve İkna	6/9/2026	11:00	A202	32	Öğr. Gör. Elif ATAMAN GÜNDOĞDU
+BAN126	Sigortacılık Branşları ve Teknikleri	6/10/2026	11:00	A202	30	Öğr. Gör. Elif ATAMAN GÜNDOĞDU
+BAN124	Ticaret ve Borçlar Hukuku	6/12/2026	11:00	A202	32	Öğr. Gör. Ömer OCAY
+
+Bankacılık - 2:
+BAN236	Vadeli Piyasa İşlemleri	6/9/2026	15:00	A202	32	Öğr. Gör. Elif ATAMAN GÜNDOĞDU
+BAN250	Araştırma Yöntem ve Teknikleri	6/8/2026	15:00	A202	28	Öğr. Gör. Dr. A. Z. Ç. BAŞARAN
+BAN244	Poliçe Üretim ve Sunum Teknikleri	6/10/2026	15:00	A202	33	Öğr. Gör. Seval ŞENGEZER
+BAN246	Temel Eksperlik Bilgileri	6/1/2026	15:00	A202	34	Öğr. Gör. Abdulkadir ERYILMAZ
+BAN218	Mesleki Yazılımlar	6/2/2026	15:00	A202	39	Öğr. Gör. Abdulkadir ERYILMAZ
+BAN254	Mesleki Yazışmalar ve Hızlı Yaz.Tek.	6/3/2026	12:00	LAB1	39	Öğr. Gör. Serkan VARAN
+BAN230	İş Yeri Eğitimi	6/1/2026	12:00			Öğr. Gör. Abdulkadir ERYILMAZ
+BAN232	İş Yeri Uygulaması	6/1/2026	12:30			Öğr. Gör. Abdulkadir ERYILMAZ
+BAN230	İş Yeri Eğitimi	6/4/2026	12:00			Öğr. Gör. Dr. A. Z. Ç. BAŞARAN
+BAN232	İş Yeri Uygulaması	6/4/2026	12:30			Öğr. Gör. Dr. A. Z. Ç. BAŞARAN
+Online:
+TDİ102	Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz. 		
+ATİ102	Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
+YDİ102	Yabancı Dil II	6/7/2026				
+TDİ102	Türk Dili II  (2.ÖĞRETİM) 	6/7/2026				
+ATİ102	Atatürk İlkeleri ve İnkılap Tarihi II (2.ÖĞRETİM) 	6/7/2026				
+YDİ102	Yabancı Dil II (2.ÖĞRETİM) 	6/7/2026				
+Campus:
+Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
+Atatürk İlkeleri ve İnkılap Tarihi II					
+Yabancı Dil II					
+
+Bilgisayar Programcılığı - 1:
+DERS KODU  	DERSİN ADI	TARİH	SAAT	DERSLİK	ÖĞR. SAYISI	ÖĞRETİM GÖREVLİSİNİN ADI SOYADI
+BİP102	Mesleki Matematik	6/4/2026	11:00	A201 -D202	110	Doç. Dr. Evren ERGÜN
+BİP104	Veri Tabanı-I	6/5/2026	11:00	A201 	87	Öğr. Gör. Neslihan YONDEMİR ÇALIŞKAN
+BİP106	Yazılım Mimarileri	6/1/2026	11:00	A201 	91	Öğr. Gör. Tuğba CANSU TOPALLI
+BİP110	Bilgisayar Donanımı	6/2/2026	11:00	A201 	91	Öğr. Gör. Serkan VARAN
+BİP122	İş Sağlığı ve Güvenliği	6/9/2026	11:00	A201 	82	Öğr. Gör. ASLI TOSYALI
+BİP126	Web Editörü	6/8/2026	11:00	A201 	90	Öğr. Gör. ASLI TOSYALI
+Online:
+Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz.		
+Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
+Yabancı Dil II	6/7/2026				
+Campus:
+Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
+Atatürk İlkeleri ve İnkılap Tarihi II					
+Yabancı Dil II					
+
+Bilgisayar Programcılığı - 2:
+BİP252	Görsel Programlama-II	6/4/2026	15:00	A201 	60	Öğr. Gör. Tuğba CANSU TOPALLI
+BİP254	İnternet Programcılığı-II	6/5/2026	15:00	A201 	55	Öğr. Gör. Neslihan YONDEMİR ÇALIŞKAN
+BİP256	Nesne Tabanlı Programlama-II 	6/2/2026	15:00	A201 	57	Öğr. Gör. Dr. Hakan Can ALTUNAY
+BİP258	Sistem Analizi ve Tasarımı	6/3/2026	15:00	A201 	57	Öğr. Gör. Serkan VARAN
+BİP260	Sunucu İşletim Sistemi	6/1/2026	15:00	A201 	55	Öğr. Gör. Tuğba CANSU TOPALLI
+BİP262	Oyun Programlama	6/8/2026	15:00	A201 	61	Öğr. Gör. Sema BİLGİLİ
+BİP226	İş Yeri Eğitimi	6/2/2026	12:30			Öğr. Gör. Serkan VARAN
+BİP228	İş Yeri Uygulaması	6/2/2026	12:00			Öğr. Gör. Serkan VARAN

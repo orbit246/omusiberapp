@@ -15,6 +15,7 @@ import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/widgets/home/notification_consent_addon.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NewsTabView extends StatefulWidget {
   const NewsTabView({super.key});
@@ -25,8 +26,15 @@ class NewsTabView extends StatefulWidget {
 
 class _NewsTabViewState extends State<NewsTabView> {
   static const int _imagePrefetchLimit = 2;
+  static const String _todayExpandedPrefsKey = 'news_summary_today_expanded';
+  static const String _weekExpandedPrefsKey = 'news_summary_week_expanded';
   late final NewsTabController _controller;
   final SimpleNotifications _notifications = SimpleNotifications();
+  final Map<String, bool> _summarySectionExpanded = <String, bool>{
+    'today': false,
+    'week': false,
+  };
+  final Set<String> _prefetchedImageUrls = <String>{};
 
   bool _showBackToTopButton = false;
   final ScrollController _scrollController = ScrollController();
@@ -35,6 +43,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   bool _notificationRequestInFlight = false;
   bool _notificationPromptHandled = false;
   Timer? _notificationPromptTimer;
+  String? _lastControllerViewSignature;
 
   MasterNewsWidgetsView? get _summaryWidgets => _controller.summaryWidgets;
   String get _selectedSortKey => _controller.selectedSortKey;
@@ -61,6 +70,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     _controller = NewsTabController()..addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(_restoreSummarySectionExpansionState());
       unawaited(_refreshNotificationConsentState());
       unawaited(_controller.loadInitialData());
     });
@@ -77,7 +87,12 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   void _handleControllerChanged() {
     if (!mounted) return;
-    _precacheNewsImages(_controller.articles);
+    _precacheNewsImagesIfNeeded(_controller.articles);
+    final nextSignature = _buildControllerViewSignature();
+    if (_lastControllerViewSignature == nextSignature) {
+      return;
+    }
+    _lastControllerViewSignature = nextSignature;
     setState(() {});
   }
 
@@ -119,6 +134,69 @@ class _NewsTabViewState extends State<NewsTabView> {
     _controller.loadMoreNews();
   }
 
+  bool _isCollapsibleSummarySection(MasterNewsWidgetSection section) {
+    return section.id == 'today' || section.id == 'week';
+  }
+
+  bool _isSummarySectionExpanded(MasterNewsWidgetSection section) {
+    return _summarySectionExpanded[section.id] ?? true;
+  }
+
+  String? _summarySectionSubtitle(MasterNewsWidgetSection section) {
+    switch (section.id) {
+      case 'today':
+        return 'Günlük Gelişmeler';
+      case 'week':
+        return 'Haftalık Gelişmeler';
+      default:
+        return null;
+    }
+  }
+
+  void _toggleSummarySection(MasterNewsWidgetSection section) {
+    if (!_isCollapsibleSummarySection(section)) return;
+    final nextValue = !_isSummarySectionExpanded(section);
+    setState(() {
+      _summarySectionExpanded[section.id] = nextValue;
+    });
+    unawaited(_persistSummarySectionExpansionState(section.id, nextValue));
+  }
+
+  Future<void> _restoreSummarySectionExpansionState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayExpanded = prefs.getBool(_todayExpandedPrefsKey);
+    final weekExpanded = prefs.getBool(_weekExpandedPrefsKey);
+    if (!mounted) return;
+
+    final nextTodayExpanded = todayExpanded ?? _summarySectionExpanded['today']!;
+    final nextWeekExpanded = weekExpanded ?? _summarySectionExpanded['week']!;
+    if (_summarySectionExpanded['today'] == nextTodayExpanded &&
+        _summarySectionExpanded['week'] == nextWeekExpanded) {
+      return;
+    }
+
+    setState(() {
+      _summarySectionExpanded['today'] = nextTodayExpanded;
+      _summarySectionExpanded['week'] = nextWeekExpanded;
+    });
+  }
+
+  Future<void> _persistSummarySectionExpansionState(
+    String sectionId,
+    bool isExpanded,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final prefsKey = switch (sectionId) {
+      'today' => _todayExpandedPrefsKey,
+      'week' => _weekExpandedPrefsKey,
+      _ => null,
+    };
+    if (prefsKey == null) {
+      return;
+    }
+    await prefs.setBool(prefsKey, isExpanded);
+  }
+
   Future<List<NewsFaculty>> _ensureFacultiesForFilters() async {
     return _controller.ensureFacultiesForFilters();
   }
@@ -156,14 +234,47 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
-  void _precacheNewsImages(List<NewsView> items) {
+  String _buildControllerViewSignature() {
+    final summarySignature = _summaryWidgets?.toJson().toString() ?? 'no-summary';
+    final articlesSignature = _visibleFilteredArticles
+        .map(
+          (item) =>
+              '${item.id}:${item.likeCount}:${item.viewCount}:${item.isFavorited}',
+        )
+        .join('|');
+
+    return [
+      summarySignature,
+      articlesSignature,
+      _filteredArticles.length,
+      _isSummaryLoading,
+      _isNewsLoading,
+      _isFacultyNewsLoading,
+      _errorMessage ?? '',
+      _selectedSortKey,
+      _selectedDatePreset,
+      _selectedFacultySlug ?? '',
+      _selectedTags.join('|'),
+      _shouldShowColdStartShimmer,
+    ].join('::');
+  }
+
+  void _precacheNewsImagesIfNeeded(List<NewsView> items) {
+    final urlsToPrefetch = items
+        .take(_imagePrefetchLimit)
+        .map((item) => item.heroImage?.trim() ?? '')
+        .where((url) => url.isNotEmpty)
+        .toSet();
+    final pendingUrls = urlsToPrefetch.difference(_prefetchedImageUrls);
+    if (pendingUrls.isEmpty) {
+      return;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      for (final item in items.take(_imagePrefetchLimit)) {
-        final url = item.heroImage?.trim();
-        if (url == null || url.isEmpty) continue;
-
+      for (final url in pendingUrls) {
+        _prefetchedImageUrls.add(url);
         unawaited(precacheImage(CachedNetworkImageProvider(url), context));
       }
     });
@@ -832,6 +943,80 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
+  Widget _buildCollapsibleSectionHeader(
+    BuildContext context,
+    MasterNewsWidgetSection section,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isExpanded = _isSummarySectionExpanded(section);
+    final subtitle = _summarySectionSubtitle(section);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Semantics(
+        button: true,
+        toggled: isExpanded,
+        label: '${section.title} bolumunu ${isExpanded ? 'daralt' : 'genislet'}',
+        child: OutlinedButton(
+          onPressed: () => _toggleSummarySection(section),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            backgroundColor: colorScheme.surface.withValues(alpha: 0.72),
+            side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.34),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      section.title,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Align(
+                alignment: Alignment.center,
+                child: Icon(
+                  isExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingState(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1025,9 +1210,17 @@ class _NewsTabViewState extends State<NewsTabView> {
     final slivers = <Widget>[];
     for (final section in summaryWidgets.sections) {
       if (section.title.trim().isNotEmpty) {
+        final isCollapsible = _isCollapsibleSummarySection(section);
         slivers.add(
-          SliverToBoxAdapter(child: _buildSectionLabel(context, section.title)),
+          SliverToBoxAdapter(
+            child: isCollapsible
+                ? _buildCollapsibleSectionHeader(context, section)
+                : _buildSectionLabel(context, section.title),
+          ),
         );
+        if (isCollapsible && !_isSummarySectionExpanded(section)) {
+          continue;
+        }
       }
 
       if (section.cards.isEmpty) {
