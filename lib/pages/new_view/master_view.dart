@@ -12,6 +12,7 @@ import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
 import 'package:omusiber/pages/new_view/notes_placeholder_page.dart';
 import 'package:omusiber/pages/new_view/notes_tab_view.dart';
+import 'package:omusiber/pages/new_view/exam_schedule_page.dart';
 import 'package:omusiber/pages/new_view/community_tab_view.dart';
 import 'package:omusiber/backend/update_service.dart';
 
@@ -33,6 +34,7 @@ class MasterView extends StatefulWidget {
 
 class _MasterViewState extends State<MasterView>
     with SingleTickerProviderStateMixin {
+  static final DateTime _temporaryExamMenuEndsAt = DateTime(2026, 6, 21);
   late TabController _tabController;
   String _appBarTitle = "Haberler";
 
@@ -185,6 +187,10 @@ class _MasterViewState extends State<MasterView>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
+  bool get _shouldShowTemporaryExamMenu {
+    return DateTime.now().isBefore(_temporaryExamMenuEndsAt);
   }
 
   void _scheduleUpdateCheckAfterStartupBreath() {
@@ -392,6 +398,20 @@ class _MasterViewState extends State<MasterView>
           _buildDrawerHeader(context, user: user, isAuthLoading: isAuthLoading),
           _buildDrawerDivider(),
           _buildDrawerSectionTitle(context, "Akademik"),
+          if (_shouldShowTemporaryExamMenu)
+            _buildDrawerTile(
+              context: context,
+              icon: Icons.fact_check_rounded,
+              title: "Sınav\nTakvimi",
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ExamSchedulePage(),
+                  ),
+                );
+              },
+            ),
           _buildDrawerTile(
             context: context,
             icon: Icons.calendar_month_outlined,

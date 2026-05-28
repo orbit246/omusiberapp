@@ -1,4 +1,4 @@
-Cağrı - 1
+Çağrı - 1:
 ÇHM102	Çağrı Merkezi Yönetimi II	6/3/2026	9:00	A202	79	Öğr. Gör. Dr. Dursun KIRMEMİŞ
 ÇHM104	Çağrı Alma Teknikleri II	6/4/2026	9:00	A202	72	Öğr. Gör. Dr. Dursun KIRMEMİŞ
 ÇHM106	Klavye Teknikleri II	6/4/2026	11:00	LAB1	70	Öğr. Gör. Dr. Dursun KIRMEMİŞ
@@ -9,7 +9,7 @@ Cağrı - 1
 ÇHM116	Ofis Programları II	6/10/2026	9:00	A202	59	Öğr. Gör. Tuğba CANSU TOPALLI
 ÇHM118	İş Sağlığı ve Güvenliği	6/9/2026	9:00	A202	55	Öğr. Gör. Aslı TOSYALI
 
-Çağrı - 2
+Çağrı - 2:
 ÇHM206	Ticaret Hukuku	6/8/2026	13:00	D103	26	Öğr. Gör. Meray KATAR KARAKAŞ
 ÇHM212	İstatistik	6/10/2026	13:00	D103	27	Öğr. Gör. Dr. Azize Zehra ÇELENLİ BAŞARAN
 ÇHM216	Temel ve Ticari Matematik	6/2/2026	13:00	D103	24	Doç. Dr. Evren ERGÜN
@@ -24,7 +24,7 @@ Online:
 Türk Dili II	6/7/2026		sinav.omu.edu.tr üzerinden sınav giriş bilgilerini,sınav tarihi ve saatini  kontrol ediniz.		
 Atatürk İlkeleri ve İnkılap Tarihi II	6/7/2026				
 Yabancı Dil II	6/7/2026				
-Campus
+Campus:
 Türk Dili II	6/6/2026	16:00	YÜZYÜZE		EĞİTİM  FAKÜLTESİ  B-BLOK DERSLİKLERİ
 Atatürk İlkeleri ve İnkılap Tarihi II					
 Yabancı Dil II					
