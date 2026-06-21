@@ -146,7 +146,7 @@ class _SettingsPageState extends State<SettingsPage> {
           }
 
           return StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
+            stream: FirebaseAuth.instance.userChanges(),
             builder: (context, snapshot) {
               return _buildSettingsBody(
                 context,

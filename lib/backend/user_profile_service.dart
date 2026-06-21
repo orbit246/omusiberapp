@@ -169,6 +169,52 @@ class UserProfileService {
           response.body,
         );
       }
+
+      _profileCache.remove(uid);
+
+      final currentUid = _auth.currentUser?.uid;
+      final normalizedUid = uid.trim();
+      final responseUid = () {
+        try {
+          final decoded = json.decode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            final rawUid = decoded['uid'];
+            if (rawUid is String && rawUid.trim().isNotEmpty) {
+              return rawUid.trim();
+            }
+          }
+        } catch (_) {}
+        return null;
+      }();
+
+      final cacheUid = responseUid ?? currentUid ?? normalizedUid;
+      if (cacheUid.isNotEmpty) {
+        final badges = () {
+          try {
+            final decoded = json.decode(response.body);
+            if (decoded is Map<String, dynamic>) {
+              final rawBadges = decoded['badges'];
+              if (rawBadges is List) {
+                return UserBadge.fromStringList(
+                  rawBadges.whereType<String>().toList(growable: false),
+                );
+              }
+            }
+          } catch (_) {}
+          return const <UserBadge>[];
+        }();
+
+        try {
+          final decoded = json.decode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            _profileCache[cacheUid] = UserProfile.fromFirestore(
+              decoded,
+              cacheUid,
+              badges: badges,
+            );
+          }
+        } catch (_) {}
+      }
     } catch (e) {
       print('Error updating user profile: $e');
       rethrow;

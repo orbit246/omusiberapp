@@ -391,7 +391,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'departmentKey': departmentKey,
         'gradeKey': gradeKey,
       });
-      unawaited(SimpleNotifications().syncNewsFacultyTopicFromCurrentProfile());
+      unawaited(
+        SimpleNotifications().syncNewsDepartmentTopicFromCurrentProfile(),
+      );
       unawaited(MasterNewsWidgetsRepository().fetchWidgets(forceRefresh: true));
       return true;
     } catch (e) {
@@ -497,10 +499,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       await _profileService.updateUserProfile(uid, updates);
-      unawaited(SimpleNotifications().syncNewsFacultyTopicFromCurrentProfile());
+      unawaited(
+        SimpleNotifications().syncNewsDepartmentTopicFromCurrentProfile(),
+      );
 
       if (mounted) {
-        final refreshedProfile = await _profileService.fetchUserProfile(uid);
+        final refreshedProfile = await _profileService.fetchUserProfile(
+          uid,
+          forceRefresh: true,
+        );
         if (!mounted) return;
 
         setState(() {

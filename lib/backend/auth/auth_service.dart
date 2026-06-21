@@ -188,7 +188,9 @@ class AuthService {
       await AppStartupController.instance.ensureFirebaseReady();
       await _auth.signOut();
       if (createAnonymousFallback) {
-        print('Signed out from Firebase. Creating fallback anonymous session...');
+        print(
+          'Signed out from Firebase. Creating fallback anonymous session...',
+        );
         await signInAnonymously(acceptedTos: true, acceptedPrivacy: true);
       }
     } catch (e) {
@@ -199,10 +201,13 @@ class AuthService {
   bool get isSignedInWithApple {
     final user = _auth.currentUser;
     if (user == null) return false;
-    return user.providerData.any((provider) => provider.providerId == 'apple.com');
+    return user.providerData.any(
+      (provider) => provider.providerId == 'apple.com',
+    );
   }
 
-  Future<AppleDeletionAuthorization?> prepareAppleDeletionAuthorization() async {
+  Future<AppleDeletionAuthorization?>
+  prepareAppleDeletionAuthorization() async {
     if (!isSignedInWithApple) {
       return null;
     }
@@ -287,6 +292,7 @@ class AuthService {
       user = userCred.user;
     }
 
+    UserProfileService.clearCaches();
     return user;
   }
 

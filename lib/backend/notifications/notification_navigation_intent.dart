@@ -6,7 +6,9 @@ class NotificationNavigationIntentService {
 
   static final NotificationNavigationIntentService instance =
       NotificationNavigationIntentService._();
+  static const int newsTabIndex = 0;
   static const int eventsTabIndex = 1;
+  static const int communityTabIndex = 2;
 
   final StreamController<int> _tabIndexController =
       StreamController<int>.broadcast();
@@ -66,8 +68,14 @@ class NotificationNavigationIntentService {
     final type = (data['type'] ?? data['category'] ?? data['targetTab'] ?? '')
         .toString()
         .toLowerCase();
+    if (type.contains('news') || type.contains('announcement')) {
+      return newsTabIndex;
+    }
     if (type.contains('event')) {
       return eventsTabIndex;
+    }
+    if (type.contains('community')) {
+      return communityTabIndex;
     }
 
     final deepLink =
@@ -79,8 +87,15 @@ class NotificationNavigationIntentService {
                 data['link'])
             .toString()
             .toLowerCase();
+    if (deepLink.contains('/community/post/') ||
+        deepLink.contains('/community/')) {
+      return communityTabIndex;
+    }
     if (deepLink.contains('/event/') || deepLink.contains('/events/')) {
       return eventsTabIndex;
+    }
+    if (deepLink.contains('/news/') || deepLink.contains('/haber/')) {
+      return newsTabIndex;
     }
 
     return null;

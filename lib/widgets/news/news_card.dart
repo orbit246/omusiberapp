@@ -18,16 +18,32 @@ class NewsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    const cardRadius = 20.0;
+    const cardBackground = Color(0xFF0F1E34);
+    const cardBackgroundTop = Color(0xFF152746);
+    const cardBackgroundBottom = Color(0xFF0B1529);
+    const accentColor = Color(0xFF3D6DFF);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [cardBackgroundTop, cardBackground, cardBackgroundBottom],
+        ),
+        borderRadius: BorderRadius.circular(cardRadius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(cardRadius),
         child: Material(
           color: Colors.transparent,
           child: Column(
@@ -52,12 +68,10 @@ class NewsCard extends StatelessWidget {
                         memCacheHeight: cacheHeight,
                         fadeInDuration: const Duration(milliseconds: 160),
                         fadeOutDuration: const Duration(milliseconds: 80),
-                        placeholder: (_, __) => Container(
-                          color: colorScheme.surfaceContainerHighest,
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: colorScheme.surfaceContainerHighest,
-                        ),
+                        placeholder: (_, __) =>
+                            Container(color: cardBackground),
+                        errorWidget: (_, __, ___) =>
+                            Container(color: cardBackground),
                       );
                     },
                   ),
@@ -73,6 +87,7 @@ class NewsCard extends StatelessWidget {
                     Text(
                       view.title,
                       style: theme.textTheme.titleMedium!.copyWith(
+                        color: Colors.white,
                         fontWeight: FontWeight.w800,
                         height: 1.2,
                         letterSpacing: -0.5,
@@ -99,7 +114,7 @@ class NewsCard extends StatelessWidget {
                         Text(
                           view.authorName,
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                            color: Colors.white.withValues(alpha: 0.72),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -109,21 +124,39 @@ class NewsCard extends StatelessWidget {
                             view.publishedAtText!,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 10,
-                              color: colorScheme.outline,
+                              color: Colors.white.withValues(alpha: 0.52),
                             ),
                           ),
                       ],
                     ),
 
                     const SizedBox(height: 12),
-                    const Divider(height: 1, thickness: 0.5),
+                    Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
                     const SizedBox(height: 12),
 
                     // Summary
-                    AppMarkdownPreview(
-                      data: view.summary,
-                      maxHeight: 72,
-                      backgroundColor: colorScheme.surface,
+                    Theme(
+                      data: theme.copyWith(
+                        colorScheme: colorScheme.copyWith(
+                          onSurface: Colors.white,
+                          onSurfaceVariant: Colors.white.withValues(
+                            alpha: 0.74,
+                          ),
+                          primary: accentColor,
+                          surfaceContainerHighest: Colors.white.withValues(
+                            alpha: 0.08,
+                          ),
+                        ),
+                      ),
+                      child: AppMarkdownPreview(
+                        data: view.summary,
+                        maxHeight: 72,
+                        backgroundColor: Colors.transparent,
+                      ),
                     ),
 
                     const SizedBox(height: 20),
@@ -177,13 +210,13 @@ class NewsCard extends StatelessWidget {
                             Icon(
                               Icons.remove_red_eye_outlined,
                               size: 14,
-                              color: colorScheme.onSurfaceVariant,
+                              color: Colors.white.withValues(alpha: 0.65),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               _formatCompactTR(view.viewCount),
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                                color: Colors.white.withValues(alpha: 0.72),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -202,7 +235,7 @@ class NewsCard extends StatelessWidget {
                                 }
                               },
                               style: TextButton.styleFrom(
-                                foregroundColor: colorScheme.primary,
+                                foregroundColor: accentColor,
                                 padding: EdgeInsets.zero,
                                 minimumSize: const Size(0, 0),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -274,7 +307,7 @@ class _ActionButton extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final color = isActive
         ? (activeColor ?? colorScheme.primary)
-        : colorScheme.onSurfaceVariant;
+        : Colors.white.withValues(alpha: 0.72);
 
     return InkWell(
       onTap: onTap,

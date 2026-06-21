@@ -138,6 +138,24 @@ class _NewsTabViewState extends State<NewsTabView> {
     return section.id == 'today' || section.id == 'week';
   }
 
+  bool _isPrimaryGlassSummarySection(MasterNewsWidgetSection section) {
+    return section.id == 'today' || section.id == 'week';
+  }
+
+  Color _summarySectionAccentColor(
+    BuildContext context,
+    MasterNewsWidgetSection section,
+  ) {
+    switch (section.id) {
+      case 'today':
+        return const Color(0xFF8BCF2F);
+      case 'week':
+        return const Color(0xFF3D6DFF);
+      default:
+        return Theme.of(context).colorScheme.primary;
+    }
+  }
+
   bool _isSummarySectionExpanded(MasterNewsWidgetSection section) {
     return _summarySectionExpanded[section.id] ?? true;
   }
@@ -168,7 +186,8 @@ class _NewsTabViewState extends State<NewsTabView> {
     final weekExpanded = prefs.getBool(_weekExpandedPrefsKey);
     if (!mounted) return;
 
-    final nextTodayExpanded = todayExpanded ?? _summarySectionExpanded['today']!;
+    final nextTodayExpanded =
+        todayExpanded ?? _summarySectionExpanded['today']!;
     final nextWeekExpanded = weekExpanded ?? _summarySectionExpanded['week']!;
     if (_summarySectionExpanded['today'] == nextTodayExpanded &&
         _summarySectionExpanded['week'] == nextWeekExpanded) {
@@ -235,7 +254,8 @@ class _NewsTabViewState extends State<NewsTabView> {
   }
 
   String _buildControllerViewSignature() {
-    final summarySignature = _summaryWidgets?.toJson().toString() ?? 'no-summary';
+    final summarySignature =
+        _summaryWidgets?.toJson().toString() ?? 'no-summary';
     final articlesSignature = _visibleFilteredArticles
         .map(
           (item) =>
@@ -467,7 +487,7 @@ class _NewsTabViewState extends State<NewsTabView> {
     required VoidCallback onTap,
     bool active = false,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final accentColor = const Color(0xFF3D6DFF);
 
     return Material(
       color: Colors.transparent,
@@ -475,17 +495,33 @@ class _NewsTabViewState extends State<NewsTabView> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: active
-                ? colorScheme.primaryContainer.withValues(alpha: 0.92)
-                : colorScheme.surface.withValues(alpha: 0.86),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: active
+                  ? [
+                      accentColor.withValues(alpha: 0.95),
+                      accentColor.withValues(alpha: 0.78),
+                    ]
+                  : [const Color(0xFF1A2740), const Color(0xFF111C31)],
+            ),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: active
-                  ? colorScheme.primary.withValues(alpha: 0.2)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.38),
+                  ? accentColor.withValues(alpha: 0.38)
+                  : Colors.white.withValues(alpha: 0.08),
             ),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: 0.22),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -496,7 +532,7 @@ class _NewsTabViewState extends State<NewsTabView> {
                   label,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: active ? colorScheme.primary : colorScheme.onSurface,
+                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -506,8 +542,8 @@ class _NewsTabViewState extends State<NewsTabView> {
                 Icons.keyboard_arrow_down_rounded,
                 size: 18,
                 color: active
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.72),
               ),
             ],
           ),
@@ -518,7 +554,6 @@ class _NewsTabViewState extends State<NewsTabView> {
 
   Widget _buildFilterBar(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final hasActiveFilters =
         _selectedDatePreset != 'all' ||
         _selectedTags.isNotEmpty ||
@@ -526,21 +561,25 @@ class _NewsTabViewState extends State<NewsTabView> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      child: Container(
+      child: _buildPrimaryGlassSurface(
+        context,
+        borderRadius: BorderRadius.circular(22),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: colorScheme.surface.withValues(alpha: 0.84),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.36),
-          ),
-        ),
+        backgroundColor: const Color(0xFF0F1E34).withValues(alpha: 0.98),
+        borderColor: Colors.white.withValues(alpha: 0.12),
+        accentColor: const Color(0xFF3D6DFF),
         child: Row(
           children: [
+            Icon(
+              Icons.filter_alt_outlined,
+              size: 20,
+              color: const Color(0xFF3D6DFF),
+            ),
+            const SizedBox(width: 10),
             Text(
               'Filtrele',
               style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurface,
+                color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -551,7 +590,7 @@ class _NewsTabViewState extends State<NewsTabView> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: colorScheme.primary,
+                  color: const Color(0xFF3D6DFF),
                 ),
               ),
             ],
@@ -580,16 +619,16 @@ class _NewsTabViewState extends State<NewsTabView> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.12),
+                      color: const Color(0xFF34151A),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.red.withValues(alpha: 0.35),
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.close_rounded,
                       size: 18,
-                      color: Colors.red,
+                      color: Colors.white.withValues(alpha: 0.82),
                     ),
                   ),
                 ),
@@ -948,51 +987,73 @@ class _NewsTabViewState extends State<NewsTabView> {
     MasterNewsWidgetSection section,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isExpanded = _isSummarySectionExpanded(section);
     final subtitle = _summarySectionSubtitle(section);
+    final borderRadius = BorderRadius.circular(18);
+    final accentColor = _summarySectionAccentColor(context, section);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Semantics(
         button: true,
         toggled: isExpanded,
-        label: '${section.title} bolumunu ${isExpanded ? 'daralt' : 'genislet'}',
-        child: OutlinedButton(
-          onPressed: () => _toggleSummarySection(section),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            backgroundColor: colorScheme.surface.withValues(alpha: 0.72),
-            side: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.34),
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-          ),
+        label:
+            '${section.title} bolumunu ${isExpanded ? 'daralt' : 'genislet'}',
+        child: _buildPrimaryGlassSurface(
+          context,
+          borderRadius: borderRadius,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          onTap: () => _toggleSummarySection(section),
+          accentColor: accentColor,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      accentColor.withValues(alpha: 0.98),
+                      accentColor.withValues(alpha: 0.76),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: 0.32),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.calendar_today_rounded,
+                  size: 20,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       section.title,
-                      textAlign: TextAlign.center,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onSurface,
+                        color: Colors.white,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         subtitle,
-                        textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -1006,8 +1067,8 @@ class _NewsTabViewState extends State<NewsTabView> {
                   isExpanded
                       ? Icons.keyboard_arrow_up_rounded
                       : Icons.keyboard_arrow_down_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                  size: 22,
+                  color: Colors.white.withValues(alpha: 0.88),
+                  size: 24,
                 ),
               ),
             ],
@@ -1298,83 +1359,168 @@ class _NewsTabViewState extends State<NewsTabView> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final style = _summaryCardStyle(context, section: section, card: card);
+    final accentColor = _summarySectionAccentColor(context, section);
+    final usePrimaryGlass = _isPrimaryGlassSummarySection(section);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, isLastInSection ? 16 : 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: card.isInteractive ? () => _handleSummaryCardTap(card) : null,
-          borderRadius: BorderRadius.circular(style.borderRadius),
-          child: Ink(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: style.backgroundColor,
-              borderRadius: BorderRadius.circular(style.borderRadius),
-              border: Border.all(color: style.borderColor),
+      child: _buildPrimaryGlassSurface(
+        context,
+        borderRadius: BorderRadius.circular(style.borderRadius),
+        padding: const EdgeInsets.all(16),
+        onTap: card.isInteractive ? () => _handleSummaryCardTap(card) : null,
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        accentColor: accentColor,
+        child: Row(
+          children: [
+            Container(
+              width: style.iconBoxSize,
+              height: style.iconBoxSize,
+              decoration: BoxDecoration(
+                color: style.iconBackgroundColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                style.icon,
+                size: style.iconSize,
+                color: style.iconColor,
+              ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: style.iconBoxSize,
-                  height: style.iconBoxSize,
-                  decoration: BoxDecoration(
-                    color: style.iconBackgroundColor,
-                    borderRadius: BorderRadius.circular(12),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    card.subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: usePrimaryGlass
+                          ? Colors.white.withValues(alpha: 0.78)
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  child: Icon(
-                    style.icon,
-                    size: style.iconSize,
-                    color: style.iconColor,
+                  const SizedBox(height: 4),
+                  Text(
+                    card.value,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: usePrimaryGlass
+                          ? Colors.white
+                          : colorScheme.onSurface,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (card.trailingText != null &&
+                card.trailingText!.trim().isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                card.trailingText!,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: style.trailingColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+            if (card.isInteractive) ...[
+              const SizedBox(width: 6),
+              Text(
+                '>',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryGlassSurface(
+    BuildContext context, {
+    required BorderRadius borderRadius,
+    required Widget child,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    VoidCallback? onTap,
+    Color? backgroundColor,
+    Color? borderColor,
+    Color? accentColor,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final resolvedAccent = accentColor ?? colorScheme.primary;
+    final resolvedBackground =
+        backgroundColor ?? const Color(0xFF0F1E34).withValues(alpha: 0.98);
+
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF152746),
+              resolvedBackground,
+              const Color(0xFF0B1529),
+            ],
+          ),
+          border: Border.all(
+            color: borderColor ?? Colors.white.withValues(alpha: 0.12),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: -18,
+              top: -14,
+              child: IgnorePointer(
+                child: Container(
+                  width: 92,
+                  height: 92,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: resolvedAccent.withValues(alpha: 0.08),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        card.subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        card.value,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: borderRadius,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.04),
+                      Colors.transparent,
                     ],
                   ),
                 ),
-                if (card.trailingText != null &&
-                    card.trailingText!.trim().isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    card.trailingText!,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: style.trailingColor,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-                if (card.isInteractive) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    '>',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: borderRadius,
+                child: Padding(padding: padding, child: child),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1405,9 +1551,26 @@ class _NewsTabViewState extends State<NewsTabView> {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final isToday = section.id == 'today';
+    final usePrimaryGlass = _isPrimaryGlassSummarySection(section);
+    final accentColor = _summarySectionAccentColor(context, section);
 
     switch (card.kind) {
       case MasterNewsWidgetCardKind.event:
+        if (usePrimaryGlass) {
+          return _SummaryCardStyle(
+            borderRadius: 24,
+            backgroundColor: const Color(0xFF11213A).withValues(alpha: 0.98),
+            borderColor: Colors.white.withValues(alpha: 0.12),
+            iconBackgroundColor: accentColor,
+            iconColor: Colors.white,
+            icon: isToday
+                ? Icons.event_available_rounded
+                : Icons.event_repeat_rounded,
+            iconBoxSize: 38,
+            iconSize: 18,
+            trailingColor: Colors.white,
+          );
+        }
         return isToday
             ? _SummaryCardStyle(
                 borderRadius: 24,
@@ -1432,6 +1595,19 @@ class _NewsTabViewState extends State<NewsTabView> {
                 trailingColor: colorScheme.secondary,
               );
       case MasterNewsWidgetCardKind.news:
+        if (usePrimaryGlass) {
+          return _SummaryCardStyle(
+            borderRadius: 22,
+            backgroundColor: const Color(0xFF11213A).withValues(alpha: 0.98),
+            borderColor: Colors.white.withValues(alpha: 0.12),
+            iconBackgroundColor: accentColor,
+            iconColor: Colors.white,
+            icon: isToday ? Icons.newspaper_rounded : Icons.date_range_rounded,
+            iconBoxSize: 36,
+            iconSize: 18,
+            trailingColor: Colors.white,
+          );
+        }
         return isToday
             ? _SummaryCardStyle(
                 borderRadius: 22,
@@ -1457,6 +1633,19 @@ class _NewsTabViewState extends State<NewsTabView> {
                 trailingColor: colorScheme.secondary,
               );
       case MasterNewsWidgetCardKind.lesson:
+        if (usePrimaryGlass) {
+          return _SummaryCardStyle(
+            borderRadius: 22,
+            backgroundColor: const Color(0xFF11213A).withValues(alpha: 0.98),
+            borderColor: Colors.white.withValues(alpha: 0.12),
+            iconBackgroundColor: accentColor,
+            iconColor: Colors.white,
+            icon: Icons.menu_book_rounded,
+            iconBoxSize: 36,
+            iconSize: 18,
+            trailingColor: Colors.white,
+          );
+        }
         return isToday
             ? _SummaryCardStyle(
                 borderRadius: 22,
@@ -1483,6 +1672,19 @@ class _NewsTabViewState extends State<NewsTabView> {
               );
       case MasterNewsWidgetCardKind.community:
       case MasterNewsWidgetCardKind.unknown:
+        if (usePrimaryGlass) {
+          return _SummaryCardStyle(
+            borderRadius: 22,
+            backgroundColor: const Color(0xFF11213A).withValues(alpha: 0.98),
+            borderColor: Colors.white.withValues(alpha: 0.12),
+            iconBackgroundColor: accentColor,
+            iconColor: Colors.white,
+            icon: isToday ? Icons.forum_rounded : Icons.groups_rounded,
+            iconBoxSize: 36,
+            iconSize: 18,
+            trailingColor: Colors.white,
+          );
+        }
         return _SummaryCardStyle(
           borderRadius: 22,
           backgroundColor: colorScheme.surface.withValues(

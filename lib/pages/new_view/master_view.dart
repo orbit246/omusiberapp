@@ -603,7 +603,7 @@ class _MasterViewState extends State<MasterView>
             }
 
             return StreamBuilder<User?>(
-              stream: FirebaseAuth.instance.authStateChanges(),
+              stream: FirebaseAuth.instance.userChanges(),
               builder: (context, snapshot) {
                 return _buildDrawerContent(
                   context,
