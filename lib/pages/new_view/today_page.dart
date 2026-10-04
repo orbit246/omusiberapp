@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/food_menu_service.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/schedule_service.dart';
 import 'package:omusiber/backend/user_profile_service.dart';
@@ -12,6 +13,7 @@ import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
 import 'package:omusiber/pages/new_view/community_post_detail_page.dart';
+import 'package:omusiber/pages/new_view/food_menu_page.dart';
 import 'package:omusiber/pages/new_view/controllers/community_tab_controller.dart';
 import 'package:omusiber/pages/new_view/controllers/events_tab_controller.dart';
 import 'package:omusiber/pages/new_view/controllers/news_tab_controller.dart';
@@ -36,13 +38,17 @@ class _TodayPageState extends State<TodayPage> {
   late final CommunityTabController _communityController;
   final UserProfileService _profileService = UserProfileService();
   late Future<_TodayScheduleData> _todayScheduleFuture;
+  late Future<List<FoodMenu>> _foodMenuFuture;
   final PageController _newsPageController = PageController();
   final PageController _schedulePageController = PageController();
+  final PageController _foodPageController = PageController();
   Timer? _newsCarouselTimer;
   Timer? _scheduleClockTimer;
   Timer? _scheduleCarouselTimer;
+  Timer? _foodCarouselTimer;
   int _schedulePageIndex = 0;
   int _newsPageIndex = 0;
+  int _foodPageIndex = 0;
 
   @override
   void initState() {
@@ -52,6 +58,7 @@ class _TodayPageState extends State<TodayPage> {
     _communityController = CommunityTabController()
       ..addListener(_handleDataChanged);
     _todayScheduleFuture = _loadTodaySchedule();
+    _foodMenuFuture = FoodMenuService().fetchMenus();
     _scheduleClockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -69,6 +76,10 @@ class _TodayPageState extends State<TodayPage> {
         duration: const Duration(milliseconds: 420),
         curve: Curves.easeOutCubic,
       );
+    });
+    _foodCarouselTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted || !_foodPageController.hasClients) return;
+      unawaited(_advanceFoodCarousel());
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -170,8 +181,10 @@ class _TodayPageState extends State<TodayPage> {
     _newsCarouselTimer?.cancel();
     _scheduleClockTimer?.cancel();
     _scheduleCarouselTimer?.cancel();
+    _foodCarouselTimer?.cancel();
     _newsPageController.dispose();
     _schedulePageController.dispose();
+    _foodPageController.dispose();
     super.dispose();
   }
 
@@ -181,6 +194,18 @@ class _TodayPageState extends State<TodayPage> {
     if (!mounted || count < 2 || !_schedulePageController.hasClients) return;
     final nextPage = (_schedulePageIndex + 1) % count;
     await _schedulePageController.animateToPage(
+      nextPage,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Future<void> _advanceFoodCarousel() async {
+    final menus = await _foodMenuFuture;
+    final count = menus.length > 5 ? 5 : menus.length;
+    if (!mounted || count < 2 || !_foodPageController.hasClients) return;
+    final nextPage = (_foodPageIndex + 1) % count;
+    await _foodPageController.animateToPage(
       nextPage,
       duration: const Duration(milliseconds: 420),
       curve: Curves.easeOutCubic,
@@ -529,6 +554,84 @@ class _TodayPageState extends State<TodayPage> {
                 },
               ),
             ),
+          const SizedBox(height: 26),
+          _TodaySectionHeader(
+            title: 'Yemek Menüsü',
+            actionLabel: 'Tümünü Gör',
+            onAction: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FoodMenuPage()));
+            },
+          ),
+          const SizedBox(height: 10),
+          FutureBuilder<List<FoodMenu>>(
+            future: _foodMenuFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const SizedBox(
+                  height: 108,
+                  child: _TodayFoodMenuSkeleton(),
+                );
+              }
+
+              final menus = [...?snapshot.data]
+                ..sort((left, right) => left.date.compareTo(right.date));
+              if (menus.isEmpty) {
+                return const _TodayEmptyCard(
+                  message: 'Yemek menüsü bulunamadı.',
+                );
+              }
+
+              final todayIndex = menus.indexWhere(
+                (menu) => DateUtils.isSameDay(menu.date, DateTime.now()),
+              );
+              if (todayIndex > 0) {
+                final today = menus.removeAt(todayIndex);
+                menus.insert(0, today);
+              }
+
+              final visibleMenus = menus.take(5).toList(growable: false);
+              return Column(
+                children: [
+                  SizedBox(
+                    height: 108,
+                    child: PageView.builder(
+                      controller: _foodPageController,
+                      itemCount: visibleMenus.length,
+                      onPageChanged: (index) {
+                        if (mounted) setState(() => _foodPageIndex = index);
+                      },
+                      itemBuilder: (context, index) {
+                        final menu = visibleMenus[index];
+                        return _TodayFoodMenuCard(
+                          menu: menu,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const FoodMenuPage(),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  if (visibleMenus.length > 1) ...[
+                    const SizedBox(height: 10),
+                    _TodayNewsDots(
+                      count: visibleMenus.length,
+                      activeIndex: _foodPageIndex.clamp(
+                        0,
+                        visibleMenus.length - 1,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -1279,6 +1382,111 @@ class _TodayCommunityCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TodayFoodMenuCard extends StatelessWidget {
+  const _TodayFoodMenuCard({required this.menu, required this.onTap});
+
+  final FoodMenu menu;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isToday = DateUtils.isSameDay(menu.date, DateTime.now());
+    final dateLabel = DateFormat('EEE, d MMM', 'tr').format(menu.date);
+    final items = menu.items
+        .where((item) => item.trim().isNotEmpty)
+        .take(3)
+        .join(' • ');
+
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width - 40,
+      child: Material(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 92,
+                height: double.infinity,
+                child: ColoredBox(
+                  color: cs.primaryContainer.withValues(alpha: 0.72),
+                  child: Icon(
+                    Icons.restaurant_menu_rounded,
+                    color: cs.primary,
+                    size: 32,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isToday ? 'Bugün' : dateLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (isToday)
+                            Icon(
+                              Icons.today_rounded,
+                              size: 16,
+                              color: cs.primary,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        items.isEmpty ? 'Menü detayları için dokunun.' : items,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TodayFoodMenuSkeleton extends StatelessWidget {
+  const _TodayFoodMenuSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
   }
 }
