@@ -6,9 +6,9 @@ class NotificationNavigationIntentService {
 
   static final NotificationNavigationIntentService instance =
       NotificationNavigationIntentService._();
-  static const int newsTabIndex = 0;
-  static const int eventsTabIndex = 1;
-  static const int communityTabIndex = 2;
+  static const int newsTabIndex = 1;
+  static const int eventsTabIndex = 2;
+  static const int communityTabIndex = 3;
 
   final StreamController<int> _tabIndexController =
       StreamController<int>.broadcast();

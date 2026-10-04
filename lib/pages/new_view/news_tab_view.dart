@@ -119,7 +119,7 @@ class _NewsTabViewState extends State<NewsTabView> {
   void _openMasterTab(int index) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => MasterView(initialTabIndex: index),
+        builder: (context) => MasterView(initialTabIndex: index + 1),
       ),
     );
   }

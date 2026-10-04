@@ -14,6 +14,7 @@ import 'package:omusiber/pages/new_view/notes_placeholder_page.dart';
 import 'package:omusiber/pages/new_view/notes_tab_view.dart';
 import 'package:omusiber/pages/new_view/exam_schedule_page.dart';
 import 'package:omusiber/pages/new_view/community_tab_view.dart';
+import 'package:omusiber/pages/new_view/today_page.dart';
 import 'package:omusiber/backend/update_service.dart';
 
 import 'package:omusiber/pages/new_view/settings_page.dart';
@@ -22,6 +23,7 @@ import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/pages/new_view/academic_calendar_page.dart';
 import 'package:omusiber/pages/new_view/edit_profile_page.dart';
 import 'package:omusiber/widgets/profile/account_profile_entry.dart';
+import 'package:omusiber/widgets/shared/navbar.dart';
 
 class MasterView extends StatefulWidget {
   const MasterView({super.key, this.initialTabIndex = 0});
@@ -36,12 +38,12 @@ class _MasterViewState extends State<MasterView>
     with SingleTickerProviderStateMixin {
   static final DateTime _temporaryExamMenuEndsAt = DateTime(2026, 6, 21);
   late TabController _tabController;
-  String _appBarTitle = "Haberler";
+  String _appBarTitle = 'Bugün';
 
-  // News, Events, Community
-  final List<bool> _unreadStates = [true, false, false];
+  // Today, News, Events, Community
+  final List<bool> _unreadStates = [false, true, false, false];
   bool _unreadNotifications = false;
-  final List<Widget?> _tabBodies = List<Widget?>.filled(3, null);
+  final List<Widget?> _tabBodies = List<Widget?>.filled(4, null);
 
   final TabBadgeService _badgeService = TabBadgeService();
   final AppStartupController _startupController = AppStartupController.instance;
@@ -68,7 +70,7 @@ class _MasterViewState extends State<MasterView>
     );
     _appBarTitle = _titleForIndex(initialTabIndex);
     _tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
       initialIndex: initialTabIndex,
     );
@@ -206,30 +208,18 @@ class _MasterViewState extends State<MasterView>
     });
   }
 
-  String _titleForIndex(int index) {
-    switch (index) {
-      case 1:
-        return "Etkinlikler";
-      case 2:
-        return "Topluluk";
-      case 0:
-      default:
-        return "Haberler";
-    }
-  }
-
   void _handleTabSelection(int index) {
     setState(() {
       _tabBodies[index] ??= _buildTabBodyForIndex(index);
       _appBarTitle = _titleForIndex(index);
       switch (index) {
-        case 0:
+        case 1:
           _badgeService.markNewsViewed();
           break;
-        case 1:
+        case 2:
           _badgeService.markEventsViewed();
           break;
-        case 2:
+        case 3:
           _badgeService.markCommunityViewed();
           break;
       }
@@ -237,6 +227,15 @@ class _MasterViewState extends State<MasterView>
         _unreadStates[index] = false;
       }
     });
+  }
+
+  String _titleForIndex(int index) {
+    return switch (index) {
+      1 => 'Haberler',
+      2 => 'Etkinlikler',
+      3 => 'Topluluk',
+      _ => 'Bugün',
+    };
   }
 
   void _openTabFromNotification(int index) {
@@ -253,13 +252,25 @@ class _MasterViewState extends State<MasterView>
     _tabController.animateTo(index);
   }
 
+  void _selectTab(int index) {
+    if (_tabController.index == index) {
+      _handleTabSelection(index);
+      return;
+    }
+
+    _tabBodies[index] ??= _buildTabBodyForIndex(index);
+    _tabController.animateTo(index);
+  }
+
   Widget _buildTabBodyForIndex(int index) {
     switch (index) {
-      case 1:
-        return const EventsTabView();
-      case 2:
-        return const CommunityTabView();
       case 0:
+        return TodayPage(onOpenPage: _selectTab);
+      case 2:
+        return const EventsTabView();
+      case 3:
+        return const CommunityTabView();
+      case 1:
       default:
         return const NewsTabView();
     }
@@ -341,16 +352,36 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
-  Widget _buildBadgedTab({required String text, required int index}) {
-    return Tab(text: text);
-  }
-
   Color _tabAccentColor(int index, ColorScheme colorScheme) {
     return switch (index) {
-      1 => const Color(0xFFE5484D),
-      2 => const Color(0xFFF97316),
+      2 => const Color(0xFFE5484D),
+      3 => const Color(0xFFF97316),
       _ => colorScheme.primary,
     };
+  }
+
+  Widget _buildShellButton({
+    required BuildContext context,
+    required IconData icon,
+    required VoidCallback onPressed,
+    Widget? child,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Center(
+            child: child ?? Icon(icon, size: 20, color: colorScheme.onSurface),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildDrawerHeader(
@@ -544,30 +575,6 @@ class _MasterViewState extends State<MasterView>
     );
   }
 
-  Widget _buildShellButton({
-    required BuildContext context,
-    required IconData icon,
-    required VoidCallback onPressed,
-    Widget? child,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Center(
-            child: child ?? Icon(icon, size: 20, color: colorScheme.onSurface),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _startupController.removeListener(_handleStartupChanged);
@@ -586,6 +593,7 @@ class _MasterViewState extends State<MasterView>
     final tabAccentColor = _tabAccentColor(_tabController.index, colorScheme);
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       drawer: Drawer(
         width: MediaQuery.of(context).size.width.clamp(0, 258).toDouble(),
@@ -671,62 +679,37 @@ class _MasterViewState extends State<MasterView>
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: _buildShellButton(
-              context: context,
-              icon: Icons.settings_outlined,
-              onPressed: _openSettingsPage,
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(71),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 3, 12, 12),
-            child: Container(
-              height: 54,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: colorScheme.surface.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.38),
-                ),
+            child: Material(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: false,
-                dividerColor: Colors.transparent,
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  color: tabAccentColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: tabAccentColor.withValues(alpha: 0.24),
+              child: PopupMenuButton<String>(
+                tooltip: 'Diğer seçenekler',
+                padding: EdgeInsets.zero,
+                icon: Icon(Icons.more_horiz, color: colorScheme.onSurface),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                onSelected: (value) {
+                  if (value == 'settings') {
+                    _openSettingsPage();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'settings',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.settings_outlined),
+                      title: Text('Ayarlar'),
+                    ),
                   ),
-                ),
-                labelColor: tabAccentColor,
-                unselectedLabelColor: colorScheme.onSurfaceVariant,
-                labelStyle: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-                unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                labelPadding: EdgeInsets.zero,
-                splashBorderRadius: BorderRadius.circular(18),
-                overlayColor: WidgetStatePropertyAll(
-                  tabAccentColor.withValues(alpha: 0.06),
-                ),
-                onTap: (index) => _handleTabSelection(index),
-                tabs: [
-                  _buildBadgedTab(text: "Haberler", index: 0),
-                  _buildBadgedTab(text: "Etkinlikler", index: 1),
-                  _buildBadgedTab(text: "Topluluk", index: 2),
                 ],
               ),
             ),
           ),
-        ),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -734,11 +717,19 @@ class _MasterViewState extends State<MasterView>
           _MasterBackgroundBlobs(accentColor: tabAccentColor),
           IndexedStack(
             index: _tabController.index,
-            children: List<Widget>.generate(3, (index) {
+            children: List<Widget>.generate(4, (index) {
               return _tabBodies[index] ?? const SizedBox.expand();
             }),
           ),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        child: FloatingClassicNavbar(
+          currentIndex: _tabController.index,
+          onDestinationSelected: _selectTab,
+        ),
       ),
     );
   }
