@@ -32,7 +32,7 @@ class ShareService {
   ) {
     return _shareLink(
       context,
-      title: post.authorName,
+      title: post.displayAuthorName,
       subject: 'AkademiZ topluluk gönderisi',
       link: AkademizDeepLink.communityPostUri(post.id).toString(),
     );

@@ -66,6 +66,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   int _profileStep = 0;
   int _departmentRequestToken = 0;
   int _gradeRequestToken = 0;
+  final List<String> _genders = ['Erkek', 'Kadın', 'Belirtmek İstemiyorum'];
 
   @override
   void initState() {
@@ -156,8 +157,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
 
     if (!mounted) return;
+
+    if (_profile != null) {
+      await _loadAcademicOptions();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      return;
+    }
+
     setState(() {
-      _isLoading = _profile == null;
+      _isLoading = true;
     });
 
     try {
@@ -391,6 +400,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'departmentKey': departmentKey,
         'gradeKey': gradeKey,
       });
+      _applyLocalProfileUpdate(includeIdentity: false);
+
       unawaited(
         SimpleNotifications().syncNewsDepartmentTopicFromCurrentProfile(),
       );
@@ -469,13 +480,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _selectedGradeKey = profile.gradeKey;
   }
 
-  Future<void> _saveProfile({
+  Future<bool> _saveProfile({
     bool validateIdentity = true,
     bool includeIdentity = true,
   }) async {
     final uid = _resolvedUid;
-    if (_profile == null || _isLoading || uid == null) return;
-    if (validateIdentity && !_formKey.currentState!.validate()) return;
+    if (_profile == null || _isLoading || uid == null) return false;
+    if (validateIdentity && !_formKey.currentState!.validate()) return false;
 
     setState(() => _isSaving = true);
 
@@ -499,26 +510,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       await _profileService.updateUserProfile(uid, updates);
+      _applyLocalProfileUpdate(includeIdentity: includeIdentity);
       unawaited(
         SimpleNotifications().syncNewsDepartmentTopicFromCurrentProfile(),
       );
 
       if (mounted) {
-        final refreshedProfile = await _profileService.fetchUserProfile(
-          uid,
-          forceRefresh: true,
-        );
-        if (!mounted) return;
-
         setState(() {
-          if (refreshedProfile != null) {
-            _applyProfile(refreshedProfile);
-            _cacheProfile(refreshedProfile);
-          }
           _isSaving = false;
         });
         await _showProfileSavedDialog();
       }
+      return true;
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
       if (mounted) {
@@ -526,9 +529,50 @@ class _EditProfilePageState extends State<EditProfilePage> {
           context,
         ).showSnackBar(SnackBar(content: Text("Hata oluştu: $message")));
       }
+      return false;
     } finally {
       if (mounted && _isSaving) setState(() => _isSaving = false);
     }
+  }
+
+  void _applyLocalProfileUpdate({required bool includeIdentity}) {
+    final current = _profile;
+    if (current == null) return;
+
+    final selectedFaculty = _selectedFaculty;
+    final selectedDepartment = _selectedDepartment;
+    final selectedGrade = _availableGrades
+        .where((grade) => grade.key == _selectedGradeKey)
+        .firstOrNull;
+
+    final updated = UserProfile(
+      uid: current.uid,
+      studentId: includeIdentity
+          ? (_studentIdController.text.trim().isEmpty
+                ? null
+                : _studentIdController.text.trim())
+          : current.studentId,
+      email: current.email,
+      name: includeIdentity ? _nameController.text.trim() : current.name,
+      photoUrl: current.photoUrl,
+      role: current.role,
+      badges: current.badges,
+      isPrivate: current.isPrivate,
+      gender: includeIdentity ? _selectedGender : current.gender,
+      age: includeIdentity
+          ? int.tryParse(_ageController.text.trim())
+          : current.age,
+      facultyKey: _selectedFacultyKey,
+      facultyName: selectedFaculty?.name,
+      departmentKey: _selectedDepartmentKey,
+      department: selectedDepartment?.name,
+      gradeKey: _selectedGradeKey,
+      gradeName: selectedGrade?.name,
+      campus: current.campus,
+    );
+
+    _applyProfile(updated);
+    _cacheProfile(updated);
   }
 
   Future<void> _showProfileSavedDialog() async {
@@ -599,7 +643,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     }
 
-    _saveProfile();
+    final saved = await _saveProfile();
+    if (!mounted || !saved) return;
+
+    setState(() {
+      _profileStep = 0;
+    });
   }
 
   Future<void> _showDeleteAccountDialog() async {
@@ -1011,9 +1060,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget _buildIdentityCard(ThemeData theme) {
     return _buildStickyCard(
       theme: theme,
-      title: 'Kimlik Bilgileri',
+      title: 'Öğrenci Bilgileri',
       subtitle:
-          'Ad soyad ve öğrenci numarası isteğe bağlı. Dilerseniz atlayabilirsiniz.',
+          'Öğrenci bilgilerinizi güncelleyin. Dilerseniz boş bırakabilirsiniz.',
       icon: Icons.badge_outlined,
       child: Column(
         children: [
@@ -1054,6 +1103,55 @@ class _EditProfilePageState extends State<EditProfilePage> {
               }
               return null;
             },
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _ageController,
+                  decoration: _buildCardFieldDecoration(
+                    theme: theme,
+                    labelText: 'Yaş',
+                    icon: Icons.cake_outlined,
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return null;
+                    final age = int.tryParse(val);
+                    if (age == null || age <= 13 || age >= 70) {
+                      return '14-69 olmalı';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('gender-$_selectedGender'),
+                  isExpanded: true,
+                  initialValue: _selectedGender,
+                  decoration: _buildCardFieldDecoration(
+                    theme: theme,
+                    labelText: 'Cinsiyet',
+                    icon: Icons.wc_outlined,
+                  ),
+                  items: _genders
+                      .map(
+                        (gender) => DropdownMenuItem<String>(
+                          value: gender,
+                          child: Text(gender, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _selectedGender = value),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1130,7 +1228,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         const SizedBox(width: 12),
         FilledButton(
           onPressed: canGoNext ? _handleNextAction : null,
-          child: const Text('İleri'),
+          child: Text(_profileStep == 0 ? 'İleri' : 'Kaydet'),
         ),
       ],
     );

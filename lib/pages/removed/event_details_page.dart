@@ -61,6 +61,11 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   Future<void> _handleJoinAction() async {
     final event = _event ?? widget.event;
+    if (event.usesExternalRegistration) {
+      await _openExternalLink();
+      return;
+    }
+
     if (_hasJoined) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -100,13 +105,11 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       } finally {
         if (mounted) setState(() => _isJoining = false);
       }
-    } else if (event.redirectTo != null && event.redirectTo!.isNotEmpty) {
-      await _openExternalLink();
     }
   }
 
   Future<void> _openExternalLink() async {
-    final link = (_event ?? widget.event).redirectTo;
+    final link = (_event ?? widget.event).registrationUrl;
     if (link == null || link.isEmpty) return;
 
     final uri = Uri.tryParse(link);
@@ -176,8 +179,8 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final hasExternalLink =
-        event.redirectTo != null && event.redirectTo!.isNotEmpty;
+    final hasExternalLink = event.registrationUrl?.trim().isNotEmpty ?? false;
+    final usesExternalRegistration = event.usesExternalRegistration;
 
     // Logic to determine image source
     final List<String> images = event.imageLinks.isNotEmpty
@@ -588,14 +591,17 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               ),
                             )
                           : FilledButton.icon(
-                              onPressed:
-                                  (isPast ||
-                                      event.isRegistrationClosed ||
-                                      _hasJoined)
-                                  ? null
-                                  : _handleJoinAction,
+                              onPressed: usesExternalRegistration
+                                  ? _openExternalLink
+                                  : ((isPast ||
+                                            event.isRegistrationClosed ||
+                                            _hasJoined)
+                                        ? null
+                                        : _handleJoinAction),
                               icon: Icon(
-                                (isPast || event.isRegistrationClosed)
+                                usesExternalRegistration
+                                    ? Icons.open_in_new
+                                    : (isPast || event.isRegistrationClosed)
                                     ? Icons.event_busy_rounded
                                     : (_hasJoined
                                           ? Icons.task_alt_rounded
@@ -605,7 +611,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                 size: 18,
                               ),
                               label: Text(
-                                isPast
+                                usesExternalRegistration
+                                    ? 'Detaylar'
+                                    : isPast
                                     ? 'Geçmiş Etkinlik'
                                     : (event.isRegistrationClosed
                                           ? 'Kayıt Kapandı'
@@ -616,18 +624,20 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                                       : 'Dış Bağlantıya Git'))),
                               ),
                               style: FilledButton.styleFrom(
-                                backgroundColor:
-                                    (_hasJoined ||
-                                        isPast ||
-                                        event.isRegistrationClosed)
-                                    ? colorScheme.primaryContainer
-                                    : null,
-                                foregroundColor:
-                                    (_hasJoined ||
-                                        isPast ||
-                                        event.isRegistrationClosed)
-                                    ? colorScheme.onPrimaryContainer
-                                    : null,
+                                backgroundColor: usesExternalRegistration
+                                    ? null
+                                    : ((_hasJoined ||
+                                              isPast ||
+                                              event.isRegistrationClosed)
+                                          ? colorScheme.primaryContainer
+                                          : null),
+                                foregroundColor: usesExternalRegistration
+                                    ? null
+                                    : ((_hasJoined ||
+                                              isPast ||
+                                              event.isRegistrationClosed)
+                                          ? colorScheme.onPrimaryContainer
+                                          : null),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 24,
                                   vertical: 14,
@@ -754,4 +764,3 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     }
   }
 }
-

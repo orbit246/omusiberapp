@@ -82,9 +82,7 @@ class _TodayPageState extends State<TodayPage> {
       final aUpcoming = !aDate.isBefore(now);
       final bUpcoming = !bDate.isBefore(now);
       if (aUpcoming != bUpcoming) return aUpcoming ? -1 : 1;
-      return aUpcoming
-          ? aDate.compareTo(bDate)
-          : bDate.compareTo(aDate);
+      return aUpcoming ? aDate.compareTo(bDate) : bDate.compareTo(aDate);
     });
     return items.take(6).toList();
   }
@@ -111,15 +109,15 @@ class _TodayPageState extends State<TodayPage> {
   }
 
   void _openNews(NewsView item) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => NewsItemPage(view: item)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => NewsItemPage(view: item)));
   }
 
   void _openEvent(PostView event) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EventDetailsPage(event: event)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => EventDetailsPage(event: event)));
   }
 
   void _openPost(CommunityPost post) {
@@ -185,7 +183,10 @@ class _TodayPageState extends State<TodayPage> {
           else if (recentNews.isEmpty)
             const _TodayEmptyCard(message: 'Henüz haber bulunamadı.')
           else
-            _TodayNewsCard(news: recentNews.first, onTap: () => _openNews(recentNews.first)),
+            _TodayNewsCard(
+              news: recentNews.first,
+              onTap: () => _openNews(recentNews.first),
+            ),
           const SizedBox(height: 26),
           _TodaySectionHeader(
             title: 'Bugün Öne Çıkan Etkinlikler',
@@ -291,9 +292,9 @@ class _TodaySummaryCard extends StatelessWidget {
                       : 'Sıradaki: ${event?.title}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -515,7 +516,11 @@ class _TodayEventCard extends StatelessWidget {
                     const SizedBox(height: 7),
                     Row(
                       children: [
-                        Icon(Icons.schedule_rounded, size: 15, color: cs.primary),
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 15,
+                          color: cs.primary,
+                        ),
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
@@ -567,26 +572,22 @@ class _TodayCommunityCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 15,
-                      backgroundColor: cs.primaryContainer,
-                      backgroundImage: post.authorImage == null
+                      backgroundColor: const Color(0xFF4C1D95),
+                      backgroundImage: post.displayAuthorImage == null
                           ? null
-                          : NetworkImage(post.authorImage!),
-                      child: post.authorImage == null
-                          ? Text(
-                              post.authorName.isEmpty
-                                  ? '?'
-                                  : post.authorName[0].toUpperCase(),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: cs.onPrimaryContainer,
-                                fontWeight: FontWeight.w800,
-                              ),
+                          : NetworkImage(post.displayAuthorImage!),
+                      child: post.displayAuthorImage == null
+                          ? const Icon(
+                              Icons.notifications_none_rounded,
+                              color: Color(0xFFE9D5FF),
+                              size: 17,
                             )
                           : null,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        post.authorName,
+                        post.displayAuthorName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelMedium?.copyWith(
@@ -682,10 +683,8 @@ class _TodayEventSkeleton extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       itemCount: 2,
       separatorBuilder: (_, __) => const SizedBox(width: 12),
-      itemBuilder: (_, __) => const SizedBox(
-        width: 220,
-        child: AppSkeleton(height: 230),
-      ),
+      itemBuilder: (_, __) =>
+          const SizedBox(width: 220, child: AppSkeleton(height: 230)),
     );
   }
 }
@@ -699,10 +698,8 @@ class _TodayCommunitySkeleton extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       itemCount: 2,
       separatorBuilder: (_, __) => const SizedBox(width: 12),
-      itemBuilder: (_, __) => const SizedBox(
-        width: 230,
-        child: AppSkeleton(height: 150),
-      ),
+      itemBuilder: (_, __) =>
+          const SizedBox(width: 230, child: AppSkeleton(height: 150)),
     );
   }
 }

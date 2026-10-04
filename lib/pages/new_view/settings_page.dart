@@ -189,7 +189,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               children: [
                 // --- Account Section ---
-                _buildSectionHeader(context, "Hesap"),
+                _buildSectionHeader(context, "Hesaplar"),
                 if (isAuthLoading || isLoggedIn) ...[
                   AccountProfileEntry(
                     user: user,
@@ -235,6 +235,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       onTap: _handleAppleSignIn,
                     ),
                 ],
+
+                _buildAgreementNotice(context),
 
                 const SizedBox(height: 24),
 
@@ -436,6 +438,33 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAgreementNotice(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 18,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "Kayıt olarak Kullanım Şartları, Gizlilik Politikası ve Açık Rıza Metni'ni kabul etmiş olursunuz.",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

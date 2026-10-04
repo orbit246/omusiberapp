@@ -1093,9 +1093,6 @@ class _NewsTabViewState extends State<NewsTabView> {
                 isLoading: _notificationRequestInFlight,
               ),
             ),
-          SliverToBoxAdapter(child: _buildLoadingSection('Bugun')),
-          const SliverToBoxAdapter(child: _LoadingSummaryCard()),
-          const SliverToBoxAdapter(child: _LoadingSummaryCard()),
           SliverToBoxAdapter(child: _buildLoadingSection('Haberler')),
           const SliverToBoxAdapter(child: _LoadingFilterRow()),
           SliverList(
@@ -1268,8 +1265,15 @@ class _NewsTabViewState extends State<NewsTabView> {
       ];
     }
 
+    final visibleSections = summaryWidgets.sections
+        .where((section) => section.id != 'today' && section.id != 'week')
+        .toList(growable: false);
+    if (visibleSections.isEmpty) {
+      return const <Widget>[];
+    }
+
     final slivers = <Widget>[];
-    for (final section in summaryWidgets.sections) {
+    for (final section in visibleSections) {
       if (section.title.trim().isNotEmpty) {
         final isCollapsible = _isCollapsibleSummarySection(section);
         slivers.add(

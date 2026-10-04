@@ -353,6 +353,7 @@ class EventListCard extends StatelessWidget {
       isJoined: event.isJoined == true,
       isPast: isPast,
       isRegistrationClosed: event.isRegistrationClosed,
+      isExternalRegistration: event.usesExternalRegistration,
       onJoin: onOpen,
       onLike: onLike,
       onShare: onShare,

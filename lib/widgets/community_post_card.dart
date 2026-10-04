@@ -47,14 +47,15 @@ class CommunityPostCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: cs.primaryContainer,
-                  backgroundImage: post.authorImage != null
-                      ? NetworkImage(post.authorImage!)
+                  backgroundColor: const Color(0xFF4C1D95),
+                  backgroundImage: post.displayAuthorImage != null
+                      ? NetworkImage(post.displayAuthorImage!)
                       : null,
-                  child: post.authorImage == null
-                      ? Text(
-                          post.authorName.isNotEmpty ? post.authorName[0] : '?',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                  child: post.displayAuthorImage == null
+                      ? const Icon(
+                          Icons.notifications_none_rounded,
+                          color: Color(0xFFE9D5FF),
+                          size: 22,
                         )
                       : null,
                 ),
@@ -64,7 +65,7 @@ class CommunityPostCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        post.authorName,
+                        post.displayAuthorName,
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,

@@ -2,6 +2,9 @@ class CommunityPost {
   final String id;
   final String authorName;
   final String? authorImage;
+  final bool useCustomPosterProfile;
+  final String? posterName;
+  final String? posterImage;
   final String content;
   final String? imageUrl;
   final DateTime createdAt;
@@ -18,6 +21,9 @@ class CommunityPost {
     required this.id,
     required this.authorName,
     this.authorImage,
+    this.useCustomPosterProfile = false,
+    this.posterName,
+    this.posterImage,
     required this.content,
     this.imageUrl,
     required this.createdAt,
@@ -31,11 +37,24 @@ class CommunityPost {
     this.selectedReactions = const {},
   });
 
+  String get displayAuthorName => useCustomPosterProfile
+      ? (posterName?.trim().isNotEmpty == true
+            ? posterName!.trim()
+            : authorName)
+      : 'AkademiZ Admin';
+
+  String? get displayAuthorImage => useCustomPosterProfile
+      ? (posterImage?.trim().isNotEmpty == true ? posterImage : authorImage)
+      : null;
+
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
     return CommunityPost(
       id: _asString(json['id']),
       authorName: _asString(json['authorName'], fallback: 'Anonim'),
       authorImage: _asNullableString(json['authorImage']),
+      useCustomPosterProfile: _asBool(json['useCustomPosterProfile']),
+      posterName: _asNullableString(json['posterName']),
+      posterImage: _asNullableString(json['posterImage']),
       content: _asString(json['content']),
       imageUrl: _asNullableString(json['imageUrl']),
       createdAt: json['createdAt'] != null
@@ -62,6 +81,9 @@ class CommunityPost {
     'id': id,
     'authorName': authorName,
     'authorImage': authorImage,
+    'useCustomPosterProfile': useCustomPosterProfile,
+    'posterName': posterName,
+    'posterImage': posterImage,
     'content': content,
     'imageUrl': imageUrl,
     'createdAt': createdAt.toIso8601String(),
@@ -79,6 +101,9 @@ class CommunityPost {
     String? id,
     String? authorName,
     String? authorImage,
+    bool? useCustomPosterProfile,
+    String? posterName,
+    String? posterImage,
     String? content,
     String? imageUrl,
     DateTime? createdAt,
@@ -95,6 +120,10 @@ class CommunityPost {
       id: id ?? this.id,
       authorName: authorName ?? this.authorName,
       authorImage: authorImage ?? this.authorImage,
+      useCustomPosterProfile:
+          useCustomPosterProfile ?? this.useCustomPosterProfile,
+      posterName: posterName ?? this.posterName,
+      posterImage: posterImage ?? this.posterImage,
       content: content ?? this.content,
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,

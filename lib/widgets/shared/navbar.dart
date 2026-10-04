@@ -8,16 +8,18 @@ class FloatingClassicNavbar extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.onDestinationSelected,
+    required this.onSettingsSelected,
   });
 
   final int currentIndex;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback onSettingsSelected;
 
   static const _destinations = [
-    (icon: Icons.home_outlined, label: 'Bugün'),
-    (icon: Icons.newspaper_outlined, label: 'Haberler'),
-    (icon: Icons.event_outlined, label: 'Etkinlikler'),
-    (icon: Icons.groups_outlined, label: 'Topluluk'),
+    (icon: Icons.newspaper_outlined, label: 'Haberler', tabIndex: 1),
+    (icon: Icons.event_outlined, label: 'Etkinlikler', tabIndex: 2),
+    (icon: Icons.home_outlined, label: 'Bugün', tabIndex: 0),
+    (icon: Icons.groups_outlined, label: 'Topluluk', tabIndex: 3),
   ];
 
   @override
@@ -35,7 +37,7 @@ class FloatingClassicNavbar extends StatelessWidget {
           color: colorScheme.outlineVariant.withValues(alpha: 0.55),
         ),
       ),
-      clipBehavior: Clip.antiAlias,
+      clipBehavior: Clip.none,
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Row(
@@ -43,15 +45,48 @@ class FloatingClassicNavbar extends StatelessWidget {
             ...List<Widget>.generate(_destinations.length, (index) {
               final destination = _destinations[index];
               return Expanded(
-                child: _DestinationButton(
-                  icon: destination.icon,
-                  label: destination.label,
-                  selected: currentIndex == index,
-                  accentColor: _accentColor(index, colorScheme),
-                  onPressed: () => onDestinationSelected(index),
-                ),
+                child: index == 2
+                    ? SizedBox(
+                        height: 45,
+                        child: OverflowBox(
+                          maxWidth: 100,
+                          maxHeight: 100,
+                          alignment: Alignment.center,
+                          child: _CenterDestinationButton(
+                            icon: destination.icon,
+                            label: destination.label,
+                            selected: currentIndex == destination.tabIndex,
+                            accentColor: _accentColor(
+                              destination.tabIndex,
+                              colorScheme,
+                            ),
+                            onPressed: () =>
+                                onDestinationSelected(destination.tabIndex),
+                          ),
+                        ),
+                      )
+                    : _DestinationButton(
+                        icon: destination.icon,
+                        label: destination.label,
+                        selected: currentIndex == destination.tabIndex,
+                        accentColor: _accentColor(
+                          destination.tabIndex,
+                          colorScheme,
+                        ),
+                        onPressed: () =>
+                            onDestinationSelected(destination.tabIndex),
+                      ),
               );
             }),
+            Expanded(
+              child: _DestinationButton(
+                icon: Icons.settings_outlined,
+                label: 'Ayarlar',
+                selected: false,
+                accentColor: colorScheme.primary,
+                onPressed: onSettingsSelected,
+              ),
+            ),
           ],
         ),
       ),
@@ -65,6 +100,70 @@ class FloatingClassicNavbar extends StatelessWidget {
       1 => colorScheme.secondary,
       _ => colorScheme.primary,
     };
+  }
+}
+
+class _CenterDestinationButton extends StatelessWidget {
+  const _CenterDestinationButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.accentColor,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final Color accentColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final foregroundColor = selected ? accentColor : colorScheme.onSurface;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Transform.translate(
+        offset: const Offset(0, -12),
+        child: Material(
+          color: selected
+              ? accentColor.withValues(alpha: 0.18)
+              : colorScheme.surfaceContainerHighest,
+          shape: const CircleBorder(),
+          elevation: 4,
+          shadowColor: Colors.black.withValues(alpha: 0.24),
+          child: InkWell(
+            onTap: onPressed,
+            customBorder: const CircleBorder(),
+            splashColor: accentColor.withValues(alpha: 0.12),
+            child: SizedBox(
+              width: 62,
+              height: 62,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 24, color: foregroundColor),
+                  const SizedBox(height: 1),
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: foregroundColor,
+                      fontSize: 9,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -95,7 +194,9 @@ class _DestinationButton extends StatelessWidget {
       selected: selected,
       label: label,
       child: Material(
-        color: selected ? accentColor.withValues(alpha: 0.13) : Colors.transparent,
+        color: selected
+            ? accentColor.withValues(alpha: 0.13)
+            : Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         child: InkWell(
           onTap: onPressed,
@@ -154,9 +255,9 @@ class App_NavigationBarState extends State<AppNavigationBar> {
           _ => const NotificationsPage(),
         };
 
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => destination),
-        );
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (context) => destination));
       },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Bugün"),

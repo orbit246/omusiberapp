@@ -23,10 +23,14 @@ class PostView {
   final String publisher;
   final bool allowAppSignups;
   final String? redirectTo;
+  final String? externalSignupUrl;
 
   bool get isJoined => _isJoined ?? false;
   bool get isLiked => _isLiked ?? false;
   bool get isRegistrationClosed => _isRegistrationClosed ?? false;
+  String? get registrationUrl => externalSignupUrl ?? redirectTo;
+  bool get usesExternalRegistration =>
+      !allowAppSignups && (registrationUrl?.trim().isNotEmpty ?? false);
   int get likeCount {
     final raw = metadata['likes'];
     if (raw is num) return raw.toInt();
@@ -53,6 +57,7 @@ class PostView {
     this.publisher = '',
     this.allowAppSignups = true,
     this.redirectTo,
+    this.externalSignupUrl,
   }) : _isJoined = isJoined,
        _isLiked = isLiked,
        _isRegistrationClosed = isRegistrationClosed;
@@ -166,6 +171,7 @@ class PostView {
       publisher: json['publisher'] as String? ?? '',
       allowAppSignups: json['allowAppSignups'] as bool? ?? true,
       redirectTo: json['redirectTo'] as String?,
+      externalSignupUrl: json['externalSignupUrl'] as String?,
     );
   }
 
@@ -190,6 +196,7 @@ class PostView {
       'publisher': publisher,
       'allowAppSignups': allowAppSignups,
       'redirectTo': redirectTo,
+      'externalSignupUrl': externalSignupUrl,
     };
   }
 
@@ -213,6 +220,7 @@ class PostView {
     String? publisher,
     bool? allowAppSignups,
     String? redirectTo,
+    String? externalSignupUrl,
   }) {
     return PostView(
       id: id ?? this.id,
@@ -220,7 +228,8 @@ class PostView {
       description: description ?? this.description,
       tags: tags ?? this.tags,
       maxContributors: maxContributors ?? this.maxContributors,
-      remainingContributors: remainingContributors ?? this.remainingContributors,
+      remainingContributors:
+          remainingContributors ?? this.remainingContributors,
       ticketPrice: ticketPrice ?? this.ticketPrice,
       location: location ?? this.location,
       thubnailUrl: thubnailUrl ?? this.thubnailUrl,
@@ -234,6 +243,7 @@ class PostView {
       publisher: publisher ?? this.publisher,
       allowAppSignups: allowAppSignups ?? this.allowAppSignups,
       redirectTo: redirectTo ?? this.redirectTo,
+      externalSignupUrl: externalSignupUrl ?? this.externalSignupUrl,
     );
   }
 }

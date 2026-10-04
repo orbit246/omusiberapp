@@ -25,6 +25,7 @@ class EventCard extends StatefulWidget {
     this.isJoined = false,
     this.isPast = false,
     this.isRegistrationClosed = false,
+    this.isExternalRegistration = false,
     // initialExpanded removed as concept is static now
     this.onJoin,
     this.onLike,
@@ -46,6 +47,7 @@ class EventCard extends StatefulWidget {
   final bool isJoined;
   final bool isPast;
   final bool isRegistrationClosed;
+  final bool isExternalRegistration;
   final VoidCallback? onJoin;
   final ValueChanged<bool>? onLike;
   final VoidCallback? onShare;
@@ -332,12 +334,16 @@ class _EventCardState extends State<EventCard> {
                         child: FilledButton.icon(
                           onPressed: widget.isPast
                               ? widget.onJoin
-                              : ((widget.isRegistrationClosed ||
-                                        widget.isJoined)
-                                    ? null
-                                    : widget.onJoin),
+                              : (widget.isExternalRegistration
+                                    ? widget.onJoin
+                                    : ((widget.isRegistrationClosed ||
+                                              widget.isJoined)
+                                          ? null
+                                          : widget.onJoin)),
                           icon: Icon(
-                            widget.isPast
+                            widget.isExternalRegistration
+                                ? Icons.open_in_new_rounded
+                                : widget.isPast
                                 ? Icons.info_outline_rounded
                                 : widget.isRegistrationClosed
                                 ? Icons.event_busy_rounded
@@ -346,7 +352,9 @@ class _EventCardState extends State<EventCard> {
                                       : Icons.bookmark_add_outlined),
                           ),
                           label: Text(
-                            widget.isPast
+                            widget.isExternalRegistration
+                                ? "Detaylar"
+                                : widget.isPast
                                 ? "Detaylar"
                                 : (widget.isRegistrationClosed
                                       ? "Kayıt Kapandı"
@@ -443,6 +451,7 @@ class _EventCardState extends State<EventCard> {
     final pixelRatio = MediaQuery.of(context).devicePixelRatio;
     return (width * pixelRatio).round().clamp(1, 4096).toInt();
   }
+
   String _fallbackShareText() {
     return [
       widget.title,

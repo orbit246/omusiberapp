@@ -10,7 +10,6 @@ import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/colors/app_theme.dart';
 import 'package:omusiber/backend/theme_manager.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
-import 'package:omusiber/pages/agreement_page.dart';
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
@@ -129,22 +128,13 @@ class _StartupShell extends StatelessWidget {
       builder: (context, child) {
         StartupLogger.log(
           'StartupShell.rebuild() stage=${controller.stage.name} '
-          'booting=${controller.isBooting} agreement=${controller.needsAgreement}',
+          'booting=${controller.isBooting}',
         );
         return Stack(
           children: [
             child!,
             if (controller.isBooting)
               const Positioned(top: 0, left: 0, right: 0, child: _BootStripe()),
-            if (controller.needsAgreement)
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12,
-                child: AgreementConsentBanner(
-                  onContinue: controller.acceptAgreements,
-                ),
-              ),
             if (controller.stage == AppStartupStage.failed)
               Positioned.fill(
                 child: _StartupErrorOverlay(

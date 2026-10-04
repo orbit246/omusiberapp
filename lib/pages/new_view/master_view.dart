@@ -625,9 +625,17 @@ class _MasterViewState extends State<MasterView>
         ),
       ),
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Color.lerp(
+          theme.scaffoldBackgroundColor,
+          colorScheme.onSurface,
+          0.035,
+        ),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        ),
+        clipBehavior: Clip.antiAlias,
         centerTitle: true,
         automaticallyImplyLeading: false,
         toolbarHeight: 64,
@@ -677,38 +685,6 @@ class _MasterViewState extends State<MasterView>
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Material(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: PopupMenuButton<String>(
-                tooltip: 'Diğer seçenekler',
-                padding: EdgeInsets.zero,
-                icon: Icon(Icons.more_horiz, color: colorScheme.onSurface),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                onSelected: (value) {
-                  if (value == 'settings') {
-                    _openSettingsPage();
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'settings',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.settings_outlined),
-                      title: Text('Ayarlar'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
       body: Stack(
@@ -729,6 +705,7 @@ class _MasterViewState extends State<MasterView>
         child: FloatingClassicNavbar(
           currentIndex: _tabController.index,
           onDestinationSelected: _selectTab,
+          onSettingsSelected: _openSettingsPage,
         ),
       ),
     );

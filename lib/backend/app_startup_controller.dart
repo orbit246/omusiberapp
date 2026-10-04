@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -8,8 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/startup_logger.dart';
 import 'package:omusiber/firebase_options.dart';
-import 'package:omusiber/pages/agreement_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppStartupStage { idle, booting, waitingForAgreement, ready, failed }
 
@@ -18,7 +15,6 @@ class AppStartupController extends ChangeNotifier {
 
   static final AppStartupController instance = AppStartupController._();
 
-  static const String _agreementPrefsKey = 'startup_agreement_acceptance_v1';
   static const Duration _startupWarmupWindow = Duration(seconds: 10);
   static const Duration _localFallbackActivationDelay = Duration(seconds: 10);
   static final Stopwatch _startupStopwatch = Stopwatch()..start();
@@ -29,7 +25,6 @@ class AppStartupController extends ChangeNotifier {
   bool _firebaseReady = false;
   bool _authenticatedSessionReady = false;
   bool _localFallbackIdentityEnabled = false;
-  bool _needsAgreement = false;
   bool _backgroundMessageHandlerRegistrationScheduled = false;
   bool _backgroundMessageHandlerRegistered = false;
   Timer? _localFallbackTimer;
@@ -40,7 +35,6 @@ class AppStartupController extends ChangeNotifier {
   bool get hasAuthenticatedSession => _authenticatedSessionReady;
   bool get shouldUseLocalFallbackIdentity => _localFallbackIdentityEnabled;
   bool get isBooting => _stage == AppStartupStage.booting;
-  bool get needsAgreement => _needsAgreement;
   bool get canUseAuthenticatedApis =>
       _stage == AppStartupStage.ready && _authenticatedSessionReady;
   bool get isInStartupWarmup =>
@@ -96,24 +90,6 @@ class AppStartupController extends ChangeNotifier {
     }
   }
 
-  Future<void> acceptAgreements(AgreementsAcceptance acceptance) async {
-    await ensureFirebaseReady();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _agreementPrefsKey,
-      jsonEncode({
-        ...acceptance.toJson(),
-        'acceptedAt': DateTime.now().toIso8601String(),
-      }),
-    );
-
-    _lastError = null;
-    _needsAgreement = false;
-    _stage = AppStartupStage.ready;
-    notifyListeners();
-  }
-
   void markReady() {
     if (_stage == AppStartupStage.ready && _lastError == null) {
       return;
@@ -127,7 +103,6 @@ class AppStartupController extends ChangeNotifier {
     StartupLogger.log('AppStartupController._performStartup() entered');
     _stage = AppStartupStage.booting;
     _lastError = null;
-    _needsAgreement = false;
     notifyListeners();
 
     try {
@@ -174,20 +149,6 @@ class AppStartupController extends ChangeNotifier {
         StartupLogger.log('FirebaseAuth currentUser check skipped: $error');
         unawaited(_ensureAnonymousSessionInBackground());
       }
-    }
-
-    final hasAccepted = await StartupLogger.logAsync(
-      'SharedPreferences agreement acceptance check',
-      _hasStoredAgreementAcceptance,
-    );
-    StartupLogger.log('Agreement accepted=$hasAccepted');
-    _needsAgreement = !hasAccepted;
-    if (_needsAgreement) {
-      StartupLogger.log(
-        'No stored agreement acceptance found; continuing startup and showing agreement banner',
-      );
-    } else {
-      StartupLogger.log('Stored agreement acceptance found');
     }
 
     _stage = AppStartupStage.ready;
@@ -255,12 +216,6 @@ class AppStartupController extends ChangeNotifier {
       );
       notifyListeners();
     });
-  }
-
-  Future<bool> _hasStoredAgreementAcceptance() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_agreementPrefsKey);
-    return raw != null && raw.isNotEmpty;
   }
 
   void _scheduleBackgroundMessageHandlerRegistration() {
