@@ -363,7 +363,7 @@ class NewsFetcher {
         title: cleanTitle,
         summary: summary,
         heroImage: heroImage,
-        authorName: authorName.isEmpty ? 'Bilinmeyen Yazar' : authorName,
+        authorName: authorName.isEmpty ? 'OMÜ' : authorName,
         detailUrl: detailUrl,
         publishedAt: publishedAt,
         publishedAtText:
