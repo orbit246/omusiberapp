@@ -3,6 +3,23 @@ import 'package:omusiber/colors/app_colors.dart';
 import 'package:omusiber/pages/new_view/master_view.dart';
 import 'package:omusiber/pages/notifications_page.dart';
 
+class NavigationSurface {
+  const NavigationSurface._();
+
+  static Color background(ColorScheme colorScheme) {
+    return colorScheme.surface.withValues(alpha: 0.96);
+  }
+
+  static Color accentColor(int index, ColorScheme colorScheme) {
+    return switch (index) {
+      2 => AppColors.amberGlow,
+      3 => colorScheme.tertiary,
+      1 => colorScheme.secondary,
+      _ => colorScheme.primary,
+    };
+  }
+}
+
 class FloatingClassicNavbar extends StatelessWidget {
   const FloatingClassicNavbar({
     super.key,
@@ -28,7 +45,7 @@ class FloatingClassicNavbar extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Material(
-      color: colorScheme.surface.withValues(alpha: 0.96),
+      color: NavigationSurface.background(colorScheme),
       elevation: 10,
       shadowColor: Colors.black.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
@@ -94,12 +111,7 @@ class FloatingClassicNavbar extends StatelessWidget {
   }
 
   Color _accentColor(int index, ColorScheme colorScheme) {
-    return switch (index) {
-      2 => AppColors.amberGlow,
-      3 => colorScheme.tertiary,
-      1 => colorScheme.secondary,
-      _ => colorScheme.primary,
-    };
+    return NavigationSurface.accentColor(index, colorScheme);
   }
 }
 

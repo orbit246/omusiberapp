@@ -102,101 +102,117 @@ class _EventCardState extends State<EventCard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // --- 1. Top Image & Date Badge ---
-            if (widget.imageUrl.isNotEmpty)
-              Stack(
-                children: [
-                  // Image
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final cacheWidth = _imageCacheWidth(
-                          context,
-                          constraints.maxWidth,
-                        );
-                        final cacheHeight = (cacheWidth * 9 / 16).round();
+            Stack(
+              children: [
+                // Keep this image slot mounted at its final size at all times.
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final imageWidth = constraints.maxWidth;
+                      final imageHeight = constraints.maxHeight;
 
-                        return CachedNetworkImage(
-                          imageUrl: widget.imageUrl,
-                          fit: BoxFit.cover,
-                          color: isPast
-                              ? cs.surface.withValues(alpha: 0.32)
-                              : null,
-                          colorBlendMode: isPast ? BlendMode.saturation : null,
-                          memCacheWidth: cacheWidth,
-                          memCacheHeight: cacheHeight,
-                          fadeInDuration: const Duration(milliseconds: 220),
-                          fadeOutDuration: const Duration(milliseconds: 120),
-                          placeholder: (context, url) =>
-                              const _EventImageShimmerPlaceholder(),
-                          errorWidget: (context, url, error) => Container(
-                            color: cs.surfaceContainerHighest,
-                            child: const Center(
-                              child: Icon(Icons.image_not_supported_outlined),
-                            ),
-                          ),
+                      if (widget.imageUrl.trim().isEmpty) {
+                        return SizedBox(
+                          width: imageWidth,
+                          height: imageHeight,
+                          child: const _EventImageShimmerPlaceholder(),
                         );
-                      },
-                    ),
-                  ),
-                  // Gradient Overlay
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.3),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.4],
+                      }
+
+                      final cacheWidth = _imageCacheWidth(context, imageWidth);
+                      final cacheHeight =
+                          (imageHeight *
+                                  MediaQuery.of(context).devicePixelRatio)
+                              .round()
+                              .clamp(1, 4096)
+                              .toInt();
+
+                      return CachedNetworkImage(
+                        imageUrl: widget.imageUrl.trim(),
+                        width: imageWidth,
+                        height: imageHeight,
+                        fit: BoxFit.cover,
+                        color: isPast
+                            ? cs.surface.withValues(alpha: 0.32)
+                            : null,
+                        colorBlendMode: isPast ? BlendMode.saturation : null,
+                        memCacheWidth: cacheWidth,
+                        memCacheHeight: cacheHeight,
+                        fadeInDuration: const Duration(milliseconds: 220),
+                        fadeOutDuration: const Duration(milliseconds: 120),
+                        placeholder: (context, url) => SizedBox(
+                          width: imageWidth,
+                          height: imageHeight,
+                          child: const _EventImageShimmerPlaceholder(),
                         ),
+                        errorWidget: (context, url, error) => SizedBox(
+                          width: imageWidth,
+                          height: imageHeight,
+                          child: const _EventImageShimmerPlaceholder(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // Gradient Overlay
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.3),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.4],
                       ),
                     ),
                   ),
-                  // Date Badge
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.surface.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                ),
+                // Date Badge
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 14,
+                          color: primaryAccent,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          widget.datetimeText,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: titleColor,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 14,
-                            color: primaryAccent,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            widget.datetimeText,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: titleColor,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
 
             // --- 2. Content Body (Everything visible) ---
             Padding(
@@ -204,29 +220,6 @@ class _EventCardState extends State<EventCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Conditional Date Row (if no image)
-                  if (widget.imageUrl.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 16,
-                            color: primaryAccent,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.datetimeText,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: titleColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                   // Publisher (if present)
                   if (widget.publisher != null && widget.publisher!.isNotEmpty)
                     Padding(

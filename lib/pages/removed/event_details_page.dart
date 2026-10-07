@@ -189,9 +189,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
     // Extract metadata
     final duration = event.metadata['durationText']?.toString();
-    final ticketValueText = (event.ticketPrice <= 0)
-        ? 'Ücretsiz'
-        : '${event.ticketPrice.toStringAsFixed(0)} TRY';
+    final ticketValueText = event.pricingType == 'paid'
+        ? 'Ücretli'
+        : 'Ücretsiz';
 
     // Human readable date (No year)
     String datetime = 'Tarih Belirtilmemiş';

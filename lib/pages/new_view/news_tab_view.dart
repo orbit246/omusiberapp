@@ -1770,13 +1770,6 @@ class _NewsTabViewState extends State<NewsTabView> {
                   ),
                 ),
               ..._buildSummarySlivers(context),
-              SliverToBoxAdapter(
-                child: _buildSectionLabel(
-                  context,
-                  "Haberler",
-                  isLoading: _isNewsLoading,
-                ),
-              ),
               SliverToBoxAdapter(child: _buildFilterBar(context)),
               // The List of News
               if (_isNewsLoading && visibleArticles.isEmpty)

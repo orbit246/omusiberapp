@@ -8,6 +8,10 @@ class PostView {
   final String title;
   final String description;
   final List<String> tags;
+  final String scope;
+  final String organizerType;
+  final String pricingType;
+  final String eventType;
   final int maxContributors;
   final int remainingContributors;
   final double ticketPrice;
@@ -42,6 +46,10 @@ class PostView {
     required this.title,
     required this.description,
     required this.tags,
+    this.scope = 'samsun',
+    this.organizerType = 'official',
+    this.pricingType = 'free',
+    this.eventType = 'other',
     required this.maxContributors,
     required this.remainingContributors,
     required this.ticketPrice,
@@ -148,6 +156,10 @@ class PostView {
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       tags: tagsList,
+      scope: json['scope'] as String? ?? 'samsun',
+      organizerType: json['organizerType'] as String? ?? 'official',
+      pricingType: json['pricingType'] as String? ?? 'free',
+      eventType: json['eventType'] as String? ?? 'other',
       maxContributors: maxJoiners,
       remainingContributors: remaining,
       ticketPrice: 0.0, // New API events are free or price not specified yet
@@ -181,6 +193,10 @@ class PostView {
       'title': title,
       'description': description,
       'tags': tags,
+      'scope': scope,
+      'organizerType': organizerType,
+      'pricingType': pricingType,
+      'eventType': eventType,
       'maxContributors': maxContributors,
       'remainingContributors': remainingContributors,
       'ticketPrice': ticketPrice,
@@ -205,6 +221,10 @@ class PostView {
     String? title,
     String? description,
     List<String>? tags,
+    String? scope,
+    String? organizerType,
+    String? pricingType,
+    String? eventType,
     int? maxContributors,
     int? remainingContributors,
     double? ticketPrice,
@@ -227,6 +247,10 @@ class PostView {
       title: title ?? this.title,
       description: description ?? this.description,
       tags: tags ?? this.tags,
+      scope: scope ?? this.scope,
+      organizerType: organizerType ?? this.organizerType,
+      pricingType: pricingType ?? this.pricingType,
+      eventType: eventType ?? this.eventType,
       maxContributors: maxContributors ?? this.maxContributors,
       remainingContributors:
           remainingContributors ?? this.remainingContributors,

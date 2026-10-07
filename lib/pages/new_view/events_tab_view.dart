@@ -104,6 +104,7 @@ class _EventsTabViewState extends State<EventsTabView> {
 
   late final EventsTabController _controller;
   final Set<String> _hasAnimatedIds = {};
+  EventFilters _filters = const EventFilters();
   bool _showBackToTopButton = false;
 
   @override
@@ -178,7 +179,9 @@ class _EventsTabViewState extends State<EventsTabView> {
           isInitialLoading: _controller.isInitialLoading,
           errorMessage: _controller.errorMessage,
           hasAnimatedIds: _hasAnimatedIds,
+          filters: _filters,
           showBackToTopButton: _showBackToTopButton,
+          onFiltersChanged: (filters) => setState(() => _filters = filters),
           onRefresh: _controller.refresh,
           onScrollNotification: _handleScrollNotification,
           onBackToTop: _scrollToTop,
@@ -198,6 +201,71 @@ class _EventsTabViewState extends State<EventsTabView> {
   }
 }
 
+class EventFilters {
+  const EventFilters({
+    this.scope,
+    this.organizerType,
+    this.pricingType,
+    this.eventType,
+  });
+
+  final String? scope;
+  final String? organizerType;
+  final String? pricingType;
+  final String? eventType;
+
+  bool get hasActiveFilters =>
+      scope != null ||
+      organizerType != null ||
+      pricingType != null ||
+      eventType != null;
+
+  int get activeFilterCount =>
+      [scope, organizerType, pricingType, eventType].whereType<String>().length;
+
+  bool matches(PostView event) {
+    return (scope == null || event.scope == scope) &&
+        (organizerType == null || event.organizerType == organizerType) &&
+        (pricingType == null || event.pricingType == pricingType) &&
+        (eventType == null || event.eventType == eventType);
+  }
+}
+
+class _EventFilterOption {
+  const _EventFilterOption(this.value, this.label);
+
+  final String value;
+  final String label;
+}
+
+const _eventScopeOptions = [
+  _EventFilterOption('samsun', 'Samsun İçi'),
+  _EventFilterOption('turkiye', 'Türkiye Geneli'),
+];
+
+const _eventOrganizerOptions = [
+  _EventFilterOption('official', 'Resmi'),
+  _EventFilterOption('community', 'Topluluk'),
+];
+
+const _eventPricingOptions = [
+  _EventFilterOption('paid', 'Ücretli'),
+  _EventFilterOption('free', 'Ücretsiz'),
+];
+
+const _eventTypeOptions = [
+  _EventFilterOption('conference', 'Konferans'),
+  _EventFilterOption('seminar', 'Seminer'),
+  _EventFilterOption('workshop', 'Atölye'),
+  _EventFilterOption('training', 'Eğitim'),
+  _EventFilterOption('competition', 'Yarışma'),
+  _EventFilterOption('social', 'Sosyal'),
+  _EventFilterOption('culture', 'Kültür-Sanat'),
+  _EventFilterOption('sports', 'Spor'),
+  _EventFilterOption('career', 'Kariyer'),
+  _EventFilterOption('other', 'Diğer'),
+];
+
 class EventsTabContent extends StatelessWidget {
   const EventsTabContent({
     super.key,
@@ -205,10 +273,12 @@ class EventsTabContent extends StatelessWidget {
     required this.isInitialLoading,
     required this.errorMessage,
     required this.hasAnimatedIds,
+    required this.filters,
     required this.showBackToTopButton,
     required this.onRefresh,
     required this.onScrollNotification,
     required this.onBackToTop,
+    required this.onFiltersChanged,
     required this.onLike,
     required this.onShare,
     required this.onOpenEvent,
@@ -218,10 +288,12 @@ class EventsTabContent extends StatelessWidget {
   final bool isInitialLoading;
   final String? errorMessage;
   final Set<String> hasAnimatedIds;
+  final EventFilters filters;
   final bool showBackToTopButton;
   final Future<void> Function() onRefresh;
   final ValueChanged<ScrollNotification> onScrollNotification;
   final VoidCallback onBackToTop;
+  final ValueChanged<EventFilters> onFiltersChanged;
   final void Function(PostView event, bool isLiked) onLike;
   final ValueChanged<PostView> onShare;
   final ValueChanged<PostView> onOpenEvent;
@@ -235,6 +307,8 @@ class EventsTabContent extends StatelessWidget {
     if (errorMessage != null && events.isEmpty) {
       return Center(child: Text(errorMessage!));
     }
+
+    final visibleEvents = events.where(filters.matches).toList(growable: false);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -253,6 +327,12 @@ class EventsTabContent extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              SliverToBoxAdapter(
+                child: _EventFilterBar(
+                  filters: filters,
+                  onFiltersChanged: onFiltersChanged,
+                ),
+              ),
               if (events.isEmpty)
                 const SliverFillRemaining(
                   hasScrollBody: false,
@@ -263,10 +343,17 @@ class EventsTabContent extends StatelessWidget {
                     ],
                   ),
                 )
+              else if (visibleEvents.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Text('Bu filtrelerle eşleşen etkinlik yok.'),
+                  ),
+                )
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final event = events[index];
+                    final event = visibleEvents[index];
                     final hasAnimated = hasAnimatedIds.contains(event.id);
                     final shouldAnimate = !hasAnimated;
 
@@ -287,7 +374,7 @@ class EventsTabContent extends StatelessWidget {
                         ),
                       ),
                     );
-                  }, childCount: events.length),
+                  }, childCount: visibleEvents.length),
                 ),
               const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
@@ -302,6 +389,233 @@ class EventsTabContent extends StatelessWidget {
               child: const Icon(Icons.arrow_upward),
             )
           : null,
+    );
+  }
+}
+
+class _EventFilterBar extends StatelessWidget {
+  const _EventFilterBar({
+    required this.filters,
+    required this.onFiltersChanged,
+  });
+
+  final EventFilters filters;
+  final ValueChanged<EventFilters> onFiltersChanged;
+
+  Future<void> _openFilterSheet(BuildContext context) async {
+    final result = await showModalBottomSheet<EventFilters>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) => _EventFilterSheet(initialFilters: filters),
+    );
+    if (result != null) onFiltersChanged(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                avatar: Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: filters.hasActiveFilters
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                label: Text(
+                  filters.hasActiveFilters
+                      ? 'Filtreler (${filters.activeFilterCount})'
+                      : 'Filtreler',
+                ),
+                labelStyle: TextStyle(
+                  color: filters.hasActiveFilters
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+                backgroundColor: filters.hasActiveFilters
+                    ? colorScheme.primary
+                    : colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.45,
+                      ),
+                side: BorderSide(
+                  color: filters.hasActiveFilters
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant.withValues(alpha: 0.7),
+                ),
+                onPressed: () => _openFilterSheet(context),
+              ),
+            ),
+          ),
+          if (filters.hasActiveFilters)
+            TextButton(
+              onPressed: () => onFiltersChanged(const EventFilters()),
+              child: const Text('Temizle'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventFilterSheet extends StatefulWidget {
+  const _EventFilterSheet({required this.initialFilters});
+
+  final EventFilters initialFilters;
+
+  @override
+  State<_EventFilterSheet> createState() => _EventFilterSheetState();
+}
+
+class _EventFilterSheetState extends State<_EventFilterSheet> {
+  late String? _scope = widget.initialFilters.scope;
+  late String? _organizerType = widget.initialFilters.organizerType;
+  late String? _pricingType = widget.initialFilters.pricingType;
+  late String? _eventType = widget.initialFilters.eventType;
+
+  Widget _buildGroup(
+    BuildContext context,
+    String title,
+    List<_EventFilterOption> options,
+    String? selected,
+    ValueChanged<String?> onChanged,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildChoice(
+              context,
+              'Tümü',
+              selected == null,
+              () => onChanged(null),
+            ),
+            ...options.map(
+              (option) => _buildChoice(
+                context,
+                option.label,
+                selected == option.value,
+                () => onChanged(option.value),
+              ),
+            ),
+          ],
+        ),
+        Divider(
+          height: 28,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChoice(
+    BuildContext context,
+    String label,
+    bool selected,
+    VoidCallback onPressed,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onPressed(),
+      labelStyle: TextStyle(
+        color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+      selectedColor: colorScheme.primary,
+      backgroundColor: colorScheme.surfaceContainerHighest.withValues(
+        alpha: 0.45,
+      ),
+      side: BorderSide(
+        color: selected
+            ? colorScheme.primary
+            : colorScheme.outlineVariant.withValues(alpha: 0.7),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Etkinlik filtreleri',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 18),
+            _buildGroup(
+              context,
+              'Konum',
+              _eventScopeOptions,
+              _scope,
+              (value) => setState(() => _scope = value),
+            ),
+            _buildGroup(
+              context,
+              'Düzenleyen',
+              _eventOrganizerOptions,
+              _organizerType,
+              (value) => setState(() => _organizerType = value),
+            ),
+            _buildGroup(
+              context,
+              'Ücret',
+              _eventPricingOptions,
+              _pricingType,
+              (value) => setState(() => _pricingType = value),
+            ),
+            _buildGroup(
+              context,
+              'Etkinlik türü',
+              _eventTypeOptions,
+              _eventType,
+              (value) => setState(() => _eventType = value),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(
+                  EventFilters(
+                    scope: _scope,
+                    organizerType: _organizerType,
+                    pricingType: _pricingType,
+                    eventType: _eventType,
+                  ),
+                ),
+                child: const Text('Filtreleri uygula'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -330,9 +644,7 @@ class EventListCard extends StatelessWidget {
 
     final ticket =
         stringFromMeta(event, 'ticketText') ??
-        (event.ticketPrice <= 0
-            ? 'Bilet: Ücretsiz'
-            : 'Bilet: ₺${event.ticketPrice.toStringAsFixed(0)}');
+        (event.pricingType == 'paid' ? 'Biletli' : 'Ücretsiz');
     final capacity = (event.maxContributors > 0)
         ? 'Katılımcı: ${event.remainingContributors}/${event.maxContributors}'
         : null;
@@ -376,7 +688,7 @@ String? stringFromMeta(PostView event, String key) {
 
 String eventDateText(DateTime? date) {
   if (date == null) {
-    return 'Tarih yok';
+    return 'Yükleniyor...';
   }
 
   const months = [

@@ -37,6 +37,10 @@ class MasterView extends StatefulWidget {
 class _MasterViewState extends State<MasterView>
     with SingleTickerProviderStateMixin {
   static final DateTime _temporaryExamMenuEndsAt = DateTime(2026, 6, 21);
+  bool _showHeader = true;
+  double _headerScrollAccumulator = 0;
+  static const double _headerHideDistance = 32;
+  static const double _headerShowDistance = 10;
   late TabController _tabController;
   String _appBarTitle = 'Bugün';
 
@@ -262,6 +266,39 @@ class _MasterViewState extends State<MasterView>
     _tabController.animateTo(index);
   }
 
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    final scrollDelta = notification is ScrollUpdateNotification
+        ? notification.scrollDelta
+        : null;
+    if (scrollDelta == null || scrollDelta == 0) {
+      return false;
+    }
+
+    if (scrollDelta > 0) {
+      _headerScrollAccumulator =
+          (_headerScrollAccumulator > 0 ? _headerScrollAccumulator : 0) +
+          scrollDelta;
+      if (_showHeader && _headerScrollAccumulator >= _headerHideDistance) {
+        _headerScrollAccumulator = 0;
+        setState(() => _showHeader = false);
+      }
+    } else {
+      _headerScrollAccumulator =
+          (_headerScrollAccumulator < 0 ? _headerScrollAccumulator : 0) +
+          scrollDelta;
+      if (!_showHeader && _headerScrollAccumulator <= -_headerShowDistance) {
+        _headerScrollAccumulator = 0;
+        setState(() => _showHeader = true);
+      }
+    }
+
+    return false;
+  }
+
   Widget _buildTabBodyForIndex(int index) {
     switch (index) {
       case 0:
@@ -353,11 +390,7 @@ class _MasterViewState extends State<MasterView>
   }
 
   Color _tabAccentColor(int index, ColorScheme colorScheme) {
-    return switch (index) {
-      2 => const Color(0xFFE5484D),
-      3 => const Color(0xFFF97316),
-      _ => colorScheme.primary,
-    };
+    return NavigationSurface.accentColor(index, colorScheme);
   }
 
   Widget _buildShellButton({
@@ -594,6 +627,7 @@ class _MasterViewState extends State<MasterView>
 
     return Scaffold(
       extendBody: true,
+      extendBodyBehindAppBar: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       drawer: Drawer(
         width: MediaQuery.of(context).size.width.clamp(0, 258).toDouble(),
@@ -624,80 +658,107 @@ class _MasterViewState extends State<MasterView>
           },
         ),
       ),
-      appBar: AppBar(
-        backgroundColor: Color.lerp(
-          theme.scaffoldBackgroundColor,
-          colorScheme.onSurface,
-          0.035,
-        ),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 64,
-        leadingWidth: 58,
-        leading: Builder(
-          builder: (context) => Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: _buildShellButton(
-                context: context,
-                icon: Icons.menu_rounded,
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-          ),
-        ),
-        title: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          transitionBuilder: (child, animation) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          child: Text(
-            _appBarTitle,
-            key: ValueKey(_appBarTitle),
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _buildShellButton(
-              context: context,
-              icon: Icons.notifications_outlined,
-              onPressed: _openNotificationsPage,
-              child: Badge(
-                isLabelVisible: _unreadNotifications,
-                smallSize: 8,
-                child: Icon(
-                  Icons.notifications_outlined,
-                  size: 20,
-                  color: colorScheme.onSurface,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: ClipRect(
+          child: AnimatedSlide(
+            offset: _showHeader ? Offset.zero : const Offset(0, -1),
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeInOutCubic,
+            child: AnimatedOpacity(
+              opacity: _showHeader ? 1 : 0,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+              child: AppBar(
+                backgroundColor: Color.lerp(
+                  theme.scaffoldBackgroundColor,
+                  colorScheme.onSurface,
+                  0.035,
                 ),
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(24),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                centerTitle: true,
+                automaticallyImplyLeading: false,
+                toolbarHeight: 64,
+                leadingWidth: 58,
+                leading: Builder(
+                  builder: (context) => Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: _buildShellButton(
+                        context: context,
+                        icon: Icons.menu_rounded,
+                        onPressed: () => Scaffold.of(context).openDrawer(),
+                      ),
+                    ),
+                  ),
+                ),
+                title: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  child: Text(
+                    _appBarTitle,
+                    key: ValueKey(_appBarTitle),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _buildShellButton(
+                      context: context,
+                      icon: Icons.notifications_outlined,
+                      onPressed: _openNotificationsPage,
+                      child: Badge(
+                        isLabelVisible: _unreadNotifications,
+                        smallSize: 8,
+                        child: Icon(
+                          Icons.notifications_outlined,
+                          size: 20,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          _MasterBackgroundBlobs(accentColor: tabAccentColor),
-          IndexedStack(
-            index: _tabController.index,
-            children: List<Widget>.generate(4, (index) {
-              return _tabBodies[index] ?? const SizedBox.expand();
-            }),
+      body: AnimatedPadding(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+        padding: EdgeInsets.only(
+          top: MediaQuery.paddingOf(context).top + (_showHeader ? 64 : 0),
+        ),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _MasterBackgroundBlobs(accentColor: tabAccentColor),
+              IndexedStack(
+                index: _tabController.index,
+                children: List<Widget>.generate(4, (index) {
+                  return _tabBodies[index] ?? const SizedBox.expand();
+                }),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       bottomNavigationBar: SafeArea(
         top: false,
