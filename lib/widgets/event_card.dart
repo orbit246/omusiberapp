@@ -139,6 +139,8 @@ class _EventCardState extends State<EventCard> {
                         colorBlendMode: isPast ? BlendMode.saturation : null,
                         memCacheWidth: cacheWidth,
                         memCacheHeight: cacheHeight,
+                        maxWidthDiskCache: cacheWidth,
+                        maxHeightDiskCache: cacheHeight,
                         fadeInDuration: const Duration(milliseconds: 220),
                         fadeOutDuration: const Duration(milliseconds: 120),
                         placeholder: (context, url) => SizedBox(

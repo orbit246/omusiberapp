@@ -123,9 +123,13 @@ class PostView {
     final int remaining = maxJoiners > 0 ? (maxJoiners - currentJoiners) : 0;
 
     // Handle event date
-    String dateStr = json['date'] as String? ?? '';
+    String dateStr = json['date']?.toString() ?? '';
     if (dateStr.isEmpty) {
-      dateStr = json['createdAt'] as String? ?? '';
+      // Persistent event cache stores the parsed date under eventDate.
+      dateStr = json['eventDate']?.toString() ?? '';
+    }
+    if (dateStr.isEmpty) {
+      dateStr = json['createdAt']?.toString() ?? '';
     }
     final DateTime? parsedDate = DateTime.tryParse(dateStr);
 

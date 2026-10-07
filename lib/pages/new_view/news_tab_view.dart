@@ -15,6 +15,7 @@ import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/widgets/home/notification_consent_addon.dart';
 import 'package:omusiber/widgets/news/news_card.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
+import 'package:omusiber/widgets/shared/content_filter_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NewsTabView extends StatefulWidget {
@@ -61,7 +62,17 @@ class _NewsTabViewState extends State<NewsTabView> {
       _controller.visibleFilteredArticles;
   List<String> get _availableTags => _controller.availableTags;
   String get _sortLabel => _controller.sortLabel;
-  String get _filterSummary => _controller.filterSummary;
+
+  List<String> get _selectedFilterLabels {
+    final labels = <String>[];
+    if (_selectedDatePreset == 'today') labels.add('Bugün');
+    if (_selectedDatePreset == 'week') labels.add('Bu Hafta');
+    labels.addAll(_selectedTags);
+    if (_selectedFacultySlug != null) {
+      labels.add(_controller.selectedFacultyName ?? _selectedFacultySlug!);
+    }
+    return labels;
+  }
 
   @override
   void initState() {
@@ -481,162 +492,20 @@ class _NewsTabViewState extends State<NewsTabView> {
     );
   }
 
-  Widget _buildFilterPill(
-    BuildContext context, {
-    required String label,
-    required VoidCallback onTap,
-    bool active = false,
-  }) {
-    final accentColor = const Color(0xFF3D6DFF);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: active
-                  ? [
-                      accentColor.withValues(alpha: 0.95),
-                      accentColor.withValues(alpha: 0.78),
-                    ]
-                  : [const Color(0xFF1A2740), const Color(0xFF111C31)],
-            ),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: active
-                  ? accentColor.withValues(alpha: 0.38)
-                  : Colors.white.withValues(alpha: 0.08),
-            ),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: accentColor.withValues(alpha: 0.22),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 150),
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 18,
-                color: active
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.72),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFilterBar(BuildContext context) {
-    final theme = Theme.of(context);
     final hasActiveFilters =
         _selectedDatePreset != 'all' ||
         _selectedTags.isNotEmpty ||
         _selectedFacultySlug != null;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      child: _buildPrimaryGlassSurface(
-        context,
-        borderRadius: BorderRadius.circular(22),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        backgroundColor: const Color(0xFF0F1E34).withValues(alpha: 0.98),
-        borderColor: Colors.white.withValues(alpha: 0.12),
-        accentColor: const Color(0xFF3D6DFF),
-        child: Row(
-          children: [
-            Icon(
-              Icons.filter_alt_outlined,
-              size: 20,
-              color: const Color(0xFF3D6DFF),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Filtrele',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (_isFacultyNewsLoading) ...[
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: const Color(0xFF3D6DFF),
-                ),
-              ),
-            ],
-            const Spacer(),
-            _buildFilterPill(
-              context,
-              label: _sortLabel,
-              onTap: _openFilterSheet,
-              active: true,
-            ),
-            const SizedBox(width: 8),
-            _buildFilterPill(
-              context,
-              label: _filterSummary,
-              onTap: _openFilterSheet,
-              active: hasActiveFilters,
-            ),
-            if (hasActiveFilters) ...[
-              const SizedBox(width: 8),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _clearActiveFilters,
-                  borderRadius: BorderRadius.circular(999),
-                  child: Ink(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF34151A),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: Colors.white.withValues(alpha: 0.82),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return ContentFilterBar(
+      sortLabel: _sortLabel,
+      filterLabel: 'Filtrele',
+      hasActiveFilters: hasActiveFilters,
+      selectedItems: _selectedFilterLabels,
+      isLoading: _isFacultyNewsLoading,
+      onOpen: _openFilterSheet,
+      onClear: _clearActiveFilters,
     );
   }
 
@@ -1776,46 +1645,8 @@ class _NewsTabViewState extends State<NewsTabView> {
                 SliverToBoxAdapter(child: _buildNewsLoadingIndicator(context))
               else if (visibleArticles.isEmpty)
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface.withValues(alpha: 0.84),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withValues(
-                            alpha: 0.34,
-                          ),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.filter_alt_off_rounded,
-                            size: 32,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Bu filtrelerle eşleşen haber yok.',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Filtreleri değiştirip tekrar deneyebilirsin.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: ContentFilterEmptyState(
+                    title: 'Bu filtrelerle eşleşen haber yok.',
                   ),
                 )
               else

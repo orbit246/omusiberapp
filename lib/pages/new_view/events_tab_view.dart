@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
@@ -10,6 +9,7 @@ import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
+import 'package:omusiber/widgets/shared/content_filter_bar.dart';
 
 class SlideInEntry extends StatefulWidget {
   const SlideInEntry({
@@ -100,8 +100,6 @@ class EventsTabView extends StatefulWidget {
 }
 
 class _EventsTabViewState extends State<EventsTabView> {
-  static const int _imagePrefetchLimit = 5;
-
   late final EventsTabController _controller;
   final Set<String> _hasAnimatedIds = {};
   EventFilters _filters = const EventFilters();
@@ -110,7 +108,7 @@ class _EventsTabViewState extends State<EventsTabView> {
   @override
   void initState() {
     super.initState();
-    _controller = EventsTabController()..addListener(_handleControllerChanged);
+    _controller = EventsTabController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_controller.loadInitialData());
@@ -119,13 +117,8 @@ class _EventsTabViewState extends State<EventsTabView> {
 
   @override
   void dispose() {
-    _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
     super.dispose();
-  }
-
-  void _handleControllerChanged() {
-    _precacheEventImages(_controller.events);
   }
 
   void _scrollToTop() {
@@ -137,19 +130,6 @@ class _EventsTabViewState extends State<EventsTabView> {
         curve: Curves.easeOutQuart,
       );
     }
-  }
-
-  void _precacheEventImages(List<PostView> items) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      for (final event in items.take(_imagePrefetchLimit)) {
-        final url = eventImageUrl(event);
-        if (url.isEmpty) continue;
-
-        unawaited(precacheImage(CachedNetworkImageProvider(url), context));
-      }
-    });
   }
 
   void _handleScrollNotification(ScrollNotification scrollInfo) {
@@ -203,12 +183,14 @@ class _EventsTabViewState extends State<EventsTabView> {
 
 class EventFilters {
   const EventFilters({
+    this.sortKey = 'upcoming',
     this.scope,
     this.organizerType,
     this.pricingType,
     this.eventType,
   });
 
+  final String sortKey;
   final String? scope;
   final String? organizerType;
   final String? pricingType;
@@ -223,11 +205,97 @@ class EventFilters {
   int get activeFilterCount =>
       [scope, organizerType, pricingType, eventType].whereType<String>().length;
 
+  String get sortLabel => switch (sortKey) {
+    'newest' => 'En Yeni',
+    'oldest' => 'En Eski',
+    _ => 'Yaklaşan',
+  };
+
+  String get filterSummary {
+    final parts = <String>[];
+    if (scope != null) parts.add(scope == 'samsun' ? 'Samsun İçi' : 'Türkiye');
+    if (organizerType != null) {
+      parts.add(organizerType == 'official' ? 'Resmi' : 'Topluluk');
+    }
+    if (pricingType != null) {
+      parts.add(pricingType == 'paid' ? 'Ücretli' : 'Ücretsiz');
+    }
+    if (eventType != null) {
+      parts.add(
+        _eventTypeOptions
+                .where((option) => option.value == eventType)
+                .firstOrNull
+                ?.label ??
+            eventType!,
+      );
+    }
+    return parts.isEmpty ? 'Tümü' : parts.join(' • ');
+  }
+
+  List<String> get selectedFilterLabels {
+    final labels = <String>[];
+    if (scope != null) {
+      labels.add(scope == 'samsun' ? 'Samsun İçi' : 'Türkiye Geneli');
+    }
+    if (organizerType != null) {
+      labels.add(organizerType == 'official' ? 'Resmi' : 'Topluluk');
+    }
+    if (pricingType != null) {
+      labels.add(pricingType == 'paid' ? 'Ücretli' : 'Ücretsiz');
+    }
+    if (eventType != null) {
+      labels.add(
+        _eventTypeOptions
+                .where((option) => option.value == eventType)
+                .firstOrNull
+                ?.label ??
+            eventType!,
+      );
+    }
+    return labels;
+  }
+
   bool matches(PostView event) {
     return (scope == null || event.scope == scope) &&
         (organizerType == null || event.organizerType == organizerType) &&
         (pricingType == null || event.pricingType == pricingType) &&
         (eventType == null || event.eventType == eventType);
+  }
+
+  List<PostView> sortEvents(Iterable<PostView> source) {
+    final events = source.toList(growable: false);
+    final sorted = [...events];
+    final now = DateTime.now();
+
+    DateTime? sortDate(PostView event) {
+      if (event.eventDate != null) return event.eventDate;
+      final raw = event.metadata['createdAt'] ?? event.metadata['eventDate'];
+      return raw == null ? null : DateTime.tryParse(raw.toString());
+    }
+
+    sorted.sort((left, right) {
+      final leftDate = sortDate(left);
+      final rightDate = sortDate(right);
+      if (leftDate == null && rightDate == null) return 0;
+      if (leftDate == null) return 1;
+      if (rightDate == null) return -1;
+
+      if (sortKey == 'upcoming') {
+        final leftUpcoming = !leftDate.isBefore(now);
+        final rightUpcoming = !rightDate.isBefore(now);
+        if (leftUpcoming != rightUpcoming) {
+          return leftUpcoming ? -1 : 1;
+        }
+        return leftUpcoming
+            ? leftDate.compareTo(rightDate)
+            : rightDate.compareTo(leftDate);
+      }
+
+      return sortKey == 'oldest'
+          ? leftDate.compareTo(rightDate)
+          : rightDate.compareTo(leftDate);
+    });
+    return sorted;
   }
 }
 
@@ -308,7 +376,7 @@ class EventsTabContent extends StatelessWidget {
       return Center(child: Text(errorMessage!));
     }
 
-    final visibleEvents = events.where(filters.matches).toList(growable: false);
+    final visibleEvents = filters.sortEvents(events.where(filters.matches));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -344,10 +412,9 @@ class EventsTabContent extends StatelessWidget {
                   ),
                 )
               else if (visibleEvents.isEmpty)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Text('Bu filtrelerle eşleşen etkinlik yok.'),
+                const SliverToBoxAdapter(
+                  child: ContentFilterEmptyState(
+                    title: 'Bu filtrelerle eşleşen etkinlik yok.',
                   ),
                 )
               else
@@ -415,54 +482,13 @@ class _EventFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: ActionChip(
-                avatar: Icon(
-                  Icons.tune_rounded,
-                  size: 18,
-                  color: filters.hasActiveFilters
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurfaceVariant,
-                ),
-                label: Text(
-                  filters.hasActiveFilters
-                      ? 'Filtreler (${filters.activeFilterCount})'
-                      : 'Filtreler',
-                ),
-                labelStyle: TextStyle(
-                  color: filters.hasActiveFilters
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-                backgroundColor: filters.hasActiveFilters
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.45,
-                      ),
-                side: BorderSide(
-                  color: filters.hasActiveFilters
-                      ? colorScheme.primary
-                      : colorScheme.outlineVariant.withValues(alpha: 0.7),
-                ),
-                onPressed: () => _openFilterSheet(context),
-              ),
-            ),
-          ),
-          if (filters.hasActiveFilters)
-            TextButton(
-              onPressed: () => onFiltersChanged(const EventFilters()),
-              child: const Text('Temizle'),
-            ),
-        ],
-      ),
+    return ContentFilterBar(
+      sortLabel: filters.sortLabel,
+      filterLabel: 'Filtrele',
+      hasActiveFilters: filters.hasActiveFilters,
+      selectedItems: filters.selectedFilterLabels,
+      onOpen: () => _openFilterSheet(context),
+      onClear: () => onFiltersChanged(const EventFilters()),
     );
   }
 }
@@ -477,6 +503,7 @@ class _EventFilterSheet extends StatefulWidget {
 }
 
 class _EventFilterSheetState extends State<_EventFilterSheet> {
+  late String _sortKey = widget.initialFilters.sortKey;
   late String? _scope = widget.initialFilters.scope;
   late String? _organizerType = widget.initialFilters.organizerType;
   late String? _pricingType = widget.initialFilters.pricingType;
@@ -487,8 +514,9 @@ class _EventFilterSheetState extends State<_EventFilterSheet> {
     String title,
     List<_EventFilterOption> options,
     String? selected,
-    ValueChanged<String?> onChanged,
-  ) {
+    ValueChanged<String?> onChanged, {
+    bool includeAll = true,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,12 +532,13 @@ class _EventFilterSheetState extends State<_EventFilterSheet> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _buildChoice(
-              context,
-              'Tümü',
-              selected == null,
-              () => onChanged(null),
-            ),
+            if (includeAll)
+              _buildChoice(
+                context,
+                'Tümü',
+                selected == null,
+                () => onChanged(null),
+              ),
             ...options.map(
               (option) => _buildChoice(
                 context,
@@ -573,6 +602,18 @@ class _EventFilterSheetState extends State<_EventFilterSheet> {
             const SizedBox(height: 18),
             _buildGroup(
               context,
+              'Sıralama',
+              const [
+                _EventFilterOption('upcoming', 'Yaklaşan'),
+                _EventFilterOption('newest', 'En Yeni'),
+                _EventFilterOption('oldest', 'En Eski'),
+              ],
+              _sortKey,
+              (value) => setState(() => _sortKey = value ?? 'upcoming'),
+              includeAll: false,
+            ),
+            _buildGroup(
+              context,
               'Konum',
               _eventScopeOptions,
               _scope,
@@ -604,6 +645,7 @@ class _EventFilterSheetState extends State<_EventFilterSheet> {
               child: FilledButton(
                 onPressed: () => Navigator.of(context).pop(
                   EventFilters(
+                    sortKey: _sortKey,
                     scope: _scope,
                     organizerType: _organizerType,
                     pricingType: _pricingType,

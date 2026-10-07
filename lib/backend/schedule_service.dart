@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:omusiber/backend/api_identity_service.dart';
 import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _ScheduleCacheEntry {
   const _ScheduleCacheEntry({required this.cachedAt, required this.schedules});
@@ -20,6 +21,8 @@ class ScheduleService {
   factory ScheduleService() => _instance;
 
   static const Duration _cacheDuration = Duration(minutes: 10);
+  static const String _persistentCachePrefix = 'cached_schedules_v1_';
+  static const String _latestPersistentCacheKey = 'cached_schedules_latest_v1';
   final Map<String, _ScheduleCacheEntry> _cacheByQuery =
       <String, _ScheduleCacheEntry>{};
 
@@ -56,7 +59,8 @@ class ScheduleService {
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
     );
     final cacheKey = uri.toString();
-    final cachedEntry = _cacheByQuery[cacheKey];
+    var cachedEntry = _cacheByQuery[cacheKey];
+    cachedEntry ??= await _loadPersistentCache(cacheKey);
     if (!forceRefresh &&
         cachedEntry != null &&
         DateTime.now().difference(cachedEntry.cachedAt) < _cacheDuration) {
@@ -75,10 +79,9 @@ class ScheduleService {
       final hasAuthToken = headers['Authorization']?.trim().isNotEmpty == true;
       _log('GET $uri authPresent=$hasAuthToken');
 
-      final response = await http.get(
-        uri,
-        headers: {...headers, 'Accept': 'application/json'},
-      );
+      final response = await http
+          .get(uri, headers: {...headers, 'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 8));
       _log(
         'Response status=${response.statusCode} body=${_truncate(response.body)}',
       );
@@ -94,6 +97,7 @@ class ScheduleService {
           cachedAt: DateTime.now(),
           schedules: List<ProgramSchedule>.unmodifiable(schedules),
         );
+        await _savePersistentCache(cacheKey, data);
         _log(
           'Parsed schedules count=${schedules.length} details=${_summarizeSchedules(schedules)}',
         );
@@ -103,7 +107,62 @@ class ScheduleService {
       }
     } catch (e) {
       debugPrint('[ScheduleService ERROR] Error fetching schedules: $e');
+      if (cachedEntry != null && cachedEntry.schedules.isNotEmpty) {
+        _log(
+          'Returning persistent schedules after network failure for $cacheKey',
+        );
+        return cachedEntry.schedules;
+      }
       rethrow;
+    }
+  }
+
+  String _persistentKey(String cacheKey) {
+    final encoded = base64UrlEncode(utf8.encode(cacheKey));
+    return '$_persistentCachePrefix$encoded';
+  }
+
+  Future<_ScheduleCacheEntry?> _loadPersistentCache(String cacheKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var raw = prefs.getString(_persistentKey(cacheKey));
+      raw ??= prefs.getString(_latestPersistentCacheKey);
+      if (raw == null || raw.isEmpty) return null;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic> || decoded['data'] is! List) {
+        return null;
+      }
+
+      final schedules = (decoded['data'] as List)
+          .whereType<Map>()
+          .map((item) => ProgramSchedule.fromJson(item.cast<String, dynamic>()))
+          .toList(growable: false);
+      final entry = _ScheduleCacheEntry(
+        cachedAt:
+            DateTime.tryParse(decoded['cachedAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        schedules: List<ProgramSchedule>.unmodifiable(schedules),
+      );
+      _cacheByQuery[cacheKey] = entry;
+      return entry;
+    } catch (e) {
+      debugPrint('[ScheduleService] Failed to load persistent cache: $e');
+      return null;
+    }
+  }
+
+  Future<void> _savePersistentCache(String cacheKey, List<dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload = jsonEncode({
+        'cachedAt': DateTime.now().toIso8601String(),
+        'data': data,
+      });
+      await prefs.setString(_persistentKey(cacheKey), payload);
+      await prefs.setString(_latestPersistentCacheKey, payload);
+    } catch (e) {
+      debugPrint('[ScheduleService] Failed to save persistent cache: $e');
     }
   }
 

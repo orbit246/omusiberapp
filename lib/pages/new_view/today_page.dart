@@ -12,6 +12,7 @@ import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/backend/view/news_view.dart';
 import 'package:omusiber/backend/view/schedule_model.dart';
+import 'package:omusiber/backend/view/user_profile_model.dart';
 import 'package:omusiber/pages/new_view/community_post_detail_page.dart';
 import 'package:omusiber/pages/new_view/food_menu_page.dart';
 import 'package:omusiber/pages/new_view/controllers/community_tab_controller.dart';
@@ -217,12 +218,19 @@ class _TodayPageState extends State<TodayPage> {
       final user = AppStartupController.instance.isFirebaseReady
           ? FirebaseAuth.instance.currentUser
           : null;
-      final profile = user == null
-          ? null
-          : await _profileService.fetchUserProfile(
-              user.uid,
-              includeBadges: false,
-            );
+      UserProfile? profile;
+      if (user != null) {
+        try {
+          profile = await _profileService.fetchUserProfile(
+            user.uid,
+            includeBadges: false,
+          );
+        } catch (error) {
+          debugPrint(
+            'Today profile load failed; using cached schedule: $error',
+          );
+        }
+      }
       final schedules = await ScheduleService().fetchSchedules(
         departmentKey: profile?.departmentKey,
       );
@@ -1228,6 +1236,9 @@ class _TodayEventCard extends StatelessWidget {
     final dateLabel = date == null
         ? 'Tarih yakında'
         : DateFormat('d MMM, HH:mm', 'tr').format(date);
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    final imageCacheWidth = (220 * pixelRatio).round().clamp(1, 4096).toInt();
+    final imageCacheHeight = (112 * pixelRatio).round().clamp(1, 4096).toInt();
 
     return SizedBox(
       width: 220,
@@ -1251,6 +1262,10 @@ class _TodayEventCard extends StatelessWidget {
                     : CachedNetworkImage(
                         imageUrl: imageUrl,
                         fit: BoxFit.cover,
+                        memCacheWidth: imageCacheWidth,
+                        memCacheHeight: imageCacheHeight,
+                        maxWidthDiskCache: imageCacheWidth,
+                        maxHeightDiskCache: imageCacheHeight,
                         errorWidget: (_, __, ___) => ColoredBox(
                           color: cs.primaryContainer,
                           child: Icon(Icons.event_rounded, color: cs.primary),
