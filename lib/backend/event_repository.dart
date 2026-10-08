@@ -8,6 +8,28 @@ import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class EventRegistrationFullException implements Exception {
+  const EventRegistrationFullException([
+    this.message = 'Event registration is full.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class EventRegistrationConflictException implements Exception {
+  const EventRegistrationConflictException([
+    this.message = 'Event capacity changed. Please refresh.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class EventRepository {
   static const String _storageKey = 'cached_events_list';
   static final Set<String> _locallyJoinedEventIds = <String>{};
@@ -159,6 +181,25 @@ class EventRepository {
         Uri.parse('$_baseUrl/events/$bodyId/join'),
         headers: headers,
       );
+
+      if (response.statusCode == 409) {
+        Map<String, dynamic>? errorBody;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map) {
+            errorBody = Map<String, dynamic>.from(decoded);
+          }
+        } catch (_) {
+          // Fall through to the status-based error below.
+        }
+
+        if (errorBody?['code'] == 'EVENT_FULL') {
+          throw const EventRegistrationFullException();
+        }
+        if (errorBody?['code'] == 'EVENT_CAPACITY_CONFLICT') {
+          throw const EventRegistrationConflictException();
+        }
+      }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Katılma başarısız: ${response.statusCode}');

@@ -26,6 +26,7 @@ class EventCard extends StatefulWidget {
     this.isJoined = false,
     this.isPast = false,
     this.isRegistrationClosed = false,
+    this.isCapacityReached = false,
     this.isExternalRegistration = false,
     this.onTap,
     // initialExpanded removed as concept is static now
@@ -49,6 +50,7 @@ class EventCard extends StatefulWidget {
   final bool isJoined;
   final bool isPast;
   final bool isRegistrationClosed;
+  final bool isCapacityReached;
   final bool isExternalRegistration;
   final VoidCallback? onTap;
   final VoidCallback? onJoin;
@@ -343,25 +345,25 @@ class _EventCardState extends State<EventCard> {
                           child: FilledButton.icon(
                             onPressed: widget.isPast
                                 ? widget.onJoin
-                                : (widget.isExternalRegistration
-                                      ? widget.onJoin
-                                      : ((widget.isRegistrationClosed ||
-                                                widget.isJoined)
-                                            ? null
-                                            : widget.onJoin)),
+                                : ((widget.isRegistrationClosed ||
+                                          widget.isJoined)
+                                      ? null
+                                      : widget.onJoin),
                             icon: Icon(
-                              widget.isExternalRegistration
-                                  ? Icons.open_in_new_rounded
-                                  : widget.isPast
+                              widget.isPast
                                   ? Icons.info_outline_rounded
                                   : widget.isRegistrationClosed
                                   ? Icons.event_busy_rounded
+                                  : widget.isExternalRegistration
+                                  ? Icons.open_in_new_rounded
                                   : (widget.isJoined
                                         ? Icons.task_alt_rounded
                                         : Icons.bookmark_add_outlined),
                             ),
                             label: Text(
-                              widget.isExternalRegistration
+                              widget.isCapacityReached
+                                  ? "Kontenjan Doldu"
+                                  : widget.isExternalRegistration
                                   ? "Detaylar"
                                   : widget.isPast
                                   ? "Detaylar"

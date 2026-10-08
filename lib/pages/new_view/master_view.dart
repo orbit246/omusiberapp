@@ -214,6 +214,9 @@ class _MasterViewState extends State<MasterView>
 
   void _handleTabSelection(int index) {
     setState(() {
+      // Every page change starts with the shell header visible.
+      _showHeader = true;
+      _headerScrollAccumulator = 0;
       _tabBodies[index] ??= _buildTabBodyForIndex(index);
       _appBarTitle = _titleForIndex(index);
       switch (index) {
@@ -271,9 +274,28 @@ class _MasterViewState extends State<MasterView>
       return false;
     }
 
-    final scrollDelta = notification is ScrollUpdateNotification
-        ? notification.scrollDelta
-        : null;
+    // A new gesture starts a fresh direction decision. This prevents a
+    // previous downward scroll from carrying into a later elastic rebound.
+    if (notification is ScrollStartNotification) {
+      _headerScrollAccumulator = 0;
+      return false;
+    }
+
+    if (notification is ScrollEndNotification) {
+      _headerScrollAccumulator = 0;
+      return false;
+    }
+
+    // Scroll updates without drag details are ballistic/programmatic updates
+    // (including the bounce-back after elastic overscroll). They do not count
+    // as the user intentionally scrolling upward.
+    if (notification is! ScrollUpdateNotification ||
+        notification.dragDetails == null ||
+        notification.metrics.outOfRange) {
+      return false;
+    }
+
+    final scrollDelta = notification.scrollDelta;
     if (scrollDelta == null || scrollDelta == 0) {
       return false;
     }
@@ -738,25 +760,30 @@ class _MasterViewState extends State<MasterView>
           ),
         ),
       ),
-      body: AnimatedPadding(
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeInOutCubic,
-        padding: EdgeInsets.only(
-          top: MediaQuery.paddingOf(context).top + (_showHeader ? 64 : 0),
-        ),
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _handleScrollNotification,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _MasterBackgroundBlobs(accentColor: tabAccentColor),
-              IndexedStack(
-                index: _tabController.index,
-                children: List<Widget>.generate(4, (index) {
-                  return _tabBodies[index] ?? const SizedBox.expand();
-                }),
-              ),
-            ],
+      // Keep the content at a fixed Y position while the header animates over
+      // it. Changing this padding when the header hides would move the page
+      // and make the user's scroll position jump.
+      body: Padding(
+        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 64),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOutCubic,
+          transform: Matrix4.translationValues(0, _showHeader ? 0 : -64, 0),
+          transformAlignment: Alignment.topCenter,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _MasterBackgroundBlobs(accentColor: tabAccentColor),
+                IndexedStack(
+                  index: _tabController.index,
+                  children: List<Widget>.generate(4, (index) {
+                    return _tabBodies[index] ?? const SizedBox.expand();
+                  }),
+                ),
+              ],
+            ),
           ),
         ),
       ),

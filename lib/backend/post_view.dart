@@ -24,6 +24,7 @@ class PostView {
   final bool? _isJoined;
   final bool? _isLiked;
   final bool? _isRegistrationClosed;
+  final bool? _isCapacityReached;
   final String publisher;
   final bool allowAppSignups;
   final String? redirectTo;
@@ -32,6 +33,7 @@ class PostView {
   bool get isJoined => _isJoined ?? false;
   bool get isLiked => _isLiked ?? false;
   bool get isRegistrationClosed => _isRegistrationClosed ?? false;
+  bool get isCapacityReached => _isCapacityReached ?? false;
   String? get registrationUrl => externalSignupUrl ?? redirectTo;
   bool get usesExternalRegistration =>
       !allowAppSignups && (registrationUrl?.trim().isNotEmpty ?? false);
@@ -62,28 +64,37 @@ class PostView {
     bool? isJoined,
     bool? isLiked,
     bool? isRegistrationClosed,
+    bool? isCapacityReached,
     this.publisher = '',
     this.allowAppSignups = true,
     this.redirectTo,
     this.externalSignupUrl,
   }) : _isJoined = isJoined,
        _isLiked = isLiked,
-       _isRegistrationClosed = isRegistrationClosed;
+       _isRegistrationClosed = isRegistrationClosed,
+       _isCapacityReached = isCapacityReached;
 
   factory PostView.fromJson(Map<String, dynamic> json) {
     // Parse JSON strings if they are strings (New API), otherwise use as is (Backward compatibility)
     List<String> parseList(dynamic value) {
       if (value is String) {
         try {
-          final decoded = (jsonDecode(value) as List)
-              .map((e) => e.toString())
+          final decoded = jsonDecode(value);
+          if (decoded is! List) return [];
+          return decoded
+              .whereType<String>()
+              .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
+              .where((e) => e.isNotEmpty)
               .toList();
-          return decoded;
         } catch (_) {
           return [];
         }
       } else if (value is List) {
-        return value.map((e) => e.toString()).toList();
+        return value
+            .whereType<String>()
+            .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       return [];
     }
@@ -120,7 +131,9 @@ class PostView {
     final int currentJoiners = json['joinerCount'] is int
         ? json['joinerCount']
         : joinersList.length;
-    final int remaining = maxJoiners > 0 ? (maxJoiners - currentJoiners) : 0;
+    final int remaining = maxJoiners > 0
+        ? (maxJoiners - currentJoiners).clamp(0, maxJoiners)
+        : 0;
 
     // Handle event date
     String dateStr = json['date']?.toString() ?? '';
@@ -139,7 +152,11 @@ class PostView {
 
     // Handle isRegistrationClosed
     // Use explicit field if available, otherwise calculate locally if regEndDate is present
+    final bool capacityReached =
+        json['isCapacityReached'] as bool? ??
+        (maxJoiners > 0 && currentJoiners >= maxJoiners);
     bool registrationClosed = json['isRegistrationClosed'] as bool? ?? false;
+    registrationClosed = registrationClosed || capacityReached;
     if (json['isRegistrationClosed'] == null && parsedRegEndDate != null) {
       registrationClosed = DateTime.now().isAfter(parsedRegEndDate);
     }
@@ -184,6 +201,7 @@ class PostView {
       isJoined: joined,
       isLiked: liked,
       isRegistrationClosed: registrationClosed,
+      isCapacityReached: capacityReached,
       publisher: json['publisher'] as String? ?? '',
       allowAppSignups: json['allowAppSignups'] as bool? ?? true,
       redirectTo: json['redirectTo'] as String?,
@@ -213,6 +231,7 @@ class PostView {
       'isJoined': _isJoined,
       'isLiked': _isLiked,
       'isRegistrationClosed': _isRegistrationClosed,
+      'isCapacityReached': _isCapacityReached,
       'publisher': publisher,
       'allowAppSignups': allowAppSignups,
       'redirectTo': redirectTo,
@@ -241,6 +260,7 @@ class PostView {
     bool? isJoined,
     bool? isLiked,
     bool? isRegistrationClosed,
+    bool? isCapacityReached,
     String? publisher,
     bool? allowAppSignups,
     String? redirectTo,
@@ -268,6 +288,7 @@ class PostView {
       isJoined: isJoined ?? _isJoined,
       isLiked: isLiked ?? _isLiked,
       isRegistrationClosed: isRegistrationClosed ?? _isRegistrationClosed,
+      isCapacityReached: isCapacityReached ?? _isCapacityReached,
       publisher: publisher ?? this.publisher,
       allowAppSignups: allowAppSignups ?? this.allowAppSignups,
       redirectTo: redirectTo ?? this.redirectTo,

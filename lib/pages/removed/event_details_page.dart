@@ -86,6 +86,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   Future<void> _handleJoinAction() async {
     final event = _event ?? widget.event;
+    if (event.isRegistrationClosed) {
+      return;
+    }
     if (event.usesExternalRegistration) {
       await _openExternalLink();
       return;
@@ -121,6 +124,26 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             const SnackBar(content: Text('Etkinliğe başarıyla katıldınız!')),
           );
         }
+      } on EventRegistrationFullException {
+        if (mounted) {
+          setState(() {
+            _event = event.copyWith(
+              isRegistrationClosed: true,
+              isCapacityReached: true,
+              remainingContributors: 0,
+            );
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kontenjan doldu. KayÄ±t kapandÄ±.')),
+          );
+        }
+      } on EventRegistrationConflictException {
+        unawaited(_refreshEventStatus());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kontenjan durumu deÄŸiÅŸti.')),
+          );
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(
@@ -134,7 +157,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   Future<void> _openExternalLink() async {
-    final link = (_event ?? widget.event).registrationUrl;
+    final currentEvent = _event ?? widget.event;
+    if (currentEvent.isRegistrationClosed) return;
+    final link = currentEvent.registrationUrl;
     if (link == null || link.isEmpty) return;
 
     final uri = Uri.tryParse(link);
@@ -595,7 +620,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                       if (hasExternalLink) ...[
                         const SizedBox(width: 4),
                         IconButton(
-                          onPressed: _openExternalLink,
+                          onPressed: event.isRegistrationClosed
+                              ? null
+                              : _openExternalLink,
                           icon: const Icon(Icons.open_in_new_rounded),
                           tooltip: 'Dis Baglanti',
                         ),
@@ -616,18 +643,19 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               ),
                             )
                           : FilledButton.icon(
-                              onPressed: usesExternalRegistration
-                                  ? _openExternalLink
-                                  : ((isPast ||
-                                            event.isRegistrationClosed ||
-                                            _hasJoined)
-                                        ? null
+                              onPressed:
+                                  isPast ||
+                                      event.isRegistrationClosed ||
+                                      _hasJoined
+                                  ? null
+                                  : (usesExternalRegistration
+                                        ? _openExternalLink
                                         : _handleJoinAction),
                               icon: Icon(
-                                usesExternalRegistration
-                                    ? Icons.open_in_new
-                                    : (isPast || event.isRegistrationClosed)
+                                isPast || event.isRegistrationClosed
                                     ? Icons.event_busy_rounded
+                                    : usesExternalRegistration
+                                    ? Icons.open_in_new
                                     : (_hasJoined
                                           ? Icons.task_alt_rounded
                                           : (event.allowAppSignups
@@ -636,7 +664,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                 size: 18,
                               ),
                               label: Text(
-                                usesExternalRegistration
+                                event.isCapacityReached
+                                    ? 'Kontenjan Doldu'
+                                    : usesExternalRegistration
                                     ? 'Detaylar'
                                     : isPast
                                     ? 'Geçmiş Etkinlik'

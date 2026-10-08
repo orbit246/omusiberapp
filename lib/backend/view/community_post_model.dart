@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:omusiber/backend/constants.dart';
 
 class CommunityPost {
@@ -15,6 +17,7 @@ class CommunityPost {
   final bool isLiked;
   final PollModel? poll; // Added Poll
   final String category;
+  final List<String> tags;
   final bool isPinned;
   final int? accentColor;
   final Map<String, int> reactionCounts;
@@ -35,6 +38,7 @@ class CommunityPost {
     this.isLiked = false,
     this.poll,
     this.category = 'general',
+    this.tags = const [],
     this.isPinned = false,
     this.accentColor,
     this.reactionCounts = const {},
@@ -70,6 +74,7 @@ class CommunityPost {
           ? PollModel.fromJson(Map<String, dynamic>.from(json['poll'] as Map))
           : null,
       category: _asString(json['category'], fallback: 'general'),
+      tags: _parseStringList(json['tags']),
       isPinned: json['isPinned'] == true || json['pinned'] == true,
       accentColor: _parseAccentColor(
         json['accentColor'] ?? json['borderColor'],
@@ -96,6 +101,7 @@ class CommunityPost {
     'isLiked': isLiked,
     'poll': poll?.toJson(),
     'category': category,
+    'tags': tags,
     'isPinned': isPinned,
     'accentColor': accentColor,
     'reactionCounts': reactionCounts,
@@ -117,6 +123,7 @@ class CommunityPost {
     bool? isLiked,
     PollModel? poll,
     String? category,
+    List<String>? tags,
     bool? isPinned,
     int? accentColor,
     Map<String, int>? reactionCounts,
@@ -138,6 +145,7 @@ class CommunityPost {
       isLiked: isLiked ?? this.isLiked,
       poll: poll ?? this.poll,
       category: category ?? this.category,
+      tags: tags ?? this.tags,
       isPinned: isPinned ?? this.isPinned,
       accentColor: accentColor ?? this.accentColor,
       reactionCounts: reactionCounts ?? this.reactionCounts,
@@ -178,6 +186,29 @@ Set<String> parseSelectedReactions(dynamic value) {
   if (value is List) return value.map((item) => item.toString()).toSet();
   if (value is Set) return value.map((item) => item.toString()).toSet();
   return const {};
+}
+
+List<String> _parseStringList(dynamic value) {
+  dynamic decoded = value;
+  if (value is String && value.trim().isNotEmpty) {
+    try {
+      decoded = jsonDecode(value);
+    } catch (_) {
+      return const [];
+    }
+  }
+  if (decoded is! List) return const [];
+
+  final seen = <String>{};
+  final result = <String>[];
+  for (final item in decoded) {
+    if (item is! String) continue;
+    final normalized = item.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) continue;
+    final key = normalized.toLowerCase();
+    if (seen.add(key)) result.add(normalized);
+  }
+  return result;
 }
 
 int? _parseAccentColor(dynamic value) {

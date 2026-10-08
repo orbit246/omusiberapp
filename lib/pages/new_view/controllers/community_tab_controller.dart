@@ -232,6 +232,7 @@ class CommunityTabController extends ChangeNotifier {
       createdAt: _showcaseNow.subtract(const Duration(minutes: 18)),
       likes: 42,
       category: 'announcement',
+      tags: const ['announcement'],
       isPinned: true,
       accentColor: 0xFF2563EB,
       reactionCounts: const {'\u{1F525}': 18, '\u{1F44F}': 9, '\u{1F440}': 6},
@@ -244,6 +245,7 @@ class CommunityTabController extends ChangeNotifier {
       createdAt: _showcaseNow.subtract(const Duration(hours: 2)),
       likes: 17,
       category: 'poll',
+      tags: const ['poll'],
       accentColor: 0xFFF97316,
       reactionCounts: const {'\u{1F602}': 14, '\u{1F44D}': 8},
       poll: PollModel(
@@ -266,6 +268,7 @@ class CommunityTabController extends ChangeNotifier {
       createdAt: _showcaseNow.subtract(const Duration(hours: 5)),
       likes: 9,
       category: 'question',
+      tags: const ['question'],
       accentColor: 0xFF10B981,
       reactionCounts: const {'\u{1F440}': 11, '\u{1F44D}': 5},
     ),
@@ -277,11 +280,9 @@ class CommunityTabController extends ChangeNotifier {
       createdAt: _showcaseNow.subtract(const Duration(days: 1, hours: 3)),
       likes: 23,
       category: 'campus',
+      tags: const ['campus'],
       accentColor: 0xFFA855F7,
-      reactionCounts: const {
-        '\u{2764}\u{FE0F}': 12,
-        '\u{1F44F}': 4,
-      },
+      reactionCounts: const {'\u{2764}\u{FE0F}': 12, '\u{1F44F}': 4},
     ),
   ];
 

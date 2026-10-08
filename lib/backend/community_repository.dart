@@ -238,28 +238,43 @@ class CommunityRepository {
     return null;
   }
 
-  Future<void> createPost(String content, {String? imageUrl}) async {
-    final localId = await ApiIdentityService.instance.getLocalPersistentId();
+  Future<void> createPost(
+    String content, {
+    String? imageUrl,
+    List<String> tags = const [],
+  }) async {
+    final normalizedContent = content.trim();
+    if (normalizedContent.isEmpty) {
+      throw ArgumentError.value(content, 'content', 'must not be empty');
+    }
 
-    final newPost = CommunityPost(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      authorName:
-          'Yerel Kullanici (${localId.substring(0, localId.length > 20 ? 20 : localId.length)})',
-      authorImage: null,
-      content: content,
-      imageUrl: imageUrl,
-      createdAt: DateTime.now(),
-      likes: 0,
+    final headers = await _requiredAuthorizedHeaders(
+      includeJsonContentType: true,
     );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/posts'),
+          headers: headers,
+          body: jsonEncode({
+            'content': normalizedContent,
+            'imageUrl': imageUrl,
+            'tags': tags,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
 
-    // Optimistic update
-    _cachedPosts.insert(0, newPost);
+    if (response.statusCode != 201) {
+      throw Exception(
+        'Failed to create community post: HTTP ${response.statusCode}',
+      );
+    }
 
-    // Simulate API call
-    // await http.post(...)
-    await Future.delayed(const Duration(milliseconds: 1000));
-
-    // If API call fails, remove from cache and throw error
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map) {
+      _upsertCachedPost(
+        CommunityPost.fromJson(Map<String, dynamic>.from(decoded)),
+      );
+    }
   }
 
   Future<void> setPostLike({
