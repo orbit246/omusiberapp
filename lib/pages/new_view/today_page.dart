@@ -138,7 +138,7 @@ class _TodayPageState extends State<TodayPage> {
 
   List<CommunityPost> get _recentPosts {
     final posts = [..._communityController.posts]
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
     return posts.take(4).toList();
   }
 
@@ -1379,6 +1379,19 @@ class _TodayCommunityCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
+                if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      post.imageUrl!,
+                      height: 82,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 Text(
                   post.content.replaceAll(RegExp(r'[*_#`>\\n]'), ' ').trim(),
                   maxLines: 3,
@@ -1387,7 +1400,7 @@ class _TodayCommunityCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  DateFormat('d MMM, HH:mm', 'tr').format(post.createdAt),
+                  DateFormat('d MMM, HH:mm', 'tr').format(post.publishedAt),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),

@@ -1,3 +1,5 @@
+import 'package:omusiber/backend/constants.dart';
+
 class CommunityPost {
   final String id;
   final String authorName;
@@ -8,6 +10,7 @@ class CommunityPost {
   final String content;
   final String? imageUrl;
   final DateTime createdAt;
+  final DateTime publishedAt;
   final int likes;
   final bool isLiked;
   final PollModel? poll; // Added Poll
@@ -27,6 +30,7 @@ class CommunityPost {
     required this.content,
     this.imageUrl,
     required this.createdAt,
+    DateTime? publishedAt,
     this.likes = 0,
     this.isLiked = false,
     this.poll,
@@ -35,7 +39,7 @@ class CommunityPost {
     this.accentColor,
     this.reactionCounts = const {},
     this.selectedReactions = const {},
-  });
+  }) : publishedAt = publishedAt ?? createdAt;
 
   String get displayAuthorName => useCustomPosterProfile
       ? (posterName?.trim().isNotEmpty == true
@@ -48,18 +52,18 @@ class CommunityPost {
       : null;
 
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
+    final createdAt = _parseDateTime(json['createdAt']);
     return CommunityPost(
       id: _asString(json['id']),
       authorName: _asString(json['authorName'], fallback: 'Anonim'),
-      authorImage: _asNullableString(json['authorImage']),
+      authorImage: _resolveAssetUrl(_asNullableString(json['authorImage'])),
       useCustomPosterProfile: _asBool(json['useCustomPosterProfile']),
       posterName: _asNullableString(json['posterName']),
-      posterImage: _asNullableString(json['posterImage']),
+      posterImage: _resolveAssetUrl(_asNullableString(json['posterImage'])),
       content: _asString(json['content']),
-      imageUrl: _asNullableString(json['imageUrl']),
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      imageUrl: _resolveAssetUrl(_asNullableString(json['imageUrl'])),
+      createdAt: createdAt,
+      publishedAt: _parseDateTime(json['publishedAt'], fallback: createdAt),
       likes: _asInt(json['likes']),
       isLiked: _asBool(json['isLiked']),
       poll: json['poll'] is Map
@@ -87,6 +91,7 @@ class CommunityPost {
     'content': content,
     'imageUrl': imageUrl,
     'createdAt': createdAt.toIso8601String(),
+    'publishedAt': publishedAt.toIso8601String(),
     'likes': likes,
     'isLiked': isLiked,
     'poll': poll?.toJson(),
@@ -107,6 +112,7 @@ class CommunityPost {
     String? content,
     String? imageUrl,
     DateTime? createdAt,
+    DateTime? publishedAt,
     int? likes,
     bool? isLiked,
     PollModel? poll,
@@ -127,6 +133,7 @@ class CommunityPost {
       content: content ?? this.content,
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
+      publishedAt: publishedAt ?? this.publishedAt,
       likes: likes ?? this.likes,
       isLiked: isLiked ?? this.isLiked,
       poll: poll ?? this.poll,
@@ -137,6 +144,24 @@ class CommunityPost {
       selectedReactions: selectedReactions ?? this.selectedReactions,
     );
   }
+}
+
+DateTime _parseDateTime(dynamic value, {DateTime? fallback}) {
+  return value == null
+      ? (fallback ?? DateTime.now())
+      : DateTime.tryParse(value.toString()) ?? (fallback ?? DateTime.now());
+}
+
+String? _resolveAssetUrl(String? value) {
+  if (value == null || value.isEmpty) return value;
+  if (value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:') ||
+      value.startsWith('file:')) {
+    return value;
+  }
+  if (value.startsWith('/')) return '${Constants.baseUrl}$value';
+  return value;
 }
 
 Map<String, int> parseReactionCounts(dynamic value) {

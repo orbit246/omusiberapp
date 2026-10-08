@@ -157,7 +157,7 @@ class CommunityPostCard extends StatelessWidget {
   }
 
   String _buildMetaText(CommunityPost post) {
-    final timeText = _formatTime(post.createdAt);
+    final timeText = _formatTime(post.publishedAt);
     final pollVotes = post.poll?.totalVotes;
     if (pollVotes == null) return timeText;
     return '$timeText • $pollVotes kişi oy verdi';

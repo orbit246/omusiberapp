@@ -141,7 +141,7 @@ class CommunityRepository {
       }
 
       final sortedPosts = apiPosts
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
       if (isFirstPage) {
         if (!jsonListEquals<CommunityPost>(
