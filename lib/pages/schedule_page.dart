@@ -225,7 +225,8 @@ class _SchedulePageState extends State<SchedulePage> {
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppColors.coolGray.withValues(alpha: 0.14),
+              color: AppColors.cardBorder(theme.brightness),
+              width: 1.5,
             ),
           ),
           child: const Column(
@@ -256,7 +257,8 @@ class _SchedulePageState extends State<SchedulePage> {
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: AppColors.coolGray.withValues(alpha: 0.12),
+              color: AppColors.cardBorder(theme.brightness),
+              width: 1.5,
             ),
           ),
           child: const Column(
@@ -392,7 +394,10 @@ class _SchedulePageState extends State<SchedulePage> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.14)),
+        border: Border.all(
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
+        ),
       ),
       child: status.phase == _TodayLessonPhase.noLessons
           ? Row(
@@ -592,7 +597,10 @@ class _SchedulePageState extends State<SchedulePage> {
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.12)),
+          border: Border.all(
+            color: AppColors.cardBorder(theme.brightness),
+            width: 1.5,
+          ),
         ),
         child: Column(
           children: [
@@ -641,7 +649,10 @@ class _SchedulePageState extends State<SchedulePage> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.12)),
+        border: Border.all(
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -1012,7 +1023,7 @@ class _SchedulePageState extends State<SchedulePage> {
         border: Border.all(
           color: isToday
               ? AppColors.primary.withValues(alpha: 0.28)
-              : AppColors.coolGray.withValues(alpha: 0.10),
+              : AppColors.cardBorder(theme.brightness),
         ),
       ),
       child: Column(
@@ -1062,7 +1073,10 @@ class _SchedulePageState extends State<SchedulePage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.70),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.10)),
+        border: Border.all(
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
+        ),
       ),
       child: Center(
         child: Text(
@@ -1206,7 +1220,7 @@ class _SchedulePageState extends State<SchedulePage> {
         border: Border.all(
           color: isToday
               ? AppColors.primary.withValues(alpha: 0.10)
-              : AppColors.coolGray.withValues(alpha: 0.08),
+              : AppColors.cardBorder(theme.brightness),
         ),
       ),
     );
@@ -1990,7 +2004,10 @@ class _ScheduleMomentSkeleton extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.coolGray.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.coolGray.withValues(alpha: 0.12)),
+        border: Border.all(
+          color: AppColors.cardBorder(Theme.of(context).brightness),
+          width: 1.5,
+        ),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,

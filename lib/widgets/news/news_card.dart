@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:omusiber/colors/app_colors.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/news_view.dart';
@@ -33,7 +34,10 @@ class NewsCard extends StatelessWidget {
           colors: [cardBackgroundTop, cardBackground, cardBackgroundBottom],
         ),
         borderRadius: BorderRadius.circular(cardRadius),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),

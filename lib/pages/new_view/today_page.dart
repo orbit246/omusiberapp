@@ -22,6 +22,7 @@ import 'package:omusiber/pages/news_item_page.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/pages/schedule_page.dart';
 import 'package:omusiber/pages/new_view/events_tab_view.dart';
+import 'package:omusiber/colors/app_colors.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 
 class TodayPage extends StatefulWidget {
@@ -1130,7 +1131,13 @@ class _TodayNewsCard extends StatelessWidget {
     final cs = theme.colorScheme;
     return Material(
       color: cs.surfaceContainerHighest.withValues(alpha: 0.78),
-      borderRadius: BorderRadius.circular(22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -1244,7 +1251,13 @@ class _TodayEventCard extends StatelessWidget {
       width: 220,
       child: Material(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: AppColors.cardBorder(theme.brightness),
+            width: 1.5,
+          ),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -1339,7 +1352,13 @@ class _TodayCommunityCard extends StatelessWidget {
       width: 230,
       child: Material(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(18),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: AppColors.cardBorder(theme.brightness),
+            width: 1.5,
+          ),
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(18),
@@ -1387,13 +1406,14 @@ class _TodayCommunityCard extends StatelessWidget {
                       height: 82,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                      errorBuilder: (context, error, stackTrace) =>
+                          const SizedBox.shrink(),
                     ),
                   ),
                   const SizedBox(height: 10),
                 ],
                 Text(
-                  post.content.replaceAll(RegExp(r'[*_#`>\\n]'), ' ').trim(),
+                  _communityPostPreview(post.content),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.3),
@@ -1412,6 +1432,16 @@ class _TodayCommunityCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _communityPostPreview(String content) {
+  return content
+      // Remove markdown decoration without removing ordinary letters.
+      .replaceAll(RegExp(r'[*_#`>]'), '')
+      // Handle both actual line breaks and escaped line breaks from cached data.
+      .replaceAll(RegExp(r'\\n'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
 class _TodayFoodMenuCard extends StatelessWidget {
@@ -1435,7 +1465,13 @@ class _TodayFoodMenuCard extends StatelessWidget {
       width: MediaQuery.sizeOf(context).width - 40,
       child: Material(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(
+            color: AppColors.cardBorder(theme.brightness),
+            width: 1.5,
+          ),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,

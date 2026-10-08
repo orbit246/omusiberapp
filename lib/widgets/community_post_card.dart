@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:omusiber/colors/app_colors.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/backend/view/community_post_model.dart';
 import 'package:omusiber/widgets/poll_widget.dart';
@@ -35,7 +36,10 @@ class CommunityPostCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accent.withValues(alpha: 0.65), width: 1.2),
+        side: BorderSide(
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
+        ),
       ),
       color: theme.cardColor,
       child: Padding(

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:omusiber/colors/app_colors.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
@@ -26,6 +27,7 @@ class EventCard extends StatefulWidget {
     this.isPast = false,
     this.isRegistrationClosed = false,
     this.isExternalRegistration = false,
+    this.onTap,
     // initialExpanded removed as concept is static now
     this.onJoin,
     this.onLike,
@@ -48,6 +50,7 @@ class EventCard extends StatefulWidget {
   final bool isPast;
   final bool isRegistrationClosed;
   final bool isExternalRegistration;
+  final VoidCallback? onTap;
   final VoidCallback? onJoin;
   final ValueChanged<bool>? onLike;
   final VoidCallback? onShare;
@@ -82,358 +85,370 @@ class _EventCardState extends State<EventCard> {
         ? cs.onSurfaceVariant.withValues(alpha: 0.78)
         : cs.onSurfaceVariant;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isPast ? 0.025 : 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.cardBorder(Theme.of(context).brightness),
+            width: 1.5,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // --- 1. Top Image & Date Badge ---
-            Stack(
-              children: [
-                // Keep this image slot mounted at its final size at all times.
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final imageWidth = constraints.maxWidth;
-                      final imageHeight = constraints.maxHeight;
-
-                      if (widget.imageUrl.trim().isEmpty) {
-                        return SizedBox(
-                          width: imageWidth,
-                          height: imageHeight,
-                          child: const _EventImageShimmerPlaceholder(),
-                        );
-                      }
-
-                      final cacheWidth = _imageCacheWidth(context, imageWidth);
-                      final cacheHeight =
-                          (imageHeight *
-                                  MediaQuery.of(context).devicePixelRatio)
-                              .round()
-                              .clamp(1, 4096)
-                              .toInt();
-
-                      return CachedNetworkImage(
-                        imageUrl: widget.imageUrl.trim(),
-                        width: imageWidth,
-                        height: imageHeight,
-                        fit: BoxFit.cover,
-                        color: isPast
-                            ? cs.surface.withValues(alpha: 0.32)
-                            : null,
-                        colorBlendMode: isPast ? BlendMode.saturation : null,
-                        memCacheWidth: cacheWidth,
-                        memCacheHeight: cacheHeight,
-                        maxWidthDiskCache: cacheWidth,
-                        maxHeightDiskCache: cacheHeight,
-                        fadeInDuration: const Duration(milliseconds: 220),
-                        fadeOutDuration: const Duration(milliseconds: 120),
-                        placeholder: (context, url) => SizedBox(
-                          width: imageWidth,
-                          height: imageHeight,
-                          child: const _EventImageShimmerPlaceholder(),
-                        ),
-                        errorWidget: (context, url, error) => SizedBox(
-                          width: imageWidth,
-                          height: imageHeight,
-                          child: const _EventImageShimmerPlaceholder(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                // Gradient Overlay
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.3),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.4],
-                      ),
-                    ),
-                  ),
-                ),
-                // Date Badge
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.surface.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          size: 14,
-                          color: primaryAccent,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          widget.datetimeText,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: titleColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isPast ? 0.025 : 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
-
-            // --- 2. Content Body (Everything visible) ---
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // --- 1. Top Image & Date Badge ---
+              Stack(
                 children: [
-                  // Publisher (if present)
-                  if (widget.publisher != null && widget.publisher!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4.0),
-                      child: Text(
-                        widget.publisher!,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: primaryAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                  // Keep this image slot mounted at its final size at all times.
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final imageWidth = constraints.maxWidth;
+                        final imageHeight = constraints.maxHeight;
 
-                  // Title
-                  Text(
-                    widget.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 18,
-                      height: 1.25,
-                      color: titleColor,
+                        if (widget.imageUrl.trim().isEmpty) {
+                          return SizedBox(
+                            width: imageWidth,
+                            height: imageHeight,
+                            child: const _EventImageShimmerPlaceholder(),
+                          );
+                        }
+
+                        final cacheWidth = _imageCacheWidth(
+                          context,
+                          imageWidth,
+                        );
+                        final cacheHeight =
+                            (imageHeight *
+                                    MediaQuery.of(context).devicePixelRatio)
+                                .round()
+                                .clamp(1, 4096)
+                                .toInt();
+
+                        return CachedNetworkImage(
+                          imageUrl: widget.imageUrl.trim(),
+                          width: imageWidth,
+                          height: imageHeight,
+                          fit: BoxFit.cover,
+                          color: isPast
+                              ? cs.surface.withValues(alpha: 0.32)
+                              : null,
+                          colorBlendMode: isPast ? BlendMode.saturation : null,
+                          memCacheWidth: cacheWidth,
+                          memCacheHeight: cacheHeight,
+                          maxWidthDiskCache: cacheWidth,
+                          maxHeightDiskCache: cacheHeight,
+                          fadeInDuration: const Duration(milliseconds: 220),
+                          fadeOutDuration: const Duration(milliseconds: 120),
+                          placeholder: (context, url) => SizedBox(
+                            width: imageWidth,
+                            height: imageHeight,
+                            child: const _EventImageShimmerPlaceholder(),
+                          ),
+                          errorWidget: (context, url, error) => SizedBox(
+                            width: imageWidth,
+                            height: imageHeight,
+                            child: const _EventImageShimmerPlaceholder(),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(height: 8),
-
-                  // Location
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 16,
-                        color: bodyColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          widget.location,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: bodyColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  // Gradient Overlay
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.3),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.4],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-
-                  // Tags
-                  if (widget.tags.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: widget.tags
-                          .map((t) => _ModernTag(tag: t))
-                          .toList(),
-                    ),
-                  ],
-
-                  // Description (if present)
-                  if (widget.description != null &&
-                      widget.description!.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    AppMarkdownPreview(
-                      data: widget.description!,
-                      maxHeight: 74,
-                      backgroundColor: cardColor,
-                    ),
-                  ],
-
-                  // Stats (Ticket, Capacity)
-                  if (widget.ticketText != null ||
-                      widget.capacityText != null) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        if (widget.ticketText != null)
-                          Expanded(
-                            child: _InfoItem(
-                              icon: Icons.confirmation_number_outlined,
-                              text: widget.ticketText!,
-                              iconColor: primaryAccent,
-                              textColor: bodyColor,
-                            ),
-                          ),
-                        if (widget.capacityText != null)
-                          Expanded(
-                            child: _InfoItem(
-                              icon: Icons.group_outlined,
-                              text: widget.capacityText!,
-                              iconColor: primaryAccent,
-                              textColor: bodyColor,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-
-                  const SizedBox(height: 24),
-
-                  // --- 3. Actions ---
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: widget.isPast
-                              ? widget.onJoin
-                              : (widget.isExternalRegistration
-                                    ? widget.onJoin
-                                    : ((widget.isRegistrationClosed ||
-                                              widget.isJoined)
-                                          ? null
-                                          : widget.onJoin)),
-                          icon: Icon(
-                            widget.isExternalRegistration
-                                ? Icons.open_in_new_rounded
-                                : widget.isPast
-                                ? Icons.info_outline_rounded
-                                : widget.isRegistrationClosed
-                                ? Icons.event_busy_rounded
-                                : (widget.isJoined
-                                      ? Icons.task_alt_rounded
-                                      : Icons.bookmark_add_outlined),
-                          ),
-                          label: Text(
-                            widget.isExternalRegistration
-                                ? "Detaylar"
-                                : widget.isPast
-                                ? "Detaylar"
-                                : (widget.isRegistrationClosed
-                                      ? "Kayıt Kapandı"
-                                      : (widget.isJoined
-                                            ? "Katıldınız"
-                                            : "Katıl / Kayıt Ol")),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                (widget.isJoined ||
-                                    widget.isPast ||
-                                    widget.isRegistrationClosed)
-                                ? (isPast
-                                      ? cs.surfaceContainerHighest
-                                      : cs.primaryContainer)
-                                : null,
-                            foregroundColor:
-                                (widget.isJoined ||
-                                    widget.isPast ||
-                                    widget.isRegistrationClosed)
-                                ? (isPast
-                                      ? cs.onSurfaceVariant
-                                      : cs.onPrimaryContainer)
-                                : null,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
+                  // Date Badge
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                      if (!widget.isPast) ...[
-                        const SizedBox(width: 12),
-                        IconButton.filledTonal(
-                          onPressed: () {
-                            setState(() => _isSaved = !_isSaved);
-                            widget.onLike?.call(_isSaved);
-                          },
-                          icon: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _isSaved
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                '${widget.likeCount}',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: _isSaved
-                                      ? cs.primary
-                                      : cs.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+                      decoration: BoxDecoration(
+                        color: cs.surface.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.filledTonal(
-                          onPressed: () {
-                            if (widget.onShare != null) {
-                              widget.onShare!.call();
-                              return;
-                            }
-
-                            unawaited(
-                              ShareService.sharePlainText(
-                                context,
-                                title: widget.title,
-                                text: _fallbackShareText(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.share_outlined),
-                        ),
-                      ],
-                    ],
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 14,
+                            color: primaryAccent,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            widget.datetimeText,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: titleColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+
+              // --- 2. Content Body (Everything visible) ---
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Publisher (if present)
+                    if (widget.publisher != null &&
+                        widget.publisher!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4.0),
+                        child: Text(
+                          widget.publisher!,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: primaryAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                    // Title
+                    Text(
+                      widget.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        height: 1.25,
+                        color: titleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Location
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 16,
+                          color: bodyColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            widget.location,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: bodyColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Tags
+                    if (widget.tags.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: widget.tags
+                            .map((t) => _ModernTag(tag: t))
+                            .toList(),
+                      ),
+                    ],
+
+                    // Description (if present)
+                    if (widget.description != null &&
+                        widget.description!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      AppMarkdownPreview(
+                        data: widget.description!,
+                        maxHeight: 74,
+                        backgroundColor: cardColor,
+                      ),
+                    ],
+
+                    // Stats (Ticket, Capacity)
+                    if (widget.ticketText != null ||
+                        widget.capacityText != null) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          if (widget.ticketText != null)
+                            Expanded(
+                              child: _InfoItem(
+                                icon: Icons.confirmation_number_outlined,
+                                text: widget.ticketText!,
+                                iconColor: primaryAccent,
+                                textColor: bodyColor,
+                              ),
+                            ),
+                          if (widget.capacityText != null)
+                            Expanded(
+                              child: _InfoItem(
+                                icon: Icons.group_outlined,
+                                text: widget.capacityText!,
+                                iconColor: primaryAccent,
+                                textColor: bodyColor,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+
+                    // --- 3. Actions ---
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: widget.isPast
+                                ? widget.onJoin
+                                : (widget.isExternalRegistration
+                                      ? widget.onJoin
+                                      : ((widget.isRegistrationClosed ||
+                                                widget.isJoined)
+                                            ? null
+                                            : widget.onJoin)),
+                            icon: Icon(
+                              widget.isExternalRegistration
+                                  ? Icons.open_in_new_rounded
+                                  : widget.isPast
+                                  ? Icons.info_outline_rounded
+                                  : widget.isRegistrationClosed
+                                  ? Icons.event_busy_rounded
+                                  : (widget.isJoined
+                                        ? Icons.task_alt_rounded
+                                        : Icons.bookmark_add_outlined),
+                            ),
+                            label: Text(
+                              widget.isExternalRegistration
+                                  ? "Detaylar"
+                                  : widget.isPast
+                                  ? "Detaylar"
+                                  : (widget.isRegistrationClosed
+                                        ? "Kayıt Kapandı"
+                                        : (widget.isJoined
+                                              ? "Katıldınız"
+                                              : "Katıl / Kayıt Ol")),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  (widget.isJoined ||
+                                      widget.isPast ||
+                                      widget.isRegistrationClosed)
+                                  ? (isPast
+                                        ? cs.surfaceContainerHighest
+                                        : cs.primaryContainer)
+                                  : null,
+                              foregroundColor:
+                                  (widget.isJoined ||
+                                      widget.isPast ||
+                                      widget.isRegistrationClosed)
+                                  ? (isPast
+                                        ? cs.onSurfaceVariant
+                                        : cs.onPrimaryContainer)
+                                  : null,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (!widget.isPast) ...[
+                          const SizedBox(width: 12),
+                          IconButton.filledTonal(
+                            onPressed: () {
+                              setState(() => _isSaved = !_isSaved);
+                              widget.onLike?.call(_isSaved);
+                            },
+                            icon: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _isSaved
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  '${widget.likeCount}',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: _isSaved
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            onPressed: () {
+                              if (widget.onShare != null) {
+                                widget.onShare!.call();
+                                return;
+                              }
+
+                              unawaited(
+                                ShareService.sharePlainText(
+                                  context,
+                                  title: widget.title,
+                                  text: _fallbackShareText(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.share_outlined),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

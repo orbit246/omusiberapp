@@ -14,7 +14,7 @@ class AppTheme {
       onSecondary: Colors.black,
       surface: AppColors.surfaceDark,
       error: const Color(0xFFCF6679),
-    );
+    ).copyWith(surfaceContainerHighest: AppColors.surfaceContainerHighestDark);
 
     return _base(scheme).copyWith(
       scaffoldBackgroundColor: AppColors.deepBackground,
@@ -25,7 +25,7 @@ class AppTheme {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+          side: const BorderSide(color: AppColors.cardBorderDark, width: 1.5),
         ),
       ),
 
@@ -49,7 +49,7 @@ class AppTheme {
       onSecondary: Colors.white,
       surface: AppColors.subtleSurface,
       onSurface: const Color(0xFF0F172A), // Slate 900 text
-    );
+    ).copyWith(surfaceContainerHighest: AppColors.surfaceContainerHighestLight);
 
     return _base(scheme).copyWith(
       scaffoldBackgroundColor: AppColors.subtleBackground,
@@ -70,7 +70,7 @@ class AppTheme {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12), // Gentle radius
-          side: BorderSide(color: Colors.grey.shade200, width: 1),
+          side: const BorderSide(color: AppColors.cardBorderLight, width: 1.5),
         ),
       ),
 

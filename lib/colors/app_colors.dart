@@ -25,6 +25,16 @@ class AppColors {
   // Subtle application
   static const Color subtleBackground = Color(0xFFF8FAFC); // Slate 50
   static const Color subtleSurface = Color(0xFFFFFFFF); // Pure White
+
+  // Explicit ColorScheme token used by schedule, news, event, and food cards.
+  static const Color surfaceContainerHighestLight = Color(0xFFE5F4F8);
+  static const Color surfaceContainerHighestDark = Color.fromARGB(255, 23, 37, 70);
+
+  static const Color cardBorderLight = Color(0x33000000);
+  static const Color cardBorderDark = Color(0x55000000);
+
+  static Color cardBorder(Brightness brightness) =>
+      brightness == Brightness.dark ? cardBorderDark : cardBorderLight;
 }
 
 /// Semantic tokens updated to use the new palette

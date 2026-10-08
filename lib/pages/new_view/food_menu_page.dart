@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:omusiber/backend/food_menu_service.dart';
+import 'package:omusiber/colors/app_colors.dart';
 
 class FoodMenuPage extends StatefulWidget {
   const FoodMenuPage({super.key});
@@ -159,10 +160,8 @@ class _FoodMenuPageState extends State<FoodMenuPage> {
             : theme.cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isToday
-              ? colorScheme.primary.withOpacity(0.2)
-              : colorScheme.outlineVariant.withOpacity(0.5),
-          width: 1,
+          color: AppColors.cardBorder(theme.brightness),
+          width: 1.5,
         ),
       ),
       child: Column(

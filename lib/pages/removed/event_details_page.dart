@@ -7,7 +7,6 @@ import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
-import 'package:omusiber/widgets/shared/app_skeleton.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EventDetailsPage extends StatefulWidget {
@@ -20,6 +19,10 @@ class EventDetailsPage extends StatefulWidget {
 }
 
 class _EventDetailsPageState extends State<EventDetailsPage> {
+  // Keep the image provider's cache key stable while the flexible app bar
+  // changes size during a scroll/stretch gesture.
+  static const double _heroImageHeight = 480.0;
+
   final CarouselSliderController _carouselController =
       CarouselSliderController();
   final EventRepository _repo = EventRepository();
@@ -55,8 +58,30 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       if (!imagePath.startsWith('http')) {
         continue;
       }
-      unawaited(precacheImage(CachedNetworkImageProvider(imagePath), context));
+      unawaited(
+        precacheImage(
+          CachedNetworkImageProvider(
+            imagePath,
+            maxWidth: _heroImageCacheWidth(context),
+            maxHeight: _heroImageCacheHeight(context),
+          ),
+          context,
+        ),
+      );
     }
+  }
+
+  int _heroImageCacheWidth(BuildContext context) {
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    return (MediaQuery.sizeOf(context).width * pixelRatio)
+        .round()
+        .clamp(1, 4096)
+        .toInt();
+  }
+
+  int _heroImageCacheHeight(BuildContext context) {
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    return (_heroImageHeight * pixelRatio).round().clamp(1, 4096).toInt();
   }
 
   Future<void> _handleJoinAction() async {
@@ -270,10 +295,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                   ),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
-                  stretchModes: const [
-                    StretchMode.zoomBackground,
-                    StretchMode.blurBackground,
-                  ],
+                  stretchModes: const [StretchMode.zoomBackground],
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -283,7 +305,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         CarouselSlider(
                           carouselController: _carouselController,
                           options: CarouselOptions(
-                            height: 480,
+                            height: _heroImageHeight,
                             viewportFraction: 1.0,
                             enableInfiniteScroll: images.length > 1,
                             autoPlay: images.length > 1,
@@ -492,7 +514,10 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         // Body Content
                         AppMarkdownBody(
                           data: event.description,
-                          selectable: true,
+                          // Selectable markdown captures long-press drags,
+                          // preventing the surrounding CustomScrollView from
+                          // scrolling when the gesture starts in the text.
+                          selectable: false,
                         ),
 
                         // Extra space for FAB
@@ -718,49 +743,39 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   Widget _buildImage(String imagePath) {
     if (imagePath.startsWith('http')) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final mediaQuery = MediaQuery.of(context);
-          final logicalWidth = constraints.maxWidth.isFinite
-              ? constraints.maxWidth
-              : mediaQuery.size.width;
-          final logicalHeight = constraints.maxHeight.isFinite
-              ? constraints.maxHeight
-              : 380.0;
-          final pixelRatio = mediaQuery.devicePixelRatio;
-          final cacheWidth = (logicalWidth * pixelRatio)
-              .round()
-              .clamp(1, 4096)
-              .toInt();
-          final cacheHeight = (logicalHeight * pixelRatio)
-              .round()
-              .clamp(1, 4096)
-              .toInt();
+      final cacheWidth = _heroImageCacheWidth(context);
+      final cacheHeight = _heroImageCacheHeight(context);
 
-          return CachedNetworkImage(
-            imageUrl: imagePath,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            memCacheWidth: cacheWidth,
-            memCacheHeight: cacheHeight,
-            fadeInDuration: const Duration(milliseconds: 220),
-            fadeOutDuration: const Duration(milliseconds: 120),
-            placeholder: (context, url) => AppSkeleton(
-              width: logicalWidth,
-              height: logicalHeight,
-              borderRadius: BorderRadius.zero,
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: const Center(
-                child: Icon(Icons.image_not_supported, size: 50),
-              ),
-            ),
-          );
-        },
+      return CachedNetworkImage(
+        imageUrl: imagePath,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        memCacheWidth: cacheWidth,
+        memCacheHeight: cacheHeight,
+        maxWidthDiskCache: cacheWidth,
+        maxHeightDiskCache: cacheHeight,
+        // The hero is continuously resized by SliverAppBar. A fade or an
+        // animated placeholder is visible as a flash when that happens.
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        useOldImageOnUrlChange: true,
+        placeholder: (context, url) => ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
+        errorWidget: (context, url, error) => ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: const Center(child: Icon(Icons.image_not_supported, size: 50)),
+        ),
       );
     } else {
-      return Image.asset(imagePath, fit: BoxFit.cover, width: double.infinity);
+      return Image.asset(
+        imagePath,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        gaplessPlayback: true,
+      );
     }
   }
 }
