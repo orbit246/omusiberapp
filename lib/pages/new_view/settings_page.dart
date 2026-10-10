@@ -118,6 +118,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _openWhatsappCommunity() async {
+    final uri = Uri.parse('https://chat.whatsapp.com/IJODybf377lGKQTB3ooU9f');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('WhatsApp grubu açılamadı.')),
+      );
+    }
+  }
+
   Future<void> _openCurrentProfile() async {
     final user = _startupController.isFirebaseReady
         ? FirebaseAuth.instance.currentUser
@@ -402,6 +412,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       builder: (context) => const AboutBottomSheet(),
                     );
                   },
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.groups_outlined,
+                  title: "Whatsapp Topluluk Grubu",
+                  subtitle:
+                      "Uygulama güncellemeleri ve geri bildirimler için WhatsApp grubumuza katılın",
+                  onTap: _openWhatsappCommunity,
                 ),
 
                 _buildSettingsTile(
