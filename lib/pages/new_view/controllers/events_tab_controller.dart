@@ -1,37 +1,22 @@
 import 'package:flutter/foundation.dart';
-import 'package:omusiber/backend/app_startup_controller.dart';
-import 'package:omusiber/backend/background_refresh_coordinator.dart';
 import 'package:omusiber/backend/cache_compare.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 
 class EventsTabController extends ChangeNotifier {
-  EventsTabController({
-    EventRepository? repository,
-    AppStartupController? startupController,
-  }) : _repository = repository ?? EventRepository(),
-       _startupController = startupController ?? AppStartupController.instance {
-    _backgroundRefresh = BackgroundRefreshCoordinator(
-      startupController: _startupController,
-      delay: _backgroundRefreshDelay,
-      refresh: refreshInBackground,
-      canRefresh: () => _startupController.canUseAuthenticatedApis,
-    );
-    _startupController.addListener(_handleStartupChanged);
-  }
-
-  static const Duration _backgroundRefreshDelay = Duration(seconds: 4);
+  EventsTabController({EventRepository? repository})
+    : _repository = repository ?? EventRepository();
 
   final EventRepository _repository;
-  final AppStartupController _startupController;
-  late final BackgroundRefreshCoordinator _backgroundRefresh;
 
   final List<PostView> _events = [];
   bool _isInitialLoading = true;
+  bool _isRefreshing = false;
   String? _errorMessage;
 
   List<PostView> get events => List.unmodifiable(_events);
   bool get isInitialLoading => _isInitialLoading;
+  bool get isRefreshing => _isRefreshing;
   String? get errorMessage => _errorMessage;
 
   String _mapErrorMessage(Object error) {
@@ -69,14 +54,20 @@ class EventsTabController extends ChangeNotifier {
       }
     } catch (error) {
       debugPrint("Failed to load initial events cache: $error");
-    } finally {
-      _handleStartupChanged();
     }
+
+    // Events are public, so do not wait for Firebase/auth startup or a
+    // background-refresh timer before asking for the current list.
+    await refreshInBackground();
   }
 
   Future<void> refresh() => refreshInBackground();
 
   Future<void> refreshInBackground() async {
+    if (_isRefreshing) return;
+
+    _isRefreshing = true;
+    notifyListeners();
     try {
       final fresh = await _repository.fetchEvents(
         forceRefresh: true,
@@ -111,6 +102,9 @@ class EventsTabController extends ChangeNotifier {
         _errorMessage = _mapErrorMessage(error);
         notifyListeners();
       }
+    } finally {
+      _isRefreshing = false;
+      notifyListeners();
     }
   }
 
@@ -146,19 +140,5 @@ class EventsTabController extends ChangeNotifier {
     final events = [...fresh];
     _repository.sortEventsByClosestDate(events);
     return events;
-  }
-
-  void _handleStartupChanged() {
-    if (!_startupController.canUseAuthenticatedApis) {
-      return;
-    }
-    _backgroundRefresh.schedule(ignoreStartupDeferral: _events.isEmpty);
-  }
-
-  @override
-  void dispose() {
-    _startupController.removeListener(_handleStartupChanged);
-    _backgroundRefresh.dispose();
-    super.dispose();
   }
 }

@@ -156,8 +156,10 @@ class _EventCardState extends State<EventCard> {
                           memCacheHeight: cacheHeight,
                           maxWidthDiskCache: cacheWidth,
                           maxHeightDiskCache: cacheHeight,
-                          fadeInDuration: const Duration(milliseconds: 220),
-                          fadeOutDuration: const Duration(milliseconds: 120),
+                          // The list already has a loading indicator while it
+                          // refreshes; avoid an extra animation per image.
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
                           placeholder: (context, url) => SizedBox(
                             width: imageWidth,
                             height: imageHeight,
@@ -533,57 +535,21 @@ class _InfoItem extends StatelessWidget {
   }
 }
 
-class _EventImageShimmerPlaceholder extends StatefulWidget {
+class _EventImageShimmerPlaceholder extends StatelessWidget {
   const _EventImageShimmerPlaceholder();
-
-  @override
-  State<_EventImageShimmerPlaceholder> createState() =>
-      _EventImageShimmerPlaceholderState();
-}
-
-class _EventImageShimmerPlaceholderState
-    extends State<_EventImageShimmerPlaceholder>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final base = cs.surfaceContainerHighest;
-    final highlight = cs.surfaceContainerHigh;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final x = -1.0 + (_controller.value * 2.0);
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment(x - 1.0, 0),
-              end: Alignment(x + 1.0, 0),
-              colors: [base, highlight, base],
-              stops: const [0.25, 0.5, 0.75],
-            ).createShader(bounds);
-          },
-          blendMode: BlendMode.srcATop,
-          child: Container(color: base),
-        );
-      },
+    return ColoredBox(
+      color: cs.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.image_outlined,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+          size: 28,
+        ),
+      ),
     );
   }
 }

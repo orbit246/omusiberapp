@@ -11,87 +11,6 @@ import 'package:omusiber/widgets/no_events.dart';
 import 'package:omusiber/widgets/shared/app_skeleton.dart';
 import 'package:omusiber/widgets/shared/content_filter_bar.dart';
 
-class SlideInEntry extends StatefulWidget {
-  const SlideInEntry({
-    super.key,
-    required this.child,
-    this.delay = Duration.zero,
-    this.animate = true,
-  });
-
-  final Widget child;
-  final Duration delay;
-  final bool animate;
-
-  @override
-  State<SlideInEntry> createState() => _SlideInEntryState();
-}
-
-class _SlideInEntryState extends State<SlideInEntry>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _sizeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _offsetAnimation = Tween<Offset>(
-      begin: const Offset(-0.5, 0.0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
-
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-    _sizeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.fastOutSlowIn,
-    );
-
-    if (!widget.animate) {
-      _controller.value = 1.0;
-    } else {
-      _runAnimation();
-    }
-  }
-
-  Future<void> _runAnimation() async {
-    if (widget.delay > Duration.zero) {
-      await Future.delayed(widget.delay);
-    }
-    if (mounted) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.animate) {
-      return widget.child;
-    }
-
-    return SizeTransition(
-      sizeFactor: _sizeAnimation,
-      axisAlignment: -1.0,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(position: _offsetAnimation, child: widget.child),
-      ),
-    );
-  }
-}
-
 class EventsTabView extends StatefulWidget {
   const EventsTabView({super.key});
 
@@ -101,7 +20,6 @@ class EventsTabView extends StatefulWidget {
 
 class _EventsTabViewState extends State<EventsTabView> {
   late final EventsTabController _controller;
-  final Set<String> _hasAnimatedIds = {};
   EventFilters _filters = const EventFilters();
   bool _showBackToTopButton = false;
 
@@ -157,8 +75,8 @@ class _EventsTabViewState extends State<EventsTabView> {
         return EventsTabContent(
           events: _controller.events,
           isInitialLoading: _controller.isInitialLoading,
+          isRefreshing: _controller.isRefreshing,
           errorMessage: _controller.errorMessage,
-          hasAnimatedIds: _hasAnimatedIds,
           filters: _filters,
           showBackToTopButton: _showBackToTopButton,
           onFiltersChanged: (filters) => setState(() => _filters = filters),
@@ -339,8 +257,8 @@ class EventsTabContent extends StatelessWidget {
     super.key,
     required this.events,
     required this.isInitialLoading,
+    required this.isRefreshing,
     required this.errorMessage,
-    required this.hasAnimatedIds,
     required this.filters,
     required this.showBackToTopButton,
     required this.onRefresh,
@@ -354,8 +272,8 @@ class EventsTabContent extends StatelessWidget {
 
   final List<PostView> events;
   final bool isInitialLoading;
+  final bool isRefreshing;
   final String? errorMessage;
-  final Set<String> hasAnimatedIds;
   final EventFilters filters;
   final bool showBackToTopButton;
   final Future<void> Function() onRefresh;
@@ -401,6 +319,8 @@ class EventsTabContent extends StatelessWidget {
                   onFiltersChanged: onFiltersChanged,
                 ),
               ),
+              if (isRefreshing)
+                const SliverToBoxAdapter(child: _EventsRefreshingIndicator()),
               if (events.isEmpty)
                 const SliverFillRemaining(
                   hasScrollBody: false,
@@ -421,24 +341,14 @@ class EventsTabContent extends StatelessWidget {
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final event = visibleEvents[index];
-                    final hasAnimated = hasAnimatedIds.contains(event.id);
-                    final shouldAnimate = !hasAnimated;
-
-                    if (shouldAnimate) {
-                      hasAnimatedIds.add(event.id);
-                    }
-
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
-                      child: SlideInEntry(
+                      child: EventListCard(
                         key: ValueKey(event.id),
-                        animate: shouldAnimate,
-                        child: EventListCard(
-                          event: event,
-                          onLike: (isLiked) => onLike(event, isLiked),
-                          onShare: () => onShare(event),
-                          onOpen: () => onOpenEvent(event),
-                        ),
+                        event: event,
+                        onLike: (isLiked) => onLike(event, isLiked),
+                        onShare: () => onShare(event),
+                        onOpen: () => onOpenEvent(event),
                       ),
                     );
                   }, childCount: visibleEvents.length),
@@ -657,6 +567,36 @@ class _EventFilterSheetState extends State<_EventFilterSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EventsRefreshingIndicator extends StatelessWidget {
+  const _EventsRefreshingIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Yeni etkinlikler kontrol ediliyor…',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
