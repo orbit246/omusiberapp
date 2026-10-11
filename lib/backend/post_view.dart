@@ -32,7 +32,28 @@ class PostView {
 
   bool get isJoined => _isJoined ?? false;
   bool get isLiked => _isLiked ?? false;
-  bool get isRegistrationClosed => _isRegistrationClosed ?? false;
+  bool get hasRegistrationDeadline => registrationEndDate != null;
+  bool get isRegistrationDeadlineBeforeEvent =>
+      registrationEndDate != null &&
+      eventDate != null &&
+      registrationEndDate!.isBefore(eventDate!);
+
+  bool get isRegistrationEnded {
+    final now = DateTime.now();
+    if (registrationEndDate != null && now.isAfter(registrationEndDate!)) {
+      return true;
+    }
+    if (eventDate != null && now.isAfter(eventDate!)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool get isRegistrationClosed =>
+      (_isRegistrationClosed ?? false) ||
+      isCapacityReached ||
+      isRegistrationEnded;
+
   bool get isCapacityReached => _isCapacityReached ?? false;
   String? get registrationUrl => externalSignupUrl ?? redirectTo;
   bool get usesExternalRegistration =>
@@ -147,19 +168,25 @@ class PostView {
     final DateTime? parsedDate = DateTime.tryParse(dateStr);
 
     // Handle registration end date
-    final String regEndDateStr = json['registrationEndDate'] as String? ?? '';
-    final DateTime? parsedRegEndDate = DateTime.tryParse(regEndDateStr);
+    final rawRegEndDate = json['registrationEndDate'];
+    final String regEndDateStr = rawRegEndDate is String
+        ? rawRegEndDate
+        : (rawRegEndDate?.toString() ?? '');
+    final DateTime? parsedRegEndDate =
+        regEndDateStr.isNotEmpty ? DateTime.tryParse(regEndDateStr) : null;
 
     // Handle isRegistrationClosed
-    // Use explicit field if available, otherwise calculate locally if regEndDate is present
+    // Use explicit field if available, and verify client-side deadline and capacity
     final bool capacityReached =
         json['isCapacityReached'] as bool? ??
         (maxJoiners > 0 && currentJoiners >= maxJoiners);
     bool registrationClosed = json['isRegistrationClosed'] as bool? ?? false;
-    registrationClosed = registrationClosed || capacityReached;
-    if (json['isRegistrationClosed'] == null && parsedRegEndDate != null) {
-      registrationClosed = DateTime.now().isAfter(parsedRegEndDate);
-    }
+    final now = DateTime.now();
+    final bool registrationEnded =
+        (parsedRegEndDate != null && now.isAfter(parsedRegEndDate)) ||
+        (parsedDate != null && now.isAfter(parsedDate));
+    registrationClosed =
+        registrationClosed || capacityReached || registrationEnded;
 
     // New stats
     final int views = json['views'] is int ? json['views'] : 0;

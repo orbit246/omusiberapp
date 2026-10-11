@@ -1290,12 +1290,28 @@ class _TodayEventCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      event.tags.isEmpty ? 'Etkinlik' : event.tags.first,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          event.tags.isEmpty ? 'Etkinlik' : event.tags.first,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (event.isRegistrationClosed) ...[
+                          const Spacer(),
+                          Text(
+                            event.isCapacityReached
+                                ? 'Dolu'
+                                : 'Kayıt Kapandı',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 5),
                     Text(

@@ -30,6 +30,17 @@ class EventRegistrationConflictException implements Exception {
   String toString() => message;
 }
 
+class EventRegistrationEndedException implements Exception {
+  const EventRegistrationEndedException([
+    this.message = 'Bu etkinlik için kayıt süresi sona erdi.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class EventRepository {
   static const String _storageKey = 'cached_events_list';
   static final Set<String> _locallyJoinedEventIds = <String>{};
@@ -182,7 +193,7 @@ class EventRepository {
         headers: headers,
       );
 
-      if (response.statusCode == 409) {
+      if (response.statusCode == 409 || response.statusCode == 400) {
         Map<String, dynamic>? errorBody;
         try {
           final decoded = jsonDecode(response.body);
@@ -193,6 +204,14 @@ class EventRepository {
           // Fall through to the status-based error below.
         }
 
+        if (errorBody?['code'] == 'REGISTRATION_ENDED' ||
+            errorBody?['error']
+                ?.toString()
+                .toLowerCase()
+                .contains('ended') ==
+            true) {
+          throw const EventRegistrationEndedException();
+        }
         if (errorBody?['code'] == 'EVENT_FULL') {
           throw const EventRegistrationFullException();
         }

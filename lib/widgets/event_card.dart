@@ -28,6 +28,7 @@ class EventCard extends StatefulWidget {
     this.isRegistrationClosed = false,
     this.isCapacityReached = false,
     this.isExternalRegistration = false,
+    this.registrationDeadlineText,
     this.onTap,
     // initialExpanded removed as concept is static now
     this.onJoin,
@@ -42,6 +43,7 @@ class EventCard extends StatefulWidget {
   final String? durationText;
   final String? ticketText;
   final String? capacityText;
+  final String? registrationDeadlineText;
   final String? description;
   final List<EventTag> tags;
   final String? publisher;
@@ -334,6 +336,28 @@ class _EventCardState extends State<EventCard> {
                                 textColor: bodyColor,
                               ),
                             ),
+                        ],
+                      ),
+                    ],
+
+                    if (widget.registrationDeadlineText != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _InfoItem(
+                              icon: widget.isRegistrationClosed
+                                  ? Icons.event_busy_rounded
+                                  : Icons.timer_outlined,
+                              text: widget.registrationDeadlineText!,
+                              iconColor: (widget.isRegistrationClosed && !isPast)
+                                  ? cs.error
+                                  : primaryAccent,
+                              textColor: (widget.isRegistrationClosed && !isPast)
+                                  ? cs.error
+                                  : bodyColor,
+                            ),
+                          ),
                         ],
                       ),
                     ],

@@ -44,6 +44,7 @@ final List<PostView> mockEvents = [
       'ticketText': "Kayıt Gerekli",
     },
     eventDate: DateTime(2026, 3, 20, 14, 0),
+    registrationEndDate: DateTime(2026, 3, 18, 23, 59),
     isJoined: false,
     isLiked: false,
   ),

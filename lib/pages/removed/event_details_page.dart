@@ -124,6 +124,17 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             const SnackBar(content: Text('Etkinliğe başarıyla katıldınız!')),
           );
         }
+      } on EventRegistrationEndedException {
+        if (mounted) {
+          setState(() {
+            _event = event.copyWith(
+              isRegistrationClosed: true,
+            );
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bu etkinlik için kayıt süresi sona erdi.')),
+          );
+        }
       } on EventRegistrationFullException {
         if (mounted) {
           setState(() {
@@ -134,7 +145,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             );
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kontenjan doldu. KayÄ±t kapandÄ±.')),
+            const SnackBar(content: Text('Kontenjan doldu. Kayıt kapandı.')),
           );
         }
       } on EventRegistrationConflictException {
@@ -243,14 +254,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         ? 'Ücretli'
         : 'Ücretsiz';
 
-    // Human readable date (No year)
-    String datetime = 'Tarih Belirtilmemiş';
-    bool isPast = false;
-
-    if (event.eventDate != null) {
-      final date = event.eventDate!;
-      isPast = date.isBefore(DateTime.now());
-
+    String formatDate(DateTime date) {
       final months = [
         '',
         'Ocak',
@@ -282,7 +286,28 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       final timeStr =
           '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
-      datetime = '${date.day} $monthName $dayName, $timeStr';
+      return '${date.day} $monthName $dayName, $timeStr';
+    }
+
+    // Human readable date (No year)
+    String datetime = 'Tarih Belirtilmemiş';
+    bool isPast = false;
+
+    if (event.eventDate != null) {
+      final date = event.eventDate!;
+      isPast = date.isBefore(DateTime.now());
+      datetime = formatDate(date);
+    }
+
+    String? registrationDeadlineText;
+    if (event.registrationEndDate != null) {
+      final regDate = event.registrationEndDate!;
+      final formatted = formatDate(regDate);
+      if (event.isRegistrationEnded) {
+        registrationDeadlineText = '$formatted (Sona erdi)';
+      } else {
+        registrationDeadlineText = formatted;
+      }
     }
 
     return Scaffold(
@@ -495,7 +520,74 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
+
+                        if (event.hasRegistrationDeadline && event.isRegistrationDeadlineBeforeEvent) ...[
+                          if (event.isRegistrationClosed && !isPast && !event.isCapacityReached)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 20),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: colorScheme.errorContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: colorScheme.error.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline_rounded,
+                                    color: colorScheme.error,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      "Bu etkinlik için son kayıt süresi sona ermiştir. Yeni kayıt alınmamaktadır.",
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.onErrorContainer,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (!event.isRegistrationClosed)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 20),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: colorScheme.primary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.timer_outlined,
+                                    color: colorScheme.primary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      "Dikkat: Kayıtlar etkinlik tarihinden önce, $registrationDeadlineText tarihinde sona erecektir.",
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
 
                         // Info Rows (Location, Date, Ticket)
                         _buildFeatureRow(
@@ -506,6 +598,17 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               ? '$datetime ($duration)'
                               : datetime,
                         ),
+                        if (registrationDeadlineText != null) ...[
+                          const SizedBox(height: 16),
+                          _buildFeatureRow(
+                            context,
+                            event.isRegistrationEnded
+                                ? Icons.event_busy_rounded
+                                : Icons.alarm_rounded,
+                            "Son Kayıt Tarihi",
+                            subtitle: registrationDeadlineText,
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _buildFeatureRow(
                           context,

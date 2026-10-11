@@ -630,10 +630,12 @@ class EventListCard extends StatelessWidget {
     final capacity = (event.maxContributors > 0)
         ? 'Katılımcı: ${event.remainingContributors}/${event.maxContributors}'
         : null;
+    final deadlineText = eventRegistrationDeadlineText(event);
 
     return EventCard(
       title: event.title,
       datetimeText: eventDateText(eventDate),
+      registrationDeadlineText: deadlineText,
       location: event.location,
       imageUrl: imageUrl,
       durationText: duration,
@@ -668,6 +670,16 @@ String? stringFromMeta(PostView event, String key) {
   if (value == null) return null;
   if (value is String && value.trim().isNotEmpty) return value.trim();
   return value.toString();
+}
+
+String? eventRegistrationDeadlineText(PostView event) {
+  final regEnd = event.registrationEndDate;
+  if (regEnd == null) return null;
+  final formatted = eventDateText(regEnd);
+  if (event.isRegistrationEnded) {
+    return 'Son Kayıt: $formatted (Sona erdi)';
+  }
+  return 'Son Kayıt: $formatted';
 }
 
 String eventDateText(DateTime? date) {
