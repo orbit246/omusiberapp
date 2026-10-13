@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:omusiber/colors/app_colors.dart';
+import 'package:omusiber/backend/deep_link_service.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
 import 'package:omusiber/widgets/shared/app_markdown.dart';
@@ -11,6 +12,7 @@ import 'package:omusiber/widgets/shared/app_markdown.dart';
 class EventCard extends StatefulWidget {
   const EventCard({
     super.key,
+    this.eventId,
     required this.title,
     required this.datetimeText,
     required this.location,
@@ -36,6 +38,7 @@ class EventCard extends StatefulWidget {
     this.onShare,
   });
 
+  final String? eventId;
   final String title;
   final String datetimeText;
   final String location;
@@ -491,11 +494,16 @@ class _EventCardState extends State<EventCard> {
   }
 
   String _fallbackShareText() {
+    final link = (widget.eventId != null && widget.eventId!.trim().isNotEmpty)
+        ? AkademizDeepLink.eventUri(widget.eventId!.trim()).toString()
+        : null;
+
     return [
       widget.title,
       widget.datetimeText,
       widget.location,
       widget.description,
+      link,
     ].whereType<String>().where((line) => line.trim().isNotEmpty).join('\n\n');
   }
 }

@@ -42,7 +42,15 @@
                 <data
                     android:scheme="https"
                     android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/events"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
                     android:pathPrefix="/community/post"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/community/posts"/>
                 <data
                     android:scheme="https"
                     android:host="akademiz.nortixlabs.com"
@@ -51,6 +59,14 @@
                     android:scheme="https"
                     android:host="akademiz.nortixlabs.com"
                     android:pathPrefix="/user"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/users"/>
+                <data
+                    android:scheme="https"
+                    android:host="akademiz.nortixlabs.com"
+                    android:pathPrefix="/profile"/>
                 <data
                     android:scheme="https"
                     android:host="akademiz.nortixlabs.com"

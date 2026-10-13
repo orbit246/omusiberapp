@@ -38,6 +38,28 @@ class ShareService {
     );
   }
 
+  static Future<void> shareUserProfile(
+    BuildContext context, {
+    required String uid,
+    required String name,
+  }) {
+    return _shareLink(
+      context,
+      title: '$name - AkademiZ Profil',
+      subject: '$name profilini incele',
+      link: AkademizDeepLink.userUri(uid).toString(),
+    );
+  }
+
+  static Future<void> shareSchedule(BuildContext context) {
+    return _shareLink(
+      context,
+      title: 'AkademiZ Ders Programı',
+      subject: 'Ders Programı',
+      link: AkademizDeepLink.scheduleUri().toString(),
+    );
+  }
+
   static Future<void> sharePlainText(
     BuildContext context, {
     required String title,

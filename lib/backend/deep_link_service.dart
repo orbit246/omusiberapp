@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:omusiber/backend/community_repository.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/news_fetcher.dart';
+import 'package:omusiber/backend/user_profile_service.dart';
 import 'package:omusiber/pages/new_view/community_post_detail_page.dart';
+import 'package:omusiber/pages/new_view/user_profile_page.dart';
 import 'package:omusiber/pages/news_item_page.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
+import 'package:omusiber/pages/schedule_page.dart';
 
-enum DeepLinkCategory { news, events, community }
+enum DeepLinkCategory { news, events, community, user, schedule }
 
 class AkademizDeepLink {
   const AkademizDeepLink({required this.category, required this.id});
@@ -33,11 +36,15 @@ class AkademizDeepLink {
       return _parseSegments([normalizedHost, ...segments]);
     }
 
-    if (normalizedScheme != webScheme) {
+    if (normalizedScheme != webScheme && normalizedScheme != 'http') {
       return null;
     }
 
-    if (normalizedHost == webHost) {
+    if (normalizedHost == webHost ||
+        normalizedHost == 'events.akademiz.nortixlabs.com' ||
+        normalizedHost == 'localhost' ||
+        normalizedHost == '10.0.2.2' ||
+        normalizedHost == '127.0.0.1') {
       return _parseSegments(segments);
     }
 
@@ -73,6 +80,8 @@ class AkademizDeepLink {
     final first = segments.first.toLowerCase();
     if (_isNewsAlias(first)) return DeepLinkCategory.news;
     if (_isEventAlias(first)) return DeepLinkCategory.events;
+    if (_isUserAlias(first)) return DeepLinkCategory.user;
+    if (_isScheduleAlias(first)) return DeepLinkCategory.schedule;
     if (_isCommunityAlias(first)) {
       if (segments.length >= 2 &&
           <String>{'post', 'posts', 'gonderi', 'gonderiler'}
@@ -101,11 +110,28 @@ class AkademizDeepLink {
       value == 'posts' ||
       value == 'topluluk';
 
+  static bool _isUserAlias(String value) =>
+      value == 'user' ||
+      value == 'users' ||
+      value == 'profile' ||
+      value == 'profiles' ||
+      value == 'profil' ||
+      value == 'kullanici';
+
+  static bool _isScheduleAlias(String value) =>
+      value == 'schedule' ||
+      value == 'schedules' ||
+      value == 'ders-programi' ||
+      value == 'program';
+
   static String _extractId(DeepLinkCategory category, List<String> segments) {
     switch (category) {
       case DeepLinkCategory.news:
       case DeepLinkCategory.events:
+      case DeepLinkCategory.user:
         return segments.length >= 2 ? segments[1].trim() : '';
+      case DeepLinkCategory.schedule:
+        return segments.length >= 2 ? segments[1].trim() : 'current';
       case DeepLinkCategory.community:
         if (segments.isEmpty) return '';
         if (_isCommunityAlias(segments.first.toLowerCase()) &&
@@ -130,6 +156,10 @@ class AkademizDeepLink {
           host: webHost,
           path: '/community/post/$id',
         );
+      case DeepLinkCategory.user:
+        return Uri(scheme: webScheme, host: webHost, path: '/user/$id');
+      case DeepLinkCategory.schedule:
+        return Uri(scheme: webScheme, host: webHost, path: '/schedule');
     }
   }
 
@@ -141,6 +171,10 @@ class AkademizDeepLink {
         return Uri(scheme: appScheme, host: 'event', path: '/$id');
       case DeepLinkCategory.community:
         return Uri(scheme: appScheme, host: 'community', path: '/post/$id');
+      case DeepLinkCategory.user:
+        return Uri(scheme: appScheme, host: 'user', path: '/$id');
+      case DeepLinkCategory.schedule:
+        return Uri(scheme: appScheme, host: 'schedule');
     }
   }
 
@@ -153,6 +187,13 @@ class AkademizDeepLink {
 
   static Uri communityPostUri(String id) =>
       AkademizDeepLink(category: DeepLinkCategory.community, id: id)
+          .toWebUri();
+
+  static Uri userUri(String uid) =>
+      AkademizDeepLink(category: DeepLinkCategory.user, id: uid).toWebUri();
+
+  static Uri scheduleUri() =>
+      const AkademizDeepLink(category: DeepLinkCategory.schedule, id: 'current')
           .toWebUri();
 }
 
@@ -267,6 +308,11 @@ class _DeepLinkResolverPageState extends State<_DeepLinkResolverPage> {
       case DeepLinkCategory.community:
         final post = await CommunityRepository().fetchPostById(widget.link.id);
         return post == null ? null : CommunityPostDetailPage(post: post);
+      case DeepLinkCategory.user:
+        final profile = await UserProfileService().fetchUserProfile(widget.link.id);
+        return profile == null ? null : UserProfilePage(profile: profile);
+      case DeepLinkCategory.schedule:
+        return const SchedulePage();
     }
   }
 

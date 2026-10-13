@@ -633,6 +633,7 @@ class EventListCard extends StatelessWidget {
     final deadlineText = eventRegistrationDeadlineText(event);
 
     return EventCard(
+      eventId: event.id,
       title: event.title,
       datetimeText: eventDateText(eventDate),
       registrationDeadlineText: deadlineText,
