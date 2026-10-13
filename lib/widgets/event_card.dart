@@ -36,6 +36,7 @@ class EventCard extends StatefulWidget {
     this.onJoin,
     this.onLike,
     this.onShare,
+    this.onSyncCalendar,
   });
 
   final String? eventId;
@@ -61,6 +62,7 @@ class EventCard extends StatefulWidget {
   final VoidCallback? onJoin;
   final ValueChanged<bool>? onLike;
   final VoidCallback? onShare;
+  final VoidCallback? onSyncCalendar;
 
   @override
   State<EventCard> createState() => _EventCardState();
@@ -472,6 +474,14 @@ class _EventCardState extends State<EventCard> {
                             },
                             icon: const Icon(Icons.share_outlined),
                           ),
+                          if (widget.onSyncCalendar != null) ...[
+                            const SizedBox(width: 8),
+                            IconButton.filledTonal(
+                              onPressed: widget.onSyncCalendar,
+                              icon: const Icon(Icons.event_available_rounded),
+                              tooltip: 'Takvime Ekle',
+                            ),
+                          ],
                         ],
                       ],
                     ),

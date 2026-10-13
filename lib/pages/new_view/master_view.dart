@@ -7,6 +7,7 @@ import 'package:omusiber/backend/notifications/notification_navigation_intent.da
 import 'package:omusiber/backend/notifications/simple_push.dart';
 import 'package:omusiber/backend/tab_badge_service.dart';
 import 'package:omusiber/backend/startup_logger.dart';
+import 'package:omusiber/pages/new_view/events_calendar_page.dart';
 import 'package:omusiber/pages/new_view/events_tab_view.dart';
 import 'package:omusiber/pages/new_view/news_tab_view.dart';
 import 'package:omusiber/pages/new_view/notifications_tab_view.dart';
@@ -737,6 +738,21 @@ class _MasterViewState extends State<MasterView>
                   ),
                 ),
                 actions: [
+                  if (_tabController.index == 2)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _buildShellButton(
+                        context: context,
+                        icon: Icons.calendar_month_rounded,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const EventsCalendarPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: _buildShellButton(

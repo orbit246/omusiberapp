@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:omusiber/backend/app_startup_controller.dart';
+import 'package:omusiber/backend/constants.dart';
 
 class PostView {
   final String id;
@@ -62,6 +63,37 @@ class PostView {
     final raw = metadata['likes'];
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '') ?? 0;
+  }
+
+  String get effectiveImageUrl {
+    if (thubnailUrl.trim().isNotEmpty) {
+      return thubnailUrl.trim();
+    }
+    for (final link in imageLinks) {
+      if (link.trim().isNotEmpty) {
+        return link.trim();
+      }
+    }
+    const metaKeys = [
+      'thumbnailFullUrl',
+      'thumbnailUrl',
+      'thumbnail',
+      'imageUrl',
+      'image',
+      'bannerUrl',
+      'posterUrl',
+      'heroImage',
+    ];
+    for (final key in metaKeys) {
+      final val = metadata[key];
+      if (val != null) {
+        final s = val.toString().trim();
+        if (s.isNotEmpty) {
+          return s;
+        }
+      }
+    }
+    return '';
   }
 
   PostView({
@@ -126,6 +158,18 @@ class PostView {
     List<String> imagesList = parseList(json['carouselImageFullUrls']);
     if (imagesList.isEmpty) {
       imagesList = parseList(json['carouselImages']);
+    }
+    if (imagesList.isEmpty) {
+      imagesList = parseList(json['corouselImageFullUrls']);
+    }
+    if (imagesList.isEmpty) {
+      imagesList = parseList(json['corouselImages']);
+    }
+    if (imagesList.isEmpty) {
+      imagesList = parseList(json['images']);
+    }
+    if (imagesList.isEmpty) {
+      imagesList = parseList(json['imageLinks']);
     }
 
     final joinersList = parseList(json['joiners']);
@@ -197,6 +241,42 @@ class PostView {
     if (thumb.isEmpty) {
       thumb = json['thumbnailUrl'] as String? ?? '';
     }
+    if (thumb.isEmpty) {
+      thumb = json['thumbnail'] as String? ?? '';
+    }
+    if (thumb.isEmpty) {
+      thumb = json['imageUrl'] as String? ?? '';
+    }
+    if (thumb.isEmpty) {
+      thumb = json['image'] as String? ?? '';
+    }
+    if (thumb.isEmpty) {
+      thumb = json['thubnailUrl'] as String? ?? '';
+    }
+
+    String resolveUrl(String url) {
+      final trimmed = url.trim();
+      if (trimmed.isEmpty) return '';
+      if (trimmed.startsWith('http://') ||
+          trimmed.startsWith('https://') ||
+          trimmed.startsWith('data:') ||
+          trimmed.startsWith('file:') ||
+          trimmed.startsWith('assets/')) {
+        return trimmed;
+      }
+      if (trimmed.startsWith('/')) {
+        return '${Constants.baseUrl}$trimmed';
+      }
+      if (!trimmed.contains('://')) {
+        return '${Constants.baseUrl}/$trimmed';
+      }
+      return trimmed;
+    }
+
+    if (thumb.isNotEmpty) {
+      thumb = resolveUrl(thumb);
+    }
+    imagesList = imagesList.map(resolveUrl).where((e) => e.isNotEmpty).toList();
 
     return PostView(
       // API sends ID as int, we convert to String for consistency

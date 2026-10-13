@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/calendar_sync_service.dart';
+import 'package:omusiber/backend/constants.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
 import 'package:omusiber/pages/new_view/controllers/events_tab_controller.dart';
+import 'package:omusiber/pages/new_view/events_calendar_page.dart';
 import 'package:omusiber/pages/removed/event_details_page.dart';
 import 'package:omusiber/widgets/event_card.dart';
 import 'package:omusiber/widgets/event_components/event_tag.dart';
@@ -91,6 +94,15 @@ class _EventsTabViewState extends State<EventsTabView> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => EventDetailsPage(event: event)),
+            );
+          },
+          onOpenCalendar: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    EventsCalendarPage(initialEvents: _controller.events),
+              ),
             );
           },
         );
@@ -268,6 +280,7 @@ class EventsTabContent extends StatelessWidget {
     required this.onLike,
     required this.onShare,
     required this.onOpenEvent,
+    required this.onOpenCalendar,
   });
 
   final List<PostView> events;
@@ -283,6 +296,7 @@ class EventsTabContent extends StatelessWidget {
   final void Function(PostView event, bool isLiked) onLike;
   final ValueChanged<PostView> onShare;
   final ValueChanged<PostView> onOpenEvent;
+  final VoidCallback onOpenCalendar;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +331,7 @@ class EventsTabContent extends StatelessWidget {
                 child: _EventFilterBar(
                   filters: filters,
                   onFiltersChanged: onFiltersChanged,
+                  onOpenCalendar: onOpenCalendar,
                 ),
               ),
               if (isRefreshing)
@@ -349,6 +364,12 @@ class EventsTabContent extends StatelessWidget {
                         onLike: (isLiked) => onLike(event, isLiked),
                         onShare: () => onShare(event),
                         onOpen: () => onOpenEvent(event),
+                        onSyncCalendar: () => unawaited(
+                          CalendarSyncService.syncEventToCalendar(
+                            context,
+                            event,
+                          ),
+                        ),
                       ),
                     );
                   }, childCount: visibleEvents.length),
@@ -374,10 +395,12 @@ class _EventFilterBar extends StatelessWidget {
   const _EventFilterBar({
     required this.filters,
     required this.onFiltersChanged,
+    required this.onOpenCalendar,
   });
 
   final EventFilters filters;
   final ValueChanged<EventFilters> onFiltersChanged;
+  final VoidCallback onOpenCalendar;
 
   Future<void> _openFilterSheet(BuildContext context) async {
     final result = await showModalBottomSheet<EventFilters>(
@@ -399,6 +422,7 @@ class _EventFilterBar extends StatelessWidget {
       selectedItems: filters.selectedFilterLabels,
       onOpen: () => _openFilterSheet(context),
       onClear: () => onFiltersChanged(const EventFilters()),
+      onOpenCalendar: onOpenCalendar,
     );
   }
 }
@@ -609,12 +633,14 @@ class EventListCard extends StatelessWidget {
     required this.onLike,
     required this.onShare,
     required this.onOpen,
+    required this.onSyncCalendar,
   });
 
   final PostView event;
   final ValueChanged<bool> onLike;
   final VoidCallback onShare;
   final VoidCallback onOpen;
+  final VoidCallback onSyncCalendar;
 
   @override
   Widget build(BuildContext context) {
@@ -656,14 +682,29 @@ class EventListCard extends StatelessWidget {
       onJoin: onOpen,
       onLike: onLike,
       onShare: onShare,
+      onSyncCalendar: onSyncCalendar,
     );
   }
 }
 
 String eventImageUrl(PostView event) {
-  return event.thubnailUrl.trim().isNotEmpty
-      ? event.thubnailUrl.trim()
-      : (event.imageLinks.isNotEmpty ? event.imageLinks.first.trim() : '');
+  final url = event.effectiveImageUrl.trim();
+  if (url.isEmpty) return '';
+  if (url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      url.startsWith('data:') ||
+      url.startsWith('file:') ||
+      url.startsWith('assets/') ||
+      url.startsWith('asset:')) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return '${Constants.baseUrl}$url';
+  }
+  if (!url.contains('://')) {
+    return '${Constants.baseUrl}/$url';
+  }
+  return url;
 }
 
 String? stringFromMeta(PostView event, String key) {

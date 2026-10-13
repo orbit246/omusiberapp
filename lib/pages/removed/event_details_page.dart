@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:omusiber/backend/calendar_sync_service.dart';
 import 'package:omusiber/backend/event_repository.dart';
 import 'package:omusiber/backend/post_view.dart';
 import 'package:omusiber/backend/share_service.dart';
@@ -597,6 +598,31 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           subtitle: duration != null
                               ? '$datetime ($duration)'
                               : datetime,
+                          trailing: (event.eventDate != null)
+                              ? OutlinedButton.icon(
+                                  onPressed: () => unawaited(
+                                    CalendarSyncService.syncEventToCalendar(
+                                      context,
+                                      event,
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.event_available_rounded,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Takvime Ekle'),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                )
+                              : null,
                         ),
                         if (registrationDeadlineText != null) ...[
                           const SizedBox(height: 16),
@@ -693,6 +719,18 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                             unawaited(ShareService.shareEvent(context, event)),
                         icon: const Icon(Icons.share_outlined),
                         tooltip: 'Paylaş',
+                      ),
+                      const SizedBox(width: 4),
+                      // Add to Calendar
+                      IconButton(
+                        onPressed: () => unawaited(
+                          CalendarSyncService.syncEventToCalendar(
+                            context,
+                            event,
+                          ),
+                        ),
+                        icon: const Icon(Icons.event_available_rounded),
+                        tooltip: 'Takvime Ekle',
                       ),
                       const SizedBox(width: 4),
                       // Like
@@ -832,6 +870,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     IconData icon,
     String title, {
     String? subtitle,
+    Widget? trailing,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -870,6 +909,10 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             ],
           ),
         ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing,
+        ],
       ],
     );
   }

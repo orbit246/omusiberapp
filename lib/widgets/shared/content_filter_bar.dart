@@ -10,6 +10,7 @@ class ContentFilterBar extends StatelessWidget {
     this.selectedItems = const <String>[],
     this.onClear,
     this.isLoading = false,
+    this.onOpenCalendar,
   });
 
   final String sortLabel;
@@ -19,6 +20,7 @@ class ContentFilterBar extends StatelessWidget {
   final List<String> selectedItems;
   final VoidCallback? onClear;
   final bool isLoading;
+  final VoidCallback? onOpenCalendar;
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +140,13 @@ class ContentFilterBar extends StatelessWidget {
                           onTap: onOpen,
                           active: hasActiveFilters,
                         ),
+                        if (onOpenCalendar != null) ...[
+                          const SizedBox(width: 8),
+                          _CalendarPill(
+                            label: 'Takvim',
+                            onTap: onOpenCalendar!,
+                          ),
+                        ],
                         if (hasActiveFilters && onClear != null) ...[
                           const SizedBox(width: 8),
                           Material(
@@ -277,6 +286,71 @@ class _FilterPill extends StatelessWidget {
                 Icons.keyboard_arrow_down_rounded,
                 size: 18,
                 color: active ? Colors.white : Colors.white70,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarPill extends StatelessWidget {
+  const _CalendarPill({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const accentColor = Color(0xFF3D6DFF);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF1E3A8A),
+                Color(0xFF2563EB),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: accentColor.withValues(alpha: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.28),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.calendar_month_rounded,
+                size: 17,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
